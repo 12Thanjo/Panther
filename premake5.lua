@@ -213,7 +213,8 @@ filter {}
 ------------------------------------------------------------------------------
 -- projects
 
-include "./src/premake5_main.lua"
+include "./src/premake5_panther.lua"
+include "./cli/premake5_cli.lua"
 
 
 ------------------------------------------------------------------------------

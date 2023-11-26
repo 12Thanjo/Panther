@@ -1,7 +1,7 @@
 -- premake5
 
 
-project "Main"
+project "CLI"
 	kind "ConsoleApp"
 	-- staticruntime "On"
 	
@@ -19,11 +19,13 @@ project "Main"
 	includedirs{
 		(config.location .. "/libs"),
 
+		"../include/",
 		"./",
 	}
 
 	links{
 		"Evo",
+		"Panther",
 	}
 
 
