@@ -1,9 +1,23 @@
 _ident1
 ident_2
+#attr
 // line comment
 
 /*
 /*asdf*/
 
-
 rando
+*/
+
+@intrc
+
+true
+false
+
+var foo : Int ;
+def
+struct
+enum
+
+"as\tdf"
+'w'

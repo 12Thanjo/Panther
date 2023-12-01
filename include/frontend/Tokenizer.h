@@ -23,6 +23,8 @@ namespace panther{
 			EVO_NODISCARD auto tokenize_whitespace() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_comment() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_ident() noexcept -> bool;
+			EVO_NODISCARD auto tokenize_punctuation() noexcept -> bool;
+			EVO_NODISCARD auto tokenize_string_literal() noexcept -> bool;
 
 
 		
@@ -34,10 +36,13 @@ namespace panther{
 
 				union Value{
 					size_t index;
-					
+					bool boolean;
+					// might be undef
 				} value;
 
-				TokenData(Token::Kind token_kind, size_t index_val) : kind(token_kind), value(index_val) {};
+				explicit TokenData(Token::Kind token_kind, size_t index_val) : kind(token_kind), value(index_val) {};
+				explicit TokenData(Token::Kind token_kind, bool bool_val) : kind(token_kind), value(bool_val) {};
+				explicit TokenData(Token::Kind token_kind) : kind(token_kind) {};
 			};
 
 			std::vector<TokenData> tokens{};
@@ -48,15 +53,20 @@ namespace panther{
 	};
 
 
+	struct TokenID{ uint32_t id; };
+
 
 	class TokenizerReader{
 		public:
 			TokenizerReader(Tokenizer& _tokenizer) : tokenizer(_tokenizer) {};
 			~TokenizerReader() = default;
 
-			auto print() noexcept -> void;
 
-	
+			EVO_NODISCARD auto getStringValue(TokenID id) const noexcept -> const std::string&;
+
+
+			auto print() const noexcept -> void;
+
 		private:
 			Tokenizer& tokenizer;
 	};

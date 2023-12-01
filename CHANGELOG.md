@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.0.3
+- Added to Tokenizing
+	- Intrinics
+	- Attributes
+	- bool literals
+	- string/char literals
+	- Keywords
+- Added to README (goals, etc.)
 
 ### v0.0.2
 - Added Tokens
