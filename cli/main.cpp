@@ -4,12 +4,24 @@
 
 #include "frontend/SourceManager.h"
 #include "frontend/CharStream.h"
+#include "frontend/Tokenizer.h"
 
 
+
+auto end_early(bool cond) noexcept -> void {
+	if(cond == false){
+		evo::logError("Failed to compile");
+		evo::logTrace("Press Enter to close...");
+
+		std::cin.get();
+
+		std::exit(1);
+	}
+};
 
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexcept -> int {
-	evo::log("Panther:\n");
+	// evo::log("Panther:\n");
 
 
 	std::string const test_file_path = "./testing/test.pthr";
@@ -29,10 +41,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	auto char_stream = panther::CharStream{source_manager, src_id};
 
+	auto tokenizer = panther::Tokenizer{char_stream};
+	const bool tokenize_successful = tokenizer.tokenize();
 
-	while(char_stream.is_eof() == false){
-		evo::logInfo(evo::printCharName(char_stream.next()));
-	};
+	end_early(tokenize_successful);
+
+
+	auto tokenizer_reader = panther::TokenizerReader{tokenizer};
+	tokenizer_reader.print();
 
 
 

@@ -28,9 +28,20 @@ namespace panther{
 
 
 			auto error(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
+			auto error_info(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
 			auto fatal(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
 
-	
+
+			inline auto errored() const noexcept -> bool { return this->has_errored; };
+
+
+		private:
+			enum class MessageType{
+				Error,
+				ErrorInfo,
+			};
+			auto print_location(MessageType type, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
+
 		private:
 			std::vector<SourceFile> sources{};
 
