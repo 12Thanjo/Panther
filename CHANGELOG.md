@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.0.4
+- Reordered README sections
+- Updated goals in README
+- Added logo / icon
+	- Added logo to README
+
 ### v0.0.3
 - Added to Tokenizing
 	- Intrinics

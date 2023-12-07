@@ -38,7 +38,7 @@ namespace panther{
 
 			///////////////////////////////////
 			// operators
-
+			
 
 
 
