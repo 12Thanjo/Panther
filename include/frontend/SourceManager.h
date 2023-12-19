@@ -28,6 +28,7 @@ namespace panther{
 
 
 			auto error(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
+			auto error_info(const std::string& message) noexcept -> void;
 			auto error_info(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
 			auto fatal(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
 

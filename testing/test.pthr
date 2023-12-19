@@ -1,6 +1,12 @@
 _ident1
 ident_2
 #attr
+
+"hello world
+
+asdofpj
+"
+
 // line comment
 
 /*
@@ -10,14 +16,23 @@ rando
 */
 
 @intrc
+    
+    0b101011
+    0x00ccff
+    10_000
+    0o775
+
+    1002.3000000000
+
+    300000.0
+
 
 true
 false
 
-var foo : Int ;
+var foo : 
 def
 struct
 enum
 
-"as\tdf"
-'w'
+

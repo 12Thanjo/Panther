@@ -1,5 +1,14 @@
 # Changelog
 
+### v0.0.5
+- Added tokenizing of number literals
+	- integers
+	- floating-point
+	- binary, octal, and hex
+	- exponents (positive and negative)
+	- underscores as separators (`10_000`)
+	- checking that the number fits in a `UI64` or `F128` for integers and floating-points respectively
+
 ### v0.0.4
 - Reordered README sections
 - Updated goals in README

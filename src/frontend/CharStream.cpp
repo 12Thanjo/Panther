@@ -65,6 +65,10 @@ namespace panther{
 		this->src_manager.error(message, this->src_id, line, collumn);
 	};
 
+	auto CharStream::error_info(const std::string& message) const noexcept -> void {
+		this->src_manager.error_info(message);
+	};
+
 	auto CharStream::error_info(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void {
 		this->src_manager.error_info(message, this->src_id, line, collumn);
 	};

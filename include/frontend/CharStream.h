@@ -39,6 +39,7 @@ namespace panther{
 
 
 			auto error(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;
+			auto error_info(const std::string& message) const noexcept -> void;
 			auto error_info(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;
 			auto fatal(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;
 

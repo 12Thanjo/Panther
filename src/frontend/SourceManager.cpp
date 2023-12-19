@@ -29,10 +29,15 @@ namespace panther{
 		this->print_location(MessageType::Error, id, line, collumn);
 	};
 
+	auto SourceManager::error_info(const std::string& message) noexcept -> void {
+		evo::logInfo('\t' + message);
+	};
+	
 	auto SourceManager::error_info(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
 		evo::logInfo('\t' + message);
 		this->print_location(MessageType::ErrorInfo, id, line, collumn);
 	};
+
 
 
 

@@ -22,7 +22,8 @@ namespace panther{
 			LiteralBool,
 			LiteralString,
 			LiteralChar,
-			// LiteralInt,
+			LiteralInt,
+			LiteralFloat,
 
 
 			///////////////////////////////////
@@ -39,7 +40,7 @@ namespace panther{
 			///////////////////////////////////
 			// operators
 			
-
+			
 
 
 			///////////////////////////////////
