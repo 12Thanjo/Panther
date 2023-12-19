@@ -25,22 +25,118 @@ namespace panther{
 			LiteralInt,
 			LiteralFloat,
 
+			LiteralNull,
+
+
+			///////////////////////////////////
+			// types
+
+			TypeBool,
+
+			TypeInt,
+			TypeIntN,
+			TypeUInt,
+			TypeUIntN,
+
+			TypeF16,
+			TypeF32,
+			TypeF64,
+			TypeF128,
+
+			TypeUSize,
+			TypeRawptr,
+			TypeBool32,
+
+			TypeCInt,
+			TypeCUInt,
+
+
 
 			///////////////////////////////////
 			// keywords
 
 			KeywordVar,
 			KeywordDef,
+
 			KeywordFunc,
 			KeywordStruct,
 			KeywordEnum,
 			KeywordUnion,
+			KeywordFlags,
+
+			KeywordIf,
+			KeywordElse,
+			KeywordDo,
+			KeywordWhile,
+			KeywordSwitch,
+			KeywordCase,
+			KeywordDefault,
+
+			KeywordCopy,
+			KeywordMove,
+			KeywordAddr,
+			KeywordAs,
+			KeywordCast,
+			KeywordUninit,
+
+			KeywordRead,
+			KeywordWrite,
+			KeywordIn,
+
+			KeywordReturn,
+			KeywordError,
+			KeywordDefer,
+			KeywordBreak,
+
+			KeywordTry,
+			KeywordCatch,
+
+			KeywordThis,
+			KeywordUnderscore,
+
 
 
 			///////////////////////////////////
 			// operators
 			
+			Equals, // =
+
+			Accessor, // .
+			Dereference, // .*
+			Unwrap, // .?
+
+			Plus, // +
+			Minus, // -
+			Asterisk, // *
+			ForwardSlash, // /
+			Percent, // %
+
+			PlusEquals, // +=
+			MinusEquals, // -=
+			TimesEquals, // *=
+			DivideEquals, // /=
+			ModEquals, // %=
+
+			LessThan, // <
+			LessThanEqual, // <=
+			GreaterThan, // >
+			GreaterThanEqual, // >=
+			LogicalEquals, // ==
+			LogicalNotEquals, // !=
+
+
+			LogicalAnd, // &&
+			LogicalOr, // ||
+
+			BitwiseAnd, // &
+			BitwiseOr, // |
+			BitwiseNot, // ~
 			
+			BitshiftLeft, // <<
+			BitshiftRight, // >>
+
+
+			LeftArrow, // ->
 
 
 			///////////////////////////////////

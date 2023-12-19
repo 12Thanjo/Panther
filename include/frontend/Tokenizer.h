@@ -24,6 +24,7 @@ namespace panther{
 			EVO_NODISCARD auto tokenize_comment() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_ident() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_punctuation() noexcept -> bool;
+			EVO_NODISCARD auto tokenize_operators() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_number_literal() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_string_literal() noexcept -> bool;
 
@@ -42,14 +43,14 @@ namespace panther{
 					bool boolean;
 
 					uint64_t integer;
-					long double floating_point;
+					float128_t floating_point;
 
 					// might be undef
 				} value;
 
 				explicit TokenData(Token::Kind token_kind, size_t index_val) : kind(token_kind), value(index_val) {};
 				explicit TokenData(Token::Kind token_kind, bool bool_val) : kind(token_kind), value(bool_val) {};
-				explicit TokenData(Token::Kind token_kind, long double double_val) : kind(token_kind) { this->value.floating_point = double_val; };
+				explicit TokenData(Token::Kind token_kind, float128_t double_val) : kind(token_kind) { this->value.floating_point = double_val; };
 				explicit TokenData(Token::Kind token_kind) : kind(token_kind) {};
 			};
 

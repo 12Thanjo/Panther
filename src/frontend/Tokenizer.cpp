@@ -12,6 +12,7 @@ namespace panther{
 			if(this->tokenize_comment()){ continue; }
 			if(this->tokenize_ident()){ continue; }
 			if(this->tokenize_punctuation()){ continue; }
+			if(this->tokenize_operators()){ continue; }
 			if(this->tokenize_number_literal()){ continue; }
 			if(this->tokenize_string_literal()){ continue; }
 
@@ -94,6 +95,9 @@ namespace panther{
 	auto Tokenizer::tokenize_ident() noexcept -> bool {
 		auto kind = Token::Kind::None;
 
+		const uint32_t ident_beginning_line = this->stream.get_line();
+		const uint32_t ident_beginning_collumn = this->stream.get_collumn();
+
 
 		if(evo::isLetter(this->stream.peek()) || this->stream.peek() == '_'){
 			kind = Token::Kind::Ident;
@@ -123,21 +127,156 @@ namespace panther{
 
 
 		if(kind == Token::Kind::Ident){
+
+			///////////////////////////////////
+			// literals
+
 			     if(ident_name == "true"){ this->tokens.emplace_back(Token::Kind::LiteralBool, true); }
 			else if(ident_name == "false"){ this->tokens.emplace_back(Token::Kind::LiteralBool, false); }
+			else if(ident_name == "null"){ this->tokens.emplace_back(Token::Kind::LiteralNull, false); }
+
+
+			///////////////////////////////////
+			// types
+
+			else if(ident_name == "Bool") { this->tokens.emplace_back(Token::Kind::TypeBool); }
+
+			else if(ident_name == "Int")   { this->tokens.emplace_back(Token::Kind::TypeInt);   }
+			else if(ident_name == "UInt")  { this->tokens.emplace_back(Token::Kind::TypeUInt);  }
+
+			else if(ident_name == "F16")  { this->tokens.emplace_back(Token::Kind::TypeF16);  }
+			else if(ident_name == "F32")  { this->tokens.emplace_back(Token::Kind::TypeF32);  }
+			else if(ident_name == "F64")  { this->tokens.emplace_back(Token::Kind::TypeF64);  }
+			else if(ident_name == "F128") { this->tokens.emplace_back(Token::Kind::TypeF128); }
+
+			else if(ident_name == "USize") { this->tokens.emplace_back(Token::Kind::TypeUSize); }
+			else if(ident_name == "Rawptr") { this->tokens.emplace_back(Token::Kind::TypeRawptr); }
+			else if(ident_name == "Bool32") { this->tokens.emplace_back(Token::Kind::TypeBool32); }
+
+			else if(ident_name == "CInt") { this->tokens.emplace_back(Token::Kind::TypeCInt); }
+			else if(ident_name == "CUInt") { this->tokens.emplace_back(Token::Kind::TypeCUInt); }
+
+
+			///////////////////////////////////
+			// keywords
 
 			else if(ident_name == "var")    { this->tokens.emplace_back(Token::Kind::KeywordVar);    }
 			else if(ident_name == "def")    { this->tokens.emplace_back(Token::Kind::KeywordDef);    }
+
 			else if(ident_name == "func")   { this->tokens.emplace_back(Token::Kind::KeywordFunc);   }
 			else if(ident_name == "struct") { this->tokens.emplace_back(Token::Kind::KeywordStruct); }
 			else if(ident_name == "enum")   { this->tokens.emplace_back(Token::Kind::KeywordEnum);   }
 			else if(ident_name == "union")  { this->tokens.emplace_back(Token::Kind::KeywordUnion);  }
+			else if(ident_name == "flags")  { this->tokens.emplace_back(Token::Kind::KeywordFlags);  }
+
+			else if(ident_name == "if")      { this->tokens.emplace_back(Token::Kind::KeywordIf);      }
+			else if(ident_name == "else")    { this->tokens.emplace_back(Token::Kind::KeywordElse);    }
+			else if(ident_name == "do")      { this->tokens.emplace_back(Token::Kind::KeywordDo);      }
+			else if(ident_name == "while")   { this->tokens.emplace_back(Token::Kind::KeywordWhile);   }
+			else if(ident_name == "switch")  { this->tokens.emplace_back(Token::Kind::KeywordSwitch);  }
+			else if(ident_name == "case")    { this->tokens.emplace_back(Token::Kind::KeywordCase);    }
+			else if(ident_name == "default") { this->tokens.emplace_back(Token::Kind::KeywordDefault); }
+
+			else if(ident_name == "copy")   { this->tokens.emplace_back(Token::Kind::KeywordCopy);   }
+			else if(ident_name == "move")   { this->tokens.emplace_back(Token::Kind::KeywordMove);   }
+			else if(ident_name == "addr")   { this->tokens.emplace_back(Token::Kind::KeywordAddr);   }
+			else if(ident_name == "as")     { this->tokens.emplace_back(Token::Kind::KeywordAs);     }
+			else if(ident_name == "cast")   { this->tokens.emplace_back(Token::Kind::KeywordCast);   }
+			else if(ident_name == "uninit") { this->tokens.emplace_back(Token::Kind::KeywordUninit); }
+
+			else if(ident_name == "read")  { this->tokens.emplace_back(Token::Kind::KeywordRead);  }
+			else if(ident_name == "write") { this->tokens.emplace_back(Token::Kind::KeywordWrite); }
+			else if(ident_name == "in")    { this->tokens.emplace_back(Token::Kind::KeywordIn);    }
+
+			else if(ident_name == "return") { this->tokens.emplace_back(Token::Kind::KeywordReturn); }
+			else if(ident_name == "error")  { this->tokens.emplace_back(Token::Kind::KeywordError);  }
+			else if(ident_name == "defer")  { this->tokens.emplace_back(Token::Kind::KeywordDefer);  }
+			else if(ident_name == "break")  { this->tokens.emplace_back(Token::Kind::KeywordBreak);  }
+
+			else if(ident_name == "try")   { this->tokens.emplace_back(Token::Kind::KeywordTry);   }
+			else if(ident_name == "catch") { this->tokens.emplace_back(Token::Kind::KeywordCatch); }
+
+			else if(ident_name == "this") { this->tokens.emplace_back(Token::Kind::KeywordThis);       }
+			else if(ident_name == "_")    { this->tokens.emplace_back(Token::Kind::KeywordUnderscore); }
 
 
 			else{
-				const size_t string_index = this->token_value_strings.size();
-				this->tokens.emplace_back(Token::Kind::Ident, string_index);
-				this->token_value_strings.emplace_back(std::move(ident_name));
+
+				Token::Kind token_kind = Token::Kind::Ident;
+
+				//////////////////////////////////////////////////////////////////////
+				// arbitrary integer bit widths
+
+				if(ident_name.size() >= 2 && ident_name[0] == 'I'){
+					token_kind = Token::Kind::TypeIntN;
+
+					for(int i = 1; i < ident_name.size(); i+=1){
+						if(evo::isNumber(ident_name[i]) == false){
+							token_kind = Token::Kind::Ident;
+							break;
+						}
+					}
+
+				}else if(ident_name.size() >= 3 && ident_name[0] == 'U' && ident_name[1] == 'I'){
+					token_kind = Token::Kind::TypeUIntN;
+
+					for(int i = 2; i < ident_name.size(); i+=1){
+						if(evo::isNumber(ident_name[i]) == false){
+							token_kind = Token::Kind::Ident;
+							break;
+						}
+					}
+				}
+
+
+
+				if(token_kind != Token::Kind::Ident){
+					const char* int_width_string_start = ident_name.data();
+
+					if(token_kind == Token::Kind::TypeIntN){
+						int_width_string_start += 1;
+					}else if(token_kind == Token::Kind::TypeUIntN){
+						int_width_string_start += 2;
+					}
+
+					const uint32_t integer_width = std::strtoul(int_width_string_start, nullptr, 10);
+
+					if(integer_width == ULONG_MAX && errno == ERANGE){
+						this->stream.error(
+							"Integer bit-width is too large. Maximum is 2^23",
+							ident_beginning_line, ident_beginning_collumn
+						);
+						return true;
+
+					}else if(integer_width == 0){
+						for(int i = int(int_width_string_start - ident_name.data()); i < ident_name.size(); i+=1){
+							if(ident_name[i] != '0'){
+								this->stream.fatal("Tried to parse invalid integer string for integer bit-width", ident_beginning_line, ident_beginning_collumn);
+								return true;
+							}
+						}
+
+
+						this->stream.error("Integer bit-width must be at least 1", ident_beginning_line, ident_beginning_collumn);
+						return true;
+
+					}else if(integer_width > std::pow(2, 23)){
+						this->stream.error("Integer bit-width is too large. Maximum is 2^23", ident_beginning_line, ident_beginning_collumn);
+						return true;
+					}
+
+
+					this->tokens.emplace_back(token_kind, uint64_t(integer_width));
+
+
+				}else{
+					// general ident
+
+					const size_t string_index = this->token_value_strings.size();
+					this->tokens.emplace_back(token_kind, string_index);
+					this->token_value_strings.emplace_back(std::move(ident_name));
+				}
+
 			}
 
 		}else{
@@ -176,6 +315,79 @@ namespace panther{
 		this->tokens.emplace_back(Token::get(punctuation_str));
 
 		return true;
+	};
+
+
+	auto Tokenizer::tokenize_operators() noexcept -> bool {
+		auto is_op = [&](std::string_view op) noexcept -> bool {
+			for(int i = 0; i < op.size(); i+=1){
+				if(this->stream.peek(i) != op[i]){
+					return false;
+				}
+			}
+
+			return true;
+		};
+
+
+
+		auto set_op = [&](std::string_view op){
+			this->tokens.emplace_back(Token::get(op.data()));
+			this->stream.skip(unsigned(op.size()));
+		};
+
+
+
+		// length 2
+			 if(is_op(".*")){ set_op(".*"); return true; }
+		else if(is_op(".?")){ set_op(".?"); return true; }
+
+		else if(is_op("+=")){ set_op("+="); return true; }
+		else if(is_op("-=")){ set_op("-="); return true; }
+		else if(is_op("*=")){ set_op("*="); return true; }
+		else if(is_op("/=")){ set_op("/="); return true; }
+		else if(is_op("%=")){ set_op("%="); return true; }
+
+		else if(is_op("&&")){ set_op("&&"); return true; }
+		else if(is_op("||")){ set_op("||"); return true; }
+
+		else if(is_op("<=")){ set_op("<="); return true; }
+		else if(is_op(">=")){ set_op(">="); return true; }
+		else if(is_op("==")){ set_op("=="); return true; }
+		else if(is_op("!=")){ set_op("!="); return true; }
+
+		else if(is_op("<<")){ set_op("<<"); return true; }
+		else if(is_op(">>")){ set_op(">>"); return true; }
+
+
+		else if(is_op("->")){ set_op("->"); return true; }
+
+
+
+		// length 1
+
+		else if(is_op("=")){ set_op("="); return true; }
+
+		else if(is_op(".")){ set_op("."); return true; }
+
+		else if(is_op("+")){ set_op("+"); return true; }
+		else if(is_op("-")){ set_op("-"); return true; }
+		else if(is_op("*")){ set_op("*"); return true; }
+		else if(is_op("/")){ set_op("/"); return true; }
+		else if(is_op("%")){ set_op("%"); return true; }
+
+
+		else if(is_op("<")){ set_op("<"); return true; }
+		else if(is_op(">")){ set_op(">"); return true; }
+
+
+
+		else if(is_op("&")){ set_op("&"); return true; }
+		else if(is_op("|")){ set_op("|"); return true; }
+		else if(is_op("~")){ set_op("~"); return true; }
+
+		
+		return false;
 	};
 
 
@@ -370,10 +582,10 @@ namespace panther{
 		// check exponent isn't too large
 
 		if(exponent_number != 0 && exponent_number != 1){
-			const long double floating_point_number = long double(exponent_number);
+			const float128_t floating_point_number = float128_t(exponent_number);
 
 			if(has_decimal){
-				const static long double max_float_exp = std::log10(std::numeric_limits<long double>::max()) + 1;
+				const static float128_t max_float_exp = std::log10(std::numeric_limits<float128_t>::max()) + 1;
 
 				if(floating_point_number > max_float_exp){
 					this->stream.error(
@@ -384,7 +596,7 @@ namespace panther{
 				}
 
 			}else{
-				const static long double max_int_exp = std::log10(std::numeric_limits<uint64_t>::max()) + 1;
+				const static float128_t max_int_exp = std::log10(std::numeric_limits<uint64_t>::max()) + 1;
 
 				if(floating_point_number > max_int_exp){
 					this->stream.error(
@@ -407,7 +619,7 @@ namespace panther{
 			}
 
 			char* str_end;
-			const long double parsed_number = std::strtold(number_string.data(), &str_end);
+			const float128_t parsed_number = std::strtold(number_string.data(), &str_end);
 
 			if(parsed_number == HUGE_VALL){
 				this->stream.error(
@@ -421,7 +633,7 @@ namespace panther{
 
 
 
-			if(std::numeric_limits<long double>::max() / parsed_number < std::pow(10, exponent_number)){
+			if(std::numeric_limits<float128_t>::max() / parsed_number < std::pow(10, exponent_number)){
 				this->stream.error(
 					"Literal number exponent too large to fit into an F128. This limitation will be removed when the compiler is self hosted.",
 					number_beginning_line, number_beginning_collumn
@@ -430,12 +642,9 @@ namespace panther{
 			}
 
 
-			long double output_number = parsed_number;
-			if(exponent_number != 0 && exponent_number != 1){
-				output_number *= std::pow(10, exponent_number);
-			}else if(exponent_number == 0){
-				output_number = 0;
-			}
+			float128_t output_number = parsed_number;
+			     if(exponent_number == 0){ output_number = 0; }
+			else if(exponent_number != 1){ output_number *= std::pow(10, exponent_number); }
 
 			this->tokens.emplace_back(Token::Kind::LiteralFloat, output_number);
 
@@ -471,11 +680,8 @@ namespace panther{
 
 
 			uint64_t output_number = parsed_number;
-			if(exponent_number != 0 && exponent_number != 1){
-				output_number *= uint64_t(std::pow(10, exponent_number));
-			}else if(exponent_number == 0){
-				output_number = 0;
-			}
+			     if(exponent_number == 0){ output_number = 0; }
+			else if(exponent_number != 1){ output_number *= uint64_t(std::pow(10, exponent_number)); }
 
 			this->tokens.emplace_back(Token::Kind::LiteralInt, output_number);
 		}
@@ -669,6 +875,15 @@ namespace panther{
 
 				case Token::Kind::LiteralFloat: {
 					evo::logInfo(std::format("LiteralFloat ({})", token.value.floating_point));
+				} break;
+
+
+				case Token::Kind::TypeIntN: {
+					evo::logInfo(std::format("I{}", token.value.integer));
+				} break;
+
+				case Token::Kind::TypeUIntN: {
+					evo::logInfo(std::format("UI{}", token.value.integer));
 				} break;
 
 

@@ -1,5 +1,10 @@
 # Changelog
 
+# v0.0.6
+- Added tokenizing of operators
+- Added tokeizing of many more keywords
+- Added tokenizing of builtin types
+
 ### v0.0.5
 - Added tokenizing of number literals
 	- integers

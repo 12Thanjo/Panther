@@ -4,7 +4,7 @@ ident_2
 
 "hello world
 
-asdofpj
+asdofpj\n
 "
 
 // line comment
@@ -17,20 +17,20 @@ rando
 
 @intrc
     
-    0b101011
-    0x00ccff
-    10_000
-    0o775
+    // 0b101011
+    // 0x00ccff
+    // 10_000
+    // 0o775
 
-    1002.3000000000
+    // 1002.3000000000
 
-    300000.0
+    // 1.8e-13
 
 
-true
-false
+// true
+// false
 
-var foo : 
+var foo : I19 = 12.3;
 def
 struct
 enum
