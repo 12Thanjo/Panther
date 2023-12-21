@@ -1,0 +1,419 @@
+//////////////////////////////////////////////////////////////////////
+// 																	//
+// This document is an outline of the grammar of the language       //
+//  	This is not necesarily final or even really a valid grammar //
+// 		It was just a place to layout / orgainize my idas			//
+// 																	//
+//  The grammar syntax is just made up, and was really easy to      //
+// 		make a quick syntax highlighting for Sublime (text editor)  //
+// 																	//
+//////////////////////////////////////////////////////////////////////
+
+
+
+program:
+	stmts
+
+
+//////////////////////////////////////////////////////////////////////
+// statements
+
+
+stmts:
+	stmts stmt
+	NONE
+
+
+stmt:
+	var_decl
+	func_def
+	assignment_stmt
+	multiple_assignment
+	conditional
+	iteration
+	try_catch
+	while_stmt
+	do_while_stmt
+	typedef_stmt
+	alias_stmt
+	return_stmt
+	defer_stmt
+	struct_def
+	expr ; // meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
+
+
+pub_decl:
+	PUB
+	NONE
+
+
+static_decl:
+	STATIC
+	NONE
+
+
+var_decl:
+	pub_decl static_decl VAR IDENT : type = expr ;
+	pub_decl static_decl VAR IDENT        = expr ;
+	pub_decl static_decl DEF IDENT : type = expr ;
+	pub_decl static_decl DEF IDENT        = expr ;
+
+
+assignment_stmt:
+	expr =  expr ;
+	expr += expr ;
+	expr -= expr ;
+	expr *= expr ;
+	expr /= expr ;
+	expr %= expr ;
+	expr +|= expr ;
+	expr -|= expr ;
+	expr *|= expr ;
+	UNDERSCORE = expr ; // specifically for function calls
+
+
+while_stmt:
+	WHILE ( expr ) block
+
+
+do_while_stmt:
+	DO block WHILE ( expr )
+
+
+typedef_stmt:
+	TYPEDEF IDENT = type ;
+
+alias_stmt:
+	ALIAS IDENT = type ;
+
+
+
+
+return_stmt:
+	RETURN ... ;
+	RETURN expr ;
+	RETURN [ expr_list ] ;
+	ERROR  ... ;
+	ERROR  expr ;
+	ERROR  [ expr_list ] ;
+
+
+defer_stmt:
+	DEFER block
+
+
+
+//////////////////////////////////////////////////////////////////////
+// multiple assigmnet	
+
+
+// both assignment and declaration
+multiple_assignment:
+	static_decl pub_decl VAR [ multiple_declaration_list ] = expr ;
+	static_decl pub_decl DEF [ multiple_declaration_list ] = expr ;
+			     // [ multiple_assignment_list  ] = expr ;
+			     // [ multiple_assignment_list  ] = expr ;
+
+
+// also supports optional trailling ,
+multiple_declaration_list:
+	multiple_declaration_list , IDENT
+	multiple_declaration_list , UNDERSCORE
+	IDENT
+	UNDERSCORE
+
+// also supports optional trailling ,
+// both assignment and declaration
+// multiple_assignment_list:
+// 	multiple_assignment_list , VAR IDENT
+// 	multiple_assignment_list , DEF IDENT
+// 	multiple_assignment_list , expr
+// 	multiple_assignment_list , UNDERSCORE
+// 	pub_decl VAR IDENT
+// 	pub_decl DEF IDENT
+// 	expr
+// 	UNDERSCORE
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// conditional 
+
+conditional:
+	conditional_else
+
+
+conditional_if:
+	IF ( expr ) block
+
+conditional_else_if:
+	conditional_else_if ELSE IF ( expr ) block
+	conditional_if
+
+conditional_else:
+	conditional_else_if ELSE block
+	conditional_else_if
+
+
+//////////////////////////////////////////////////////////////////////
+// iteration
+
+iteration:
+	ITER ( expr )        [ iteration_var , iteration_var ] block
+	ITER ( expr , expr ) [ iteration_var , iteration_var ] block
+
+
+iteration_var:
+	IDENT : type
+	UNDERSCORE
+
+
+//////////////////////////////////////////////////////////////////////
+// functions
+
+func_def:
+	pub_decl static_decl FUNC IDENT = ( func_params )                  func_attributes ->   type                                      block
+	pub_decl static_decl FUNC IDENT = ( func_params )                  func_attributes ->   type                < func_return_types > block
+	pub_decl static_decl FUNC IDENT = ( func_params ) [ func_capture ] func_attributes ->   type                                      block
+	pub_decl static_decl FUNC IDENT = ( func_params ) [ func_capture ] func_attributes ->   type                < func_return_types > block
+	pub_decl static_decl FUNC IDENT = ( func_params )                  func_attributes -> ( func_return_types )                       block
+	pub_decl static_decl FUNC IDENT = ( func_params )                  func_attributes -> ( func_return_types ) < func_return_types > block
+	pub_decl static_decl FUNC IDENT = ( func_params ) [ func_capture ] func_attributes -> ( func_return_types )                       block
+	pub_decl static_decl FUNC IDENT = ( func_params ) [ func_capture ] func_attributes -> ( func_return_types ) < func_return_types > block
+
+
+func_attributes:
+	func_attributes ATTRIBUTE
+	ATTRIBUTE
+	NONE
+
+
+// also supports optional trailling ,
+func_params:
+	func_params_list
+	THIS READ  , func_params_list
+	THIS WRITE , func_params_list
+	THIS WRITE
+
+func_params_list:
+	IDENT : type func_param_kind = expr , func_param
+	IDENT : type func_param_kind        , func_param
+	IDENT : type func_param_kind = expr
+	IDENT : type func_param_kind
+	NONE
+
+func_param_kind:
+	READ
+	WRITE
+	IN
+	NONE
+
+
+
+func_return_types:
+	func_return_types_named
+	func_return_types_unnamed
+
+// also supports optional trailling ,
+func_return_types_named:
+	func_return_types_named , IDENT : type
+	IDENT : type
+
+// also supports optional trailling ,
+func_return_types_unnamed:
+	func_return_types_unnamed , type
+	type
+
+// also supports optional trailling ,
+func_capture:
+	func_capture , expr func_param_kind
+	expr func_param_kind
+	NONE
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// try / catch
+
+try_catch:
+	TRY block try_catch_catches
+
+try_catch_catches:
+	try_catch_catches CATCH ( try_catch_catches_params ) block
+	CATCH ( try_catch_catches_params ) block
+
+
+// also supports optional trailling ,
+try_catch_catches_params:
+	try_catch_catches_params , IDENT : type
+	IDENT : type
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// struct def
+
+struct_def:
+	pub_decl struct IDENT = EXTERN block
+	pub_decl struct IDENT = PACKED block
+	pub_decl struct IDENT =        block
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// expressions
+
+
+expr:
+	logical_expr
+	UNINIT
+
+
+logical_expr:
+	logical_expr && equality_expr
+	logical_expr || equality_expr
+	equality_expr
+
+equality_expr:
+	equality_expr == bitshift_expr
+	equality_expr != bitshift_expr
+	equality_expr <  bitshift_expr
+	equality_expr <= bitshift_expr
+	equality_expr >  bitshift_expr
+	equality_expr >= bitshift_expr
+	bitshift_expr
+
+bitshift_expr:
+	bitshift_expr << pm_expr
+	bitshift_expr >> pm_expr
+	pm_expr
+
+pm_expr:
+	pm_expr +  tdm_expr
+	pm_expr -  tdm_expr
+	pm_expr +| tdm_expr
+	pm_expr -| tdm_expr
+	tdm_expr
+
+tdm_expr:
+	pmd_expr *| casting_expr
+	pmd_expr / casting_expr
+	pmd_expr % casting_expr
+	casting_expr
+
+
+casting_expr:
+	casting_expr AS prefix_expr
+	casting_expr CAST prefix_expr
+	prefix_expr
+
+
+prefix_expr:
+	COPY prefix_expr
+	MOVE prefix_expr
+	ADDR prefix_expr
+	- prefix_expr
+	// ! prefix_expr
+	postfix_expr
+
+
+postfix_expr:
+	paren_expr
+
+
+paren_expr:
+	( expr )
+	term
+
+
+// not sure how to represent this one properly
+term:
+	term [ expr ]
+	term ( expr_list )
+	term brace_initializer
+	term . term
+	term .*
+	term .?
+	IDENT
+	. IDENT
+	INTRINSIC
+	THIS
+	NULL
+	literal
+
+// also supports trailling ,
+expr_list:
+	expr_list , expr
+	expr_list , type
+	expr
+	type
+	NONE
+
+
+// be careful to check for NONEs
+brace_initializer:
+	{ expr_list }
+	{ assignment_list }
+	{ NONE }
+
+
+// also supports trailling ,
+assignment_list:
+	assignment_list , term = expr
+	term = expr
+	
+
+//////////////////////////////////////////////////////////////////////
+// terms, and smaller parts
+
+
+
+block:
+	{ stmts }
+
+
+
+
+type:
+	IDENT
+	builtin_types
+	type *
+	type CONST *
+	type ?
+	type CONST // should be marked only once
+	[ type : expr ] // array
+	[ type : UNDERSCORE ] // array (infer length)
+	FUNC ( func_params ) ->   type                                     
+	FUNC ( func_params ) -> ( func_return_types )                      
+	FUNC ( func_params ) ->   type                < func_return_types >
+	FUNC ( func_params ) -> ( func_return_types ) < func_return_types >
+
+
+
+builtin_types:
+	Int
+	UInt
+	IntN
+	UIntN
+	Void
+	Bool
+	F16
+	F32
+	F64
+	F128
+	// TODO...
+
+
+literal:
+	LITERAL_NUMBER
+	LITERAL_BOOL
+	LITERAL_CHAR
+	LITERAL_STRING
+

@@ -1,8 +1,14 @@
 # Changelog
 
-# v0.0.6
+### v0.0.7
+- Added more keywords / types to the tokenizer
+- Added grammar description file
+- Added basic structure of Parser
+- Added console printing of AST (for debug purposes)
+
+### v0.0.6
 - Added tokenizing of operators
-- Added tokeizing of many more keywords
+- Added tokenizing of many more keywords
 - Added tokenizing of builtin types
 
 ### v0.0.5

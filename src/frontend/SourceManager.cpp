@@ -45,7 +45,7 @@ namespace panther{
 	auto SourceManager::fatal(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
 		this->has_errored = true;
 
-		evo::logFatal(message);
+		evo::logFatal("Fatal Error: " + message);
 		evo::logFatal("This is an error in the compiler");
 
 		this->print_location(MessageType::Error, id, line, collumn);

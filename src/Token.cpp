@@ -25,6 +25,7 @@ namespace panther{
 			///////////////////////////////////
 			// types
 
+			break; case Token::Kind::TypeVoid: return "Void";
 			break; case Token::Kind::TypeBool: return "Bool";
 
 			break; case Token::Kind::TypeInt: return "Int";
@@ -51,6 +52,11 @@ namespace panther{
 
 			break; case Token::Kind::KeywordVar: return "var";
 			break; case Token::Kind::KeywordDef: return "def";
+			break; case Token::Kind::KeywordTypedef: return "typedef";
+			break; case Token::Kind::KeywordAlias: return "alias";
+
+			break; case Token::Kind::KeywordPub: return "pub";
+			break; case Token::Kind::KeywordStatic: return "static";
 
 			break; case Token::Kind::KeywordFunc: return "func";
 			break; case Token::Kind::KeywordStruct: return "struct";
@@ -79,6 +85,7 @@ namespace panther{
 
 			break; case Token::Kind::KeywordThis: return "this";
 			break; case Token::Kind::KeywordUnderscore: return "_";
+			break; case Token::Kind::KeywordUninit: return "uninit";
 
 
 			///////////////////////////////////

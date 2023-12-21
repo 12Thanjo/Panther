@@ -31,6 +31,7 @@ namespace panther{
 			///////////////////////////////////
 			// types
 
+			TypeVoid,
 			TypeBool,
 
 			TypeInt,
@@ -57,6 +58,11 @@ namespace panther{
 
 			KeywordVar,
 			KeywordDef,
+			KeywordTypedef,
+			KeywordAlias,
+
+			KeywordPub,
+			KeywordStatic,
 
 			KeywordFunc,
 			KeywordStruct,
@@ -77,7 +83,6 @@ namespace panther{
 			KeywordAddr,
 			KeywordAs,
 			KeywordCast,
-			KeywordUninit,
 
 			KeywordRead,
 			KeywordWrite,
@@ -93,6 +98,7 @@ namespace panther{
 
 			KeywordThis,
 			KeywordUnderscore,
+			KeywordUninit,
 
 
 
@@ -154,6 +160,8 @@ namespace panther{
 			CloseBrace,
 
 		};
+
+		using enum class Kind;
 
 
 		// TODO: maybe make all of constexpr?

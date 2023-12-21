@@ -1,38 +1,8 @@
-_ident1
-ident_2
-#attr
-
-"hello world
-
-asdofpj\n
-"
-
-// line comment
-
-/*
-/*asdf*/
-
-rando
-*/
-
-@intrc
-    
-    // 0b101011
-    // 0x00ccff
-    // 10_000
-    // 0o775
-
-    // 1002.3000000000
-
-    // 1.8e-13
 
 
-// true
-// false
 
-var foo : I19 = 12.3;
-def
-struct
-enum
+static var foo: Int = uninit;
+pub def bar = uninit;
+pub static var meow: Asdf = uninit;
 
 

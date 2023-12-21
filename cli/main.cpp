@@ -5,6 +5,8 @@
 #include "frontend/SourceManager.h"
 #include "frontend/CharStream.h"
 #include "frontend/Tokenizer.h"
+#include "frontend/ParserReader.h"
+#include "frontend/Parser.h"
 
 
 
@@ -48,7 +50,18 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	auto tokenizer_reader = panther::TokenizerReader{tokenizer};
-	tokenizer_reader.print();
+	tokenizer_reader.print_to_console();
+
+
+	evo::logTrace("--------------------------");
+
+	auto parser = panther::Parser{tokenizer_reader};
+	const bool parser_successful = parser.parse();
+
+	end_early(parser_successful);
+
+	auto parser_reader = panther::ParserReader{parser};
+	parser_reader.print_to_console();
 
 
 
