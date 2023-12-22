@@ -26,10 +26,17 @@ namespace panther{
 			EVO_NODISCARD auto getSourceFile(SourceFileID id) const noexcept -> const SourceFile&;
 
 
-
+			auto error(
+				const std::string& message, SourceFileID id, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn
+			) noexcept -> void;
 			auto error(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
+
 			auto error_info(const std::string& message) noexcept -> void;
 			auto error_info(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
+
+			auto fatal(
+				const std::string& message, SourceFileID id, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn
+			) noexcept -> void;
 			auto fatal(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
 
 
@@ -41,7 +48,12 @@ namespace panther{
 				Error,
 				ErrorInfo,
 			};
-			auto print_location(MessageType type, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void;
+			auto print_location(MessageType type, SourceFileID id, uint32_t line, uint32_t collumn_start, uint32_t collumn_end) noexcept -> void;
+
+			auto print_location(MessageType type, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
+				this->print_location(type, id, line, collumn, collumn);
+			};
+
 
 		private:
 			std::vector<SourceFile> sources{};

@@ -41,8 +41,7 @@ namespace panther{
 			// struct_def
 			// expr ; // meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
 		
-			// TODO: remove
-			this->fatal("Failed to parse", this->reader.peek());
+			this->error("Invalid beginning to statement", this->reader.peek());
 		};
 
 
@@ -63,7 +62,7 @@ namespace panther{
 			this->reader.skip(1);
 
 			if(this->reader.is_eof()){
-				this->error("Unexpected end of file in Variable declaration", this->reader.peek()); 
+				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
 				return Result::Error;
 			}
 		}
@@ -76,7 +75,7 @@ namespace panther{
 			this->reader.skip(1);
 
 			if(this->reader.is_eof()){
-				this->error("Unexpected end of file in variable declaration", this->reader.peek()); 
+				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
 				return Result::Error;
 			}
 		}
@@ -97,6 +96,11 @@ namespace panther{
 			return Result::WrongType;
 		}
 
+		if(this->reader.is_eof()){
+			this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+			return Result::Error;
+		}
+
 
 		// identifier
 		const Result ident_result = this->parse_ident();
@@ -110,11 +114,21 @@ namespace panther{
 			return Result::Error;
 		}
 
+		if(this->reader.is_eof()){
+			this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+			return Result::Error;
+		}
+
 
 		// : type (maybe)
 		auto type = std::optional<AST::NodeID>{};
 		if(this->reader.getKind(this->reader.peek()) == Token::get(":")){
 			this->reader.skip(1);
+
+			if(this->reader.is_eof()){
+				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+				return Result::Error;
+			}
 
 			const Result type_result = this->parse_type();
 
@@ -142,7 +156,13 @@ namespace panther{
 					return Result::Error;
 				} break;
 			};
+			
+			if(this->reader.is_eof()){
+				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+				return Result::Error;
+			}
 		}
+
 
 
 		// =
@@ -170,6 +190,11 @@ namespace panther{
 			this->reader.skip(1);
 		}
 
+		if(this->reader.is_eof()){
+			this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+			return Result::Error;
+		}
+
 
 		// expression
 		const Result expr_result = this->parse_expr();
@@ -195,6 +220,11 @@ namespace panther{
 				return Result::Error;
 			} break;
 		};
+
+		// if(this->reader.is_eof()){
+		// 	this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+		// 	return Result::Error;
+		// }
 
 
 		// ;
@@ -333,7 +363,7 @@ namespace panther{
 
 
 	auto Parser::error(const std::string& message, TokenID token) const noexcept -> void {
-		this->reader.error(message, this->reader.getLine(token), this->reader.getCollumn(token));
+		this->reader.error(message, this->reader.getLineStart(token), this->reader.getCollumnStart(token), this->reader.getLine(token), this->reader.getCollumn(token));
 	};
 	auto Parser::error_info(const std::string& message) const noexcept -> void {
 		this->reader.error_info(message);
@@ -342,7 +372,7 @@ namespace panther{
 		this->reader.error_info(message, this->reader.getLine(token), this->reader.getCollumn(token));
 	};
 	auto Parser::fatal(const std::string& message, TokenID token) const noexcept -> void {
-		this->reader.fatal(message, this->reader.getLine(token), this->reader.getCollumn(token));
+		this->reader.fatal(message, this->reader.getLineStart(token), this->reader.getCollumnStart(token), this->reader.getLine(token), this->reader.getCollumn(token));
 	};
 
 

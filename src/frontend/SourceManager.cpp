@@ -20,6 +20,21 @@ namespace panther{
 
 
 
+	auto SourceManager::error(
+		const std::string& message, SourceFileID id, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn
+	) noexcept -> void {
+		this->has_errored = true;
+
+		evo::logError("Error: " + message);
+
+		if(line_start != line){
+			this->print_location(MessageType::Error, id, line, 1, collumn);
+			this->error_info("Note: begins here", id, line_start, collumn_start);
+
+		}else{
+			this->print_location(MessageType::Error, id, line, collumn_start, collumn);
+		}
+	};
 
 	auto SourceManager::error(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
 		this->has_errored = true;
@@ -45,17 +60,32 @@ namespace panther{
 	auto SourceManager::fatal(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
 		this->has_errored = true;
 
+		this->print_location(MessageType::Error, id, line, collumn);
+	};
+
+
+	auto SourceManager::fatal(
+		const std::string& message, SourceFileID id, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn
+	) noexcept -> void {
+		this->has_errored = true;
+
 		evo::logFatal("Fatal Error: " + message);
 		evo::logFatal("This is an error in the compiler");
 
-		this->print_location(MessageType::Error, id, line, collumn);
+		if(line_start != line){
+			this->print_location(MessageType::Error, id, line, 1, collumn);
+			this->error_info("Note: begins here", id, line_start, collumn_start);
+
+		}else{
+			this->print_location(MessageType::Error, id, line, collumn_start, collumn);
+		}
 	};
 
 
 
 
 
-	auto SourceManager::print_location(MessageType type, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
+	auto SourceManager::print_location(MessageType type, SourceFileID id, uint32_t line, uint32_t collumn_start, uint32_t collumn_end) noexcept -> void {
 		size_t cursor = 0;
 		size_t current_line = 1;
 		const SourceFile& source = this->sources[id.id];
@@ -78,7 +108,7 @@ namespace panther{
 		};
 
 		auto line_str = std::string{};
-		size_t point_collumn = collumn;
+		size_t point_collumn = collumn_start;
 		bool remove_whitespace = true;
 
 		while(source.data[cursor] != '\n' && source.data[cursor] != '\r' && cursor < source.data.size()){
@@ -105,7 +135,7 @@ namespace panther{
 		if(type == MessageType::ErrorInfo){
 			line_str_to_print += '\t';
 		}
-		line_str_to_print += std::format("{}| {}", line, line_str);;
+		line_str_to_print += std::format("{}| {}", line, line_str);
 		evo::logTrace(line_str_to_print);
 
 		auto point_str = std::string{'\t'};
@@ -117,14 +147,16 @@ namespace panther{
 		for(size_t i = 0; i < pointer_indentation; i+=1){
 			point_str += ' ';
 		}
-		point_str += '^';
+
+		for(int i = collumn_start; i < collumn_end + 1; i+=1){
+			point_str += '^';			
+		}
 
 
 		switch(type){
 			break; case MessageType::Error:     evo::logError(point_str);
 			break; case MessageType::ErrorInfo: evo::logInfo(point_str);
 		};
-
 	};
 
 	

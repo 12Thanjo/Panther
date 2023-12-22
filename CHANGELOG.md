@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.0.8
+- Added checking for EOF while parsing variable declarations
+- Improved error messages (now points to section instead of just one point)
+- Fixed assert firing incorrectly during tokenizing
+
 ### v0.0.7
 - Added more keywords / types to the tokenizer
 - Added grammar description file

@@ -36,6 +36,9 @@ namespace panther{
 
 			struct TokenData{
 				Token::Kind kind;
+
+				uint32_t line_start;
+				uint32_t collumn_start;
 				uint32_t line;
 				uint32_t collumn;
 
@@ -51,17 +54,17 @@ namespace panther{
 				} value;
 
 
-				explicit TokenData(Token::Kind token_kind, uint32_t _line, uint32_t _collumn , size_t index_val)
-					: kind(token_kind), line(_line), collumn(_collumn), value(index_val) {};
+				explicit TokenData(Token::Kind token_kind, uint32_t _line_start, uint32_t _collumn_start, uint32_t _line, uint32_t _collumn , size_t index_val)
+					: kind(token_kind), line_start(_line_start), collumn_start(_collumn_start), line(_line), collumn(_collumn), value(index_val) {};
 
-				explicit TokenData(Token::Kind token_kind, uint32_t _line, uint32_t _collumn , bool bool_val)
-					: kind(token_kind), line(_line), collumn(_collumn), value(bool_val) {};
+				explicit TokenData(Token::Kind token_kind, uint32_t _line_start, uint32_t _collumn_start, uint32_t _line, uint32_t _collumn , bool bool_val)
+					: kind(token_kind), line_start(_line_start), collumn_start(_collumn_start), line(_line), collumn(_collumn), value(bool_val) {};
 
-				explicit TokenData(Token::Kind token_kind, uint32_t _line, uint32_t _collumn , float128_t float_val)
-					: kind(token_kind), line(_line), collumn(_collumn) { this->value.floating_point = float_val; };
+				explicit TokenData(Token::Kind token_kind, uint32_t _line_start, uint32_t _collumn_start, uint32_t _line, uint32_t _collumn , float128_t float_val)
+					: kind(token_kind), line_start(_line_start), collumn_start(_collumn_start), line(_line), collumn(_collumn) { this->value.floating_point = float_val; };
 
-				explicit TokenData(Token::Kind token_kind, uint32_t _line, uint32_t _collumn )
-					: kind(token_kind), line(_line), collumn(_collumn) {};
+				explicit TokenData(Token::Kind token_kind, uint32_t _line_start, uint32_t _collumn_start, uint32_t _line, uint32_t _collumn )
+					: kind(token_kind), line_start(_line_start), collumn_start(_collumn_start), line(_line), collumn(_collumn) {};
 			};
 
 			auto add_token(Token::Kind token_kind, size_t index_val) noexcept -> void;
@@ -72,6 +75,10 @@ namespace panther{
 
 			std::vector<TokenData> tokens{};
 			std::vector<std::string> token_value_strings{};
+
+
+			uint32_t line_start;
+			uint32_t collumn_start;
 
 
 			friend class TokenizerReader;
@@ -107,6 +114,8 @@ namespace panther{
 			EVO_NODISCARD auto getKind(TokenID id) const noexcept -> Token::Kind;
 			EVO_NODISCARD auto getLine(TokenID id) const noexcept -> uint32_t;
 			EVO_NODISCARD auto getCollumn(TokenID id) const noexcept -> uint32_t;
+			EVO_NODISCARD auto getLineStart(TokenID id) const noexcept -> uint32_t;
+			EVO_NODISCARD auto getCollumnStart(TokenID id) const noexcept -> uint32_t;
 
 			EVO_NODISCARD auto getStringValue(TokenID id) const noexcept -> const std::string&;
 			EVO_NODISCARD auto getBoolValue(TokenID id) const noexcept -> bool;
@@ -114,9 +123,17 @@ namespace panther{
 
 
 			auto error(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;
+			auto error(
+				const std::string& message, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn
+			) const noexcept -> void;
+
 			auto error_info(const std::string& message) const noexcept -> void;
 			auto error_info(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;
+
 			auto fatal(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;
+			auto fatal(
+				const std::string& message, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn
+			) const noexcept -> void;
 
 			EVO_NODISCARD auto get_source_manager() const noexcept -> SourceManager&;
 

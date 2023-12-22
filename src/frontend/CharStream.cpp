@@ -60,6 +60,9 @@ namespace panther{
 
 
 
+	auto CharStream::error(const std::string& message, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn) const noexcept -> void {
+		this->src_manager.error(message, this->src_id, line_start, collumn_start, line, collumn);
+	};
 
 	auto CharStream::error(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void {
 		this->src_manager.error(message, this->src_id, line, collumn);
@@ -75,6 +78,10 @@ namespace panther{
 
 	auto CharStream::fatal(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void {
 		this->src_manager.fatal(message, this->src_id, line, collumn);
+	};
+
+	auto CharStream::fatal(const std::string& message, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn) const noexcept -> void {
+		this->src_manager.fatal(message, this->src_id, line_start, collumn_start, line, collumn);
 	};
 
 

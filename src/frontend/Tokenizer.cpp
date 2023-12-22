@@ -8,6 +8,9 @@ namespace panther{
 
 	auto Tokenizer::tokenize() noexcept -> bool {
 		while(this->stream.is_eof() == false && this->stream.get_source_manager().errored() == false){
+			this->line_start = this->stream.get_line();
+			this->collumn_start = this->stream.get_collumn();
+
 			if(this->tokenize_whitespace()){ continue; }
 			if(this->tokenize_comment()){ continue; }
 			if(this->tokenize_ident()){ continue; }
@@ -64,8 +67,7 @@ namespace panther{
 			unsigned num_closes_needed = 1;
 			while(num_closes_needed > 0){
 				if(this->stream.ammount_left() < 2){
-					this->stream.error("Unexpected end of file in multi-line comment", this->stream.get_line(), this->stream.get_collumn());
-					this->stream.error_info("Multi-line comment begins here", comment_beginning_line, comment_beginning_collumn);
+					this->stream.error("Unexpected end of file in multi-line comment", comment_beginning_line, comment_beginning_collumn, this->stream.get_line(), this->stream.get_collumn());
 					return true;
 				}
 
@@ -326,6 +328,8 @@ namespace panther{
 
 	auto Tokenizer::tokenize_operators() noexcept -> bool {
 		auto is_op = [&](std::string_view op) noexcept -> bool {
+			if(this->stream.ammount_left() < op.size()){ return false; }
+
 			for(int i = 0; i < op.size(); i+=1){
 				if(this->stream.peek(i) != op[i]){
 					return false;
@@ -338,8 +342,8 @@ namespace panther{
 
 
 		auto set_op = [&](std::string_view op){
-			this->add_token(Token::get(op.data()));
 			this->stream.skip(unsigned(op.size()));
+			this->add_token(Token::get(op.data()));
 		};
 
 
@@ -764,11 +768,7 @@ namespace panther{
 
 				this->stream.error(
 					std::format("Unexpected end of file in {} literal", string_type_name),
-					this->stream.get_line(), this->stream.get_collumn()
-				);
-				this->stream.error_info(
-					std::format("{} literal begins here", string_type_name),
-					string_beginning_line, string_beginning_collumn
+					string_beginning_line, string_beginning_collumn, this->stream.get_line(), this->stream.get_collumn()
 				);
 
 				return true;
@@ -798,19 +798,19 @@ namespace panther{
 
 
 	auto Tokenizer::add_token(Token::Kind token_kind, size_t index_val) noexcept -> void {
-		this->tokens.emplace_back(token_kind, this->stream.get_line(), this->stream.get_collumn() - 1, index_val);
+		this->tokens.emplace_back(token_kind, this->line_start, this->collumn_start, this->stream.get_line(), this->stream.get_collumn() - 1, index_val);
 	};
 
 	auto Tokenizer::add_token(Token::Kind token_kind, bool bool_val) noexcept -> void {
-		this->tokens.emplace_back(token_kind, this->stream.get_line(), this->stream.get_collumn() - 1, bool_val);
+		this->tokens.emplace_back(token_kind, this->line_start, this->collumn_start, this->stream.get_line(), this->stream.get_collumn() - 1, bool_val);
 	};
 
 	auto Tokenizer::add_token(Token::Kind token_kind, float128_t float_val) noexcept -> void {
-		this->tokens.emplace_back(token_kind, this->stream.get_line(), this->stream.get_collumn() - 1, float_val);
+		this->tokens.emplace_back(token_kind, this->line_start, this->collumn_start, this->stream.get_line(), this->stream.get_collumn() - 1, float_val);
 	};
 
 	auto Tokenizer::add_token(Token::Kind token_kind) noexcept -> void {
-		this->tokens.emplace_back(token_kind, this->stream.get_line(), this->stream.get_collumn() - 1);
+		this->tokens.emplace_back(token_kind, this->line_start, this->collumn_start, this->stream.get_line(), this->stream.get_collumn() - 1);
 	};
 
 
@@ -851,14 +851,14 @@ namespace panther{
 
 
 	auto TokenizerReader::go_back(TokenID id) noexcept -> void {
-		evo::debugAssert(id.id >= uint32_t(this->cursor), std::format("{} should be only used to go backwards, not forwards", __FUNCTION__));
+		evo::debugAssert(id.id <= uint32_t(this->cursor), std::format("{} should be only used to go backwards, not forwards", __FUNCTION__));
 
 		this->cursor = int64_t(id.id);
 	};
 
 
 
-
+	
 
 	auto TokenizerReader::getKind(TokenID id) const noexcept -> Token::Kind {
 		return this->tokenizer.tokens[id.id].kind;
@@ -870,6 +870,14 @@ namespace panther{
 
 	auto TokenizerReader::getCollumn(TokenID id) const noexcept -> uint32_t {
 		return this->tokenizer.tokens[id.id].collumn;
+	};
+
+	auto TokenizerReader::getLineStart(TokenID id) const noexcept -> uint32_t {
+		return this->tokenizer.tokens[id.id].line_start;
+	};
+
+	auto TokenizerReader::getCollumnStart(TokenID id) const noexcept -> uint32_t {
+		return this->tokenizer.tokens[id.id].collumn_start;
 	};
 
 
@@ -920,7 +928,9 @@ namespace panther{
 	///////////////////////////////////
 	// messaging
 
-
+	auto TokenizerReader::error(const std::string& message, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn) const noexcept -> void {
+		this->tokenizer.stream.error(message, line_start, collumn_start, line, collumn);
+	};
 	auto TokenizerReader::error(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void {
 		this->tokenizer.stream.error(message, line, collumn);
 	};
@@ -932,6 +942,9 @@ namespace panther{
 	};
 	auto TokenizerReader::fatal(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void {
 		this->tokenizer.stream.fatal(message, line, collumn);
+	};
+	auto TokenizerReader::fatal(const std::string& message, uint32_t line_start, uint32_t collumn_start, uint32_t line, uint32_t collumn) const noexcept -> void {
+		this->tokenizer.stream.fatal(message, line_start, collumn_start, line, collumn);
 	};
 
 

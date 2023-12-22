@@ -1,8 +1,15 @@
 
 
+static var foo: Int = "asdf
 
-static var foo: Int = uninit;
-pub def bar = uninit;
-pub static var meow: Asdf = uninit;
+	end"
+// pub def bar = uninit;
+// pub static var meow: Asdf = uninit;
 
 
+// pub static var id::
+
+
+/* beginning
+
+end
