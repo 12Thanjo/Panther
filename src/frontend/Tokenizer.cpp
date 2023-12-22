@@ -132,9 +132,8 @@ namespace panther{
 			///////////////////////////////////
 			// literals
 
-			     if(ident_name == "true"){ this->add_token(Token::Kind::LiteralBool, true); }
-			else if(ident_name == "false"){ this->add_token(Token::Kind::LiteralBool, false); }
-			else if(ident_name == "null"){ this->add_token(Token::Kind::LiteralNull, false); }
+			     if(ident_name == "true")  { this->add_token(Token::Kind::LiteralBool, true);  }
+			else if(ident_name == "false") { this->add_token(Token::Kind::LiteralBool, false); }
 
 
 			///////////////////////////////////
@@ -142,6 +141,8 @@ namespace panther{
 
 			else if(ident_name == "Void") { this->add_token(Token::Kind::TypeVoid); }
 			else if(ident_name == "Bool") { this->add_token(Token::Kind::TypeBool); }
+			else if(ident_name == "String") { this->add_token(Token::Kind::TypeString); }
+			else if(ident_name == "Char") { this->add_token(Token::Kind::TypeChar); }
 
 			else if(ident_name == "Int")   { this->add_token(Token::Kind::TypeInt);   }
 			else if(ident_name == "UInt")  { this->add_token(Token::Kind::TypeUInt);  }
@@ -206,6 +207,7 @@ namespace panther{
 			else if(ident_name == "this")   { this->add_token(Token::Kind::KeywordThis);       }
 			else if(ident_name == "_")      { this->add_token(Token::Kind::KeywordUnderscore); }
 			else if(ident_name == "uninit") { this->add_token(Token::Kind::KeywordUninit);     }
+			else if(ident_name == "null")   { this->add_token(Token::Kind::KeywordNull);       }
 
 
 			else{
@@ -919,6 +921,18 @@ namespace panther{
 		);
 
 		return token.value.integer;
+	};
+
+
+	auto TokenizerReader::getFloatingPointValue(TokenID id) const noexcept -> float128_t {
+		const Tokenizer::TokenData& token = this->tokenizer.tokens[id.id];
+		
+		evo::debugAssert(
+			token.kind == Token::Kind::LiteralFloat, 
+			std::format("cannot get floating-point value of Token Kind ({})", Token::print_kind(token.kind))
+		);
+
+		return token.value.floating_point;
 	};
 
 

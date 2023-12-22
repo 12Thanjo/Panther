@@ -27,6 +27,9 @@ namespace panther{
 			EVO_NODISCARD auto getType(AST::NodeID id) noexcept -> AST::Type&;
 			EVO_NODISCARD auto getType(AST::NodeID id) const noexcept -> const AST::Type&;
 
+			EVO_NODISCARD auto getLiteral(AST::NodeID id) noexcept -> AST::Literal&;
+			EVO_NODISCARD auto getLiteral(AST::NodeID id) const noexcept -> const AST::Literal&;
+
 
 
 			auto print_to_console() const noexcept -> void;
@@ -36,6 +39,7 @@ namespace panther{
 			auto print_var_decl(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_type(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_expr(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_literal(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
 	
 		private:

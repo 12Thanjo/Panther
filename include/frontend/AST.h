@@ -13,9 +13,14 @@ namespace panther{
 			VarDecl,
 
 			Ident,
+			Literal,
 			Type,
+			Term,
 
+			// no data
 			Uninit,
+			Null,
+			This,
 		};
 
 		struct NodeID{ uint32_t id; };
@@ -28,7 +33,13 @@ namespace panther{
 			Node(Kind _kind, uint32_t index) : kind(_kind), value_index(index) {};
 
 			Node(Kind _kind) : kind(_kind) {
-				evo::debugAssert(this->kind == Kind::Uninit, "This node kind must have a value");
+				evo::debugAssert(
+					this->kind == Kind::Uninit
+					|| this->kind == Kind::Null
+					|| this->kind == Kind::This
+					, 
+					"This node kind must have a value"
+				);
 			};
 		};
 
@@ -59,6 +70,10 @@ namespace panther{
 			TokenID token;
 		};
 
+		struct Literal{
+			TokenID token;
+		};
+
 
 
 		struct Type{
@@ -81,6 +96,12 @@ namespace panther{
 
 			explicit Type(Kind _kind, Ident ident) : kind(_kind), value(ident) {};
 			explicit Type(Kind _kind, TokenID token) : kind(_kind) { this->value.builtin.token = token; };
+		};
+
+
+
+		struct Term{
+			
 		};
 
 

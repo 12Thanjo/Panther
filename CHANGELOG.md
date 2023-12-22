@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.0.9
+- Added the description.pthr file
+- Added tokenizing of the builtin `String` and `Char` types
+- Added parsing literals, identifiers, `null`, and `this`
+
 ### v0.0.8
 - Added checking for EOF while parsing variable declarations
 - Improved error messages (now points to section instead of just one point)

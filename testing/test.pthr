@@ -1,15 +1,13 @@
 
 
-static var foo: Int = "asdf
+var bool: Bool = true;
+def string = "hello world";
+var char: Char = 'a';
+var int: Int = 12;
+var float: F64 = 18.4;
 
-	end"
-// pub def bar = uninit;
-// pub static var meow: Asdf = uninit;
+def ident = foo;
 
 
-// pub static var id::
-
-
-/* beginning
-
-end
+var ptr: Rawptr = null;
+var this_ref = this;

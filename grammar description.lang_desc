@@ -348,6 +348,8 @@ term:
 	NULL
 	literal
 
+
+
 // also supports trailling ,
 expr_list:
 	expr_list , expr
@@ -412,8 +414,9 @@ builtin_types:
 
 
 literal:
-	LITERAL_NUMBER
 	LITERAL_BOOL
-	LITERAL_CHAR
 	LITERAL_STRING
+	LITERAL_CHAR
+	LITERAL_INT
+	LITERAL_FLOAT
 

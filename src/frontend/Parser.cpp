@@ -275,6 +275,7 @@ namespace panther{
 	};
 
 
+
 	// TODO: finish parsing all types
 	auto Parser::parse_type() noexcept -> Result {
 		// IDENT
@@ -308,6 +309,8 @@ namespace panther{
 		switch(this->reader.getKind(this->reader.peek())){
 			case Token::TypeVoid:
 			case Token::TypeBool:
+			case Token::TypeString:
+			case Token::TypeChar:
 
 			case Token::TypeInt:
 			case Token::TypeIntN:
@@ -338,11 +341,11 @@ namespace panther{
 
 
 
+
 	///////////////////////////////////
 	// expressions
 
 	auto Parser:: parse_expr() noexcept -> Result {
-		
 		if(this->reader.getKind(this->reader.peek()) == Token::KeywordUninit){
 			this->reader.skip(1);
 
@@ -352,8 +355,86 @@ namespace panther{
 			return AST::NodeID{node_index};
 		}
 
+		const Result term_result = this->parse_term();
+		if(term_result.code() == Result::Success){
+			return term_result;
+		}
+
 		return Result::WrongType;
 	};
+
+
+
+	// TODO: finish terms
+	auto Parser::parse_term() noexcept -> Result {
+		// literals
+		const Result literal_result = this->parse_literal();
+		if(literal_result.code() == Result::Success){
+			return literal_result;
+		}
+
+		// idents
+		const Result ident_result = this->parse_ident();
+		if(ident_result.code() == Result::Success){
+			return ident_result;
+		}
+
+
+		const TokenID first_token = this->reader.next();
+		switch(this->reader.getKind(first_token)){
+			case Token::KeywordNull: {
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				this->nodes.emplace_back(AST::Kind::Null);
+				return AST::NodeID{node_index};
+			} break;
+
+			case Token::KeywordThis: {
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				this->nodes.emplace_back(AST::Kind::This);
+				return AST::NodeID{node_index};
+			} break;
+		};
+
+		this->reader.go_back(first_token);
+
+		return Result::WrongType;
+	};
+
+
+
+
+
+	auto Parser::parse_literal() noexcept -> Result {
+		const TokenID token = this->reader.next();
+
+		bool is_literal = false;
+
+		switch(this->reader.getKind(token)){
+			case Token::LiteralBool:
+			case Token::LiteralString:
+			case Token::LiteralChar:
+			case Token::LiteralInt:
+			case Token::LiteralFloat:
+				is_literal = true;
+		};
+
+
+		if(is_literal == false){
+			this->reader.go_back(token);
+			return Result::WrongType;
+		}
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t literal_index = uint32_t(this->literals.size());
+
+		this->nodes.emplace_back(AST::Kind::Literal, literal_index);
+		this->literals.emplace_back(token);
+
+		return AST::NodeID{node_index};
+	};
+
+
 
 
 

@@ -1,0 +1,1059 @@
+
+//////////////////////////////////////////////////////////////////////
+// 																    //
+// Ideas for syntax / workings  of Panther   						//
+// 																    //
+// NOTE: SYNTAX IS NOT FINAL                                        //
+// 																	//
+// General notes:													//
+//       - assume all sections are separate files					//
+// 		 - errors are sometimes present (used for explanation)      //
+//       - some errors like "unused variable" are ignored           //
+//       - changes to the language may have been made without		//
+//			updating this file                                      //
+// 																	//
+//////////////////////////////////////////////////////////////////////
+
+
+// this is a comment
+
+/*
+	multiline comment
+
+	/*nested
+		multiline comment
+	*/
+*/
+
+
+
+func main = () -> Void {
+	// variable called foo, of type Int, of value 12
+	// Int is the size of the platform's CPU general register width
+	var foo: Int = 12;
+	foo = 14;
+
+	// constant
+	def bar: bool = false;
+
+
+	// assumes return from main is 0
+};
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// basics
+
+
+
+// trailing comma in func param list is allowed
+func multiply = (a: Int, b: Int,) -> Int {
+	return a * b;
+};
+
+
+// parameter qualities (TODO: think of better name)
+func square_nums = (a: Int, b: Int write) -> Void {
+	a *= a;
+	b *= b;
+};
+
+// Possible parameter qualities (more on the usage of these later)
+// 	- read (default) -> kinda like "const T&" in c++
+//  - write          -> kinda like "T&" in c++
+//  - in             -> kinda like "T&&" in c++ (more on this later)
+
+
+
+
+func multiple_returns = () -> (Char, F32) {
+	// 12 automatically converts to float
+	return ['a', 12];
+};
+
+
+// if some are named, all must be named
+//  - the variables associated with the named return values are initially uninit (explained later)
+func named_multiple_returns = (num: I32) -> (larger: I64, unsigned: UI32) {
+	// safe casting use `as` operator
+	// THERE IS NO IMPLICIT TYPE CONVERSIONS FOR VARIABLES
+	larger = (num as I64);
+
+	// potentially unsafe casting use `cast` operator
+	unsigned = (num cast UI32);
+
+	// return all (needed as they are named)
+	return ...;
+};
+
+
+
+func main = () -> Void {
+	// mult_resul == 24
+	// type is inferred from return type of the function
+	var mult_result = multiply(12, 2);
+
+
+	// defines variables a and b
+	// variables coorespond with multiple return values
+	var [a, b] = multiple_returns();
+
+
+	// variable can be declared without assigning a value (storage is allocated)
+	// using an uninitined variable is UB
+	var foo: Int = uninit;
+
+	// This is invalid for two reasons:
+	// 	1) redeclaring the variable 'foo'
+	//  2) cannot infer the type of the variable
+	//  3) constant value cannot be uninitined
+	def foo = uninit;
+
+
+	// foo is already defined, bar is new
+	// TODO: figure out how to do with type casting
+	// [foo, var bar] = named_multiple_returns(12);
+
+
+
+	// global scope definitions are order independant
+	// notice how `get_two()` is defined after the current function scope
+	var number_two = get_two();
+};
+
+
+func get_two = () UInt {
+	return 2;
+};
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// imports
+
+def std = @import("std");
+
+// hello world example
+func main = () Void {
+	std.log("hello world");
+};
+
+
+
+func log10 = (num: F32) F32 {
+	// local import declaration
+	def math = @import("std").math;
+
+	return math.log(10, num);
+};
+
+
+
+//////////////////////////////////////////////////////////////////////
+// defer
+
+func increment = (num: Int write) -> Int {
+	// do this after return statement (sorta like RAII destructors)
+	defer{
+		num += 1;
+	};
+
+	return num;
+};
+
+
+
+func main = () Void {
+	var number = 12;
+
+	var incremented_num = increment(num);
+
+	// number == 12
+	// incremented_num == 13
+};
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// optionals / pointers
+
+
+func sum = (a: Int, b: Int) -> Int {
+	return a + b;
+};
+
+
+func main = () -> Void {
+	
+	// optional types (think std::optional)
+	var optional: Int? = null;
+	var valid_optional: Int? = 12;
+
+	// check the value in the optional is not empty
+	if(valid_optional != null){
+		// unwrap the optional
+		//   in a debug build, unwrapping the optional is checked and throws an error if optional is not empty (more on erros later)
+		var unwrapped = valid_optional.?;
+	}
+
+
+	var number: F32 = 12;
+	var number_ptr: F32* = number; // more on variable to pointer in next section
+
+	var optional_ptr: F32*? = null;
+
+	// number_ptr is not optional, so it cannot be null (nullptr in c++)
+	//  - on platforms that memory address 0 is illegal to dereference, optional pointers can be optimized to just a pointer and null is address 0
+
+
+
+	// ///////////////////////////////////
+	// // const
+
+	// // create a pointer that can change the pointer location but cannot write to the target 
+	// var const_ptr: const F32* = number;
+
+	// // create a pointer that cannot change the pointer location but can write to the target 
+	// var ptr_const: F32 const* = number;
+
+	// // create a pointer that cannot change the pointer location and cannot write to the target 
+	// var const_ptr_const: const F32 const* = number;
+
+
+	// // the statement is semantically equivalent to
+	// def const_var_ptr: F32* = number;
+
+};
+
+// dereferencing is explained later
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// ephemeral values
+
+
+// ephemeral values are a huge concept thats completely new (I think)
+
+func main = () -> Void {
+	var num: Int = 12;
+
+
+	// to assign a value of a variable to the value of another value, you may assume it's like this:
+	var bad_copy: Int = num;
+
+	// That is an error. Here is the correct way to do it.
+	var good_copy: Int = copy num;
+
+
+	// In Panther, you are only allowed to use ephemeral values (meaning "temporary")
+	// Whenever you use a variable, your mental model should be that you are using a reference to it
+	// So, if you have a variable of type T, any time you use this variable it is of type T*
+
+	// This means that in the following statement, the type inferred is "Int*"
+	var type_inference_num = num;
+
+
+	///////////////////////////////////
+	// not sure if I like this feature
+
+	// the "ref" declaration can be used to disambiguate
+	// This is semantically the same as the above statement
+	ref num_ref = num;
+
+	// this is semantically the same as well:
+	ref explicit_type_ref: Int = num;
+
+	// not sure if I like this feature
+	///////////////////////////////////
+
+
+
+
+	// you can also move values (more on this later)
+	// since you moved the value of 'good_copy' to 'moved_number', usage of 'good_copy' is UB
+	var moved_number = move good_copy;
+
+
+
+
+	func locally_scoped_function = (a: Int read, b: Int write, c: Int in) Void {
+		// a can be read from but not written to
+		// 		- is an error if not read from
+
+		// b can be read from and written to
+		// 		- is an error if not written to
+		// 		- allowed to not be read from
+
+		// c cannot be read to or written from
+		// 		- is an error if not moved from
+		// 		- if the function is an external one, the "in" quality is converted to a regular type
+
+
+		// there is no "out" quality as out parameters should just be return values
+		// technically the write quality could be used as an out parameter, but it's discouraged
+	};
+
+
+	// valid usage examples:
+	locally_scoped_function(num,      num, move moved_number);
+	locally_scoped_function(copy num, num, copy num         );
+	locally_scoped_function(12,       num, 12               );
+
+
+	// invalid usage examples
+	locally_scoped_function(move num, 12,       num);
+	locally_scoped_function(move num, move num, num);
+	locally_scoped_function(move num, copy num, num);
+
+
+
+	
+	// creating a local scope
+	{
+		var num1: Int = 12;
+
+		// assumed "Int"
+		var num2 = 12;
+
+		// this is true as the '==' operator compares the values
+		//  - '!=' is the "not equal"
+		var are_same_value: Bool = (num1 == num2);
+
+		// this is false as the '===' operator compares the pointers
+		//  - '!==' is the "not equal"
+		var are_same_var: Bool = (num1 === num2);
+
+
+		// so, this will work correctly
+		var are_same_value_literal = (num1 == 12);
+
+		// TODO: raw pointers
+	}
+
+
+
+
+	func return_example = () -> Int {
+		var num: Int = 12;
+
+		// implicit move
+		// 	note: RVO (return value optimization) is used, so no actual move is made
+		return num;
+	};
+
+};
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// structs
+
+
+// may optimize layout with padding and reordering (size might be different than the programmer expects)
+//  - guaranteed to be ABI-aligned
+struct Position = {
+	var x: Int;
+	var y: Int;
+	var z: Int;
+};
+
+
+struct Phone = {
+	// no need to put " = uninit"
+	var generation: UInt;
+
+	// default values (explained a bit later)
+	var age: UInt = 0;
+
+	// arbitray bit-width integral types are allowed (even with regular variables)
+	var battery_percentage: UI7 = 100;
+
+
+
+	// structs can have methods
+	// methods that require a "this" must explicitly declare it
+	// 	- in this case, the "this" parameter is of type "Phone*"
+	// 	- if the "this" parameter is marked as "read", thats the equivalent of making a const method in C++
+	func charge = (this write, charge_ammount: UI7 read) -> Void {
+		// automatic dereferencing using the "."
+		this.battery_percentage += charge_ammount;
+
+		if(this.battery_percentage > 100){
+
+			// dereferences "this" first (parentheses not required)
+			(this.*).battery_percentage = 100;
+		}
+
+		// yes I'm aware the code in this function is technically unsafe (wrapping errors)
+	};
+
+
+
+	// since there is no "this" parameter, its the equivalent of a static method in C++
+	func get_max_charge = () -> UI7 { return 100; };
+
+
+
+
+	// this is the equivalent of the C++ constructor
+	// TODO: this syntax needs to be cleaned up
+	func init = (this write, generation: UInt) -> Phone {
+		// properties/functions must have an explicit "this." to use
+		// "this.generation" and "generation" are clearly distinct variables
+		this.generation = generation;
+
+		this.battery_percentage = 70;
+
+		// populates the default values of any properties not already set in this function
+		// 		- in this case, there battery_percentage was already set, so only this.age is set to the default value of 0
+		// 		- when making a function call before the @init(), the "this" can only be the value of a read parameter
+		@init();
+		
+		return this.*;
+	};
+
+
+	// function overloading is allowed
+	func init = (this write) -> Phone {
+		// since there is no "@init()" statement in this function, one is implicitly added at the beginning
+
+		// The compiler will error that this.generation is not defined
+		// Solutions given:
+		//      - give it a value
+		// 		- explicitly call "this.generation = uninit;"
+		// 		- change Phone.generation to an optional type (UInt?)
+
+		return this.*;
+	};
+
+
+	// this is the equivalent of the C++ destructor
+	func deinit = (this write) -> Void {
+		// much like init functions, deinit funcs have a @deinit()
+		// 	this deals with destructors instead of 
+	};
+
+
+
+
+	// explicily define the copy function
+	//  - if not defined, the compiler will generate one
+	//  - the "this" param is allowed to be read or write
+	//  - no other parameters are allowed
+	func copy = (this read) -> Phone {
+		// ...
+	};
+
+
+
+	// explicily define the move function
+	//  - if not defined, the compiler will generate one
+	//  - the "this" parameter must be write
+	//  - no other parameters are allowed
+	func move = (this write) -> Phone {
+		// ...
+	};
+
+};
+
+
+
+// declare struct that is aligned with the C-ABI for the target platform
+struct ExternStruct = extern {
+	var num: CInt;
+	var boolean: Bool32;
+
+	// despite being an extern struct, methods are supported
+	func num_is_0 = (this read) -> Bool { return this.num == 0; };
+};
+
+
+// declare a packed struct (helful for interfacing with packed bit-fields)
+struct VulkanPacked = packed {
+	var patch:   UI12;
+	var minor:   UI10;
+	var major:   UI7;
+	var variant: UI3;
+};
+
+// The above is an example for Vulkan version numbers:
+//   - Can be `bitcast` from the Vulkan value and it will interpret the values correctly
+//   - Vulkan documentation: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#extendingvulkan-coreversions-versionnumbers
+
+
+///////////////////////////////////
+// scoping
+
+struct Counter = {
+	// explicitly creating a default initializer, and telling the compiler to create one
+	// 		- if no initializers are defined, the default initializer is automatically created
+	// 		- if any initializers are defined, the default initializer must be explicitly defined if it is wanted
+	// 		- a default initializer cannot coexist with an initializer that only has one parameter (this write)
+
+	def init = default;
+
+	func init = (this write, UInt max, UInt starting_count) -> Counter {
+		this.max = max;
+		this.current_number = starting_count;
+
+		return this.*;
+	};
+
+
+
+	// publically viewable
+	var max: UInt? = null;
+
+	// publically viewable
+	func next = (this write) -> UInt {
+		defer{ this.current_number += 1; }
+
+		if(this.should_wrap()){
+			this.current_number = 0;
+		}
+
+		return this.current_number;
+	};
+
+
+	// not publicly writable, but is publicly readable (not same as C++ protected)
+	protected var current_number: UInt = 0;
+
+	// not publicly readable or writable (if was var)
+	func should_wrap = (this read) -> Bool {
+		// wrap if at max value (if have one)
+		return (this.max != null && this.current_number >= this.max.?);
+	};
+};
+
+
+
+
+///////////////////////////////////
+// using structs
+
+func main = () Void {
+	// create a phone
+	//  - implicit call to the Phone.init() function
+	//  - selects the correct init() function
+	//  - no need to pass the "this" param
+	//  - automatically creates the statement "defer { phone.deinit() };"
+	var phone = Phone{12};
+
+
+	var phone_max_charge = phone.get_max_charge();
+
+	// same value as the statement above
+	// this works because the function takes no "this" param
+	phone_max_charge = Phone.get_max_charge();
+
+
+
+	var phone_copy = copy phone; // same as calling phone.copy();
+
+
+	// since Counter has a default initializer, this is allowed
+	// 	- @init() will not override these values
+	//  - unlike C++, order does not matter
+	var counter = Counter{
+		max = 100,
+	};
+
+};
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// enums
+
+
+// Selects the smallest possible underlying type (preferring unsigned if possible)
+// In this case, it's an i5
+def Direction = enum {
+	Left,
+	Right = -10,
+	Up,
+	Down = 6,
+};
+
+
+// enum with explicit underlying type
+// 		- must be built-in integral type
+def Color = enum : I16 {
+	Red,
+	Green = 5, // allowed to specify the values
+	Blue,
+};
+
+
+// underlying type matches the C ABI for the target platform
+def CardinalDirections = enum : extern {
+	North,
+	South,
+	East,
+	West,
+
+
+	// methods are allowed
+	func isNorth = (this read) -> Bool {
+		var is_north: Bool = (this == CardinalDirections.North);
+
+		// this is the same value
+		is_north = (this == this.North);
+
+		// this is also the same value (it's inferred from the variable type)
+		is_north = (this == .North);
+
+
+		return is_north;
+	}
+
+	// no explicit initializers, movers, or copiers allowed
+};
+
+
+//////////////////////////////////////////////////////////////////////
+// unions
+
+
+union UnionExample = {
+	a: Int,
+	b: F32,
+	c: Bool,
+};
+
+
+union TaggedUnion = tagged {
+	integer: Int,
+	float:   F32,
+	boolean: Bool,
+	b32:     Bool32,
+
+	// methods are allowed
+	func is_bool_type = (this read) -> Bool {
+		return this == .boolean || this == .b32;
+	};
+};
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// flags
+
+// Selects the smallest possible underlying type
+// In this case, it's an ui4
+def CarProperties = flags {
+	isFast,
+	isOld,
+	isConvertable,
+	hasTurbo,
+
+	// methods are allowed
+	func is_sports_car = (this read) -> Bool {
+		// access values just like it were a struct
+		return this.isFast && this.hasTurbo;
+	};
+
+	// no explicit initializers, movers, or copiers allowed
+};
+
+
+// flags with explicit underlying type
+// 		- must be built-in unsigned integral type
+def HasFood = flags : UI16 {
+	Meat,
+	Dairy,
+	Grains,
+	Vegtables,
+};
+
+
+func main = () Void {
+
+	// create with the following properties
+	var car_props = CarProperties{
+		.isFast,
+		CarProperties.hasTurbo, // optional explicit type scope used
+		.isConvertable,
+	};
+
+};
+
+
+
+//////////////////////////////////////////////////////////////////////
+// arrays
+
+func main = () Void {
+	// create an array of 6 ints (uninitialized)
+	var uninit_arr: [Int:6] = uninit;
+
+	// create an array of 6 Ints
+	var arr: [Int:6] = {1, 2, 3, 4, 5, 6};
+
+	// inferred length of the array (in this case, 3)
+	var inferred_arr: [Int:_] = {1, 2, 3};
+
+	def inline = [Int:_]{1, 2, 3};
+
+
+
+	// get first value of array
+	var first_value = arr[0];
+
+	// throws an error in debug and safe (explained later)
+	var out_of_bounds = arr[72];
+};
+
+
+
+//////////////////////////////////////////////////////////////////////
+// interfaces / iterators
+
+// interfaces are a list of functions a struct has to have implement (for use in generics)
+// 	here's what an interface for an iterator will probably look like
+def Iterator = interface {
+	def next: func (this write) -> Void;
+	def prev: func (this write) -> Void;
+
+	// TODO: operator !=
+	// TODO: operator .*
+};
+
+
+// here's an implementation of an iterator for ints
+def IntIter = struct : Iterator {
+	func init = (this write, ptr: Int* in) -> IntIter {
+		this.ptr = move ptr;
+
+		return this.*;
+	};
+
+
+	func next = (this write) Void {
+		(this.ptr cast USize) += @sizeof(Int);
+	};
+
+	func prev = (this write) Void {
+		(this.ptr cast USize) -= @sizeof(Int);
+	};
+
+
+	// TODO: operator !=
+	// TODO: operator .*
+
+	protected var ptr: Int*;
+};
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// loops / labled blocks
+
+
+func main = () -> Void {
+	///////////////////////////////////
+	// while
+
+	while(true){
+		// do stuff forever...
+	}
+
+
+	///////////////////////////////////
+	// do while
+
+	do{
+		// do stuff forever...
+	}while(true)
+	
+
+	///////////////////////////////////
+	// for loops
+
+	// basic loop from 0 to 10
+	for(0, <, 10) [i: Int] {
+		// do stuff...
+	}
+
+	// same as "for(int64_t i = 0; i < 10; i+=1){...}" in C/C++
+
+	// TODO: maybe change the range syntax
+
+	// having the "i" variable is optional
+	for(0, <=, 15){
+
+	}
+
+
+	
+	///////////////////////////////////
+	// iterator loops
+	// TODO: maybe change the name of this, but maybe keep the same for continuity with other languages
+
+
+	// loop over array
+	def arr: [Int:_] = {1, 2, 3};
+
+	iter(arr) [i: USize, value: Int] { /*do stuff...*/ }
+
+	// you can ignore values
+	// also infers types
+	iter(arr) [_, value] { /*do stuff...*/ }
+
+
+
+	///////////////////////////////////
+	// labeled blocks
+
+	// TODO: maybe change the syntax for block labeling
+
+	for(0, < 10) [i] {->outer
+		for(0, < 10) [j] xinner
+			if(j == 4){
+				break->outer;
+			}
+		}
+	}
+
+};
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// views
+
+
+func get_sum_of_list = (array_view: [Int:@]) -> [total: Int] {
+	for(array_view) [_, value] {
+		total += value;
+	}
+
+	return ...;
+};
+
+
+func main = () -> Void {
+	def arr = [Int:_]{1, 2, 3};
+	var sum = get_sum_of_list(arr);
+};
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// errors
+
+// Errors in Panther are kinda like exceptions in C++ except they are values 
+//   and they must be dealt with immediately (instead of going who knows where)
+
+// every error name gets a unique identifier within compilation
+// TODO: figure out how that works with extern code
+
+
+
+// maybe returns an error of type std.error
+func func_that_can_error = (num: Int) -> Int |std.error| {
+	// error if number is even
+	if(num % 2 == 0){
+		throw std.error.Fail;
+	}
+
+	return num * 2;
+};
+
+
+// the rules for defining errors work the same way as regular return values
+//   multiple errors are allowed, you can name them, etc
+
+// mental model: "return" uses the normal return values, 'throw' uses the error return values
+
+
+
+
+
+def std = @import("std");
+
+func main = () Void {
+	def fs = std.fs;
+
+	try{
+		def file = fs.read_file("path/to/file.ext");
+
+
+		// doesn't error so it sets the value
+		var num_result = func_that_can_error(13);
+
+
+		// this will error and it will jump to the catch
+		// 	because it errored, the vaule of num_result is considered uninit
+		num_result = func_that_can_error(12);
+
+	}catch(e: std.error.Files){
+		// handle error....
+
+	}catch(e: std.error){
+		// picks the correct catch block statically (no RTTI needed)
+	}
+
+};
+
+
+
+//////////////////////////////////////////////////////////////////////
+// operator overloading
+
+
+struct Vec2 = {
+	var x: F32;
+	var y: F32;
+
+	func operator{+} = (this read, rhs: Vec2 read) -> Vec2 {
+		return Vec2{
+			x = this.x + rhs.x,
+			y = this.y + rhs.y,
+		};
+	};
+
+
+	func operator{+=} = (this write, rhs: Vec2 read) -> Void {
+		this.x += rhs.x;
+		this.y += rhs.y;
+	};
+};
+
+
+//////////////////////////////////////////////////////////////////////
+// modules
+
+
+func this_func_is_private = () -> Int {
+	return 12;
+};
+
+pub def this_func_is_public = () -> Int {
+	return 12;
+};
+
+
+def import_file = @import("path/to/file.pthr");
+pub def export_an_import = @import("C://different_path/to/different file.pthr");
+
+
+
+//////////////////////////////////////////////////////////////////////
+// switch
+
+func main = () -> Void {
+	def num: int = 12;
+
+
+	// switch cases automatically break
+	switch(num){
+		case(1){
+			// doesn't fire
+
+		}case(5, 9, 45){// multiple values
+			// doesn't fire
+
+		}case(12){
+			// does fire
+
+			// fallthrough (doesn't break)
+			@fallthrough();
+
+			// code cannot be here
+
+		}case(19){
+			// fires because of fallthrough
+
+			// are allowed to fallthrough to default case
+			@fallthrough();
+		}
+
+		default{
+			// default case (none found)
+		}
+	}
+};
+
+
+
+//////////////////////////////////////////////////////////////////////
+// strings
+
+// declaration of a string
+var hello_string: String = "hello";
+
+
+// the string-literal is put into read-only memory. The structure of the memory for the string-literal "hello" looks like the following:
+/*
+	struct packed {
+		def length:          UI32     = 5;
+		def data:            [Char:5] = {'h', 'e', 'l', 'l', 'o'};
+		def null_terminator: Char     = '\0';
+	}
+*/
+
+// This means that a string-literal is guaranteed to be null-terminated to allow for interaction with extern C code
+
+// In the example above, the `hello_string` variable is just a pointer to the `.data` member.
+
+
+// to reduce errors with interaction with extern C code, `@sizeof(hello_string)` would return 6
+
+// to get the actual string length (in this case: 5), you can use `@length(hello_string)`.
+// 	This uses the .length property instead of checking where the null-terminator is, or getting '@sizeof(.data)' (in case of type erasure)
+
+
+// Panther DOES NOT use null-terminators. The only reason it is there is to work with extern C code
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// external code (C)
+
+// interfacing with C code will be expanded in the future (compiler could compiling C code and can @import on header files)
+
+// But for now, probably something like this:
+
+// "extern" is implicitly "def"
+
+// void *memset(void *dest, int c, size_t count);
+extern memset = func(dest: Rawptr in, c: CInt in, count: USize in) -> Void;
+
+
+
+// varargs are allowed to (only in extern functions)
+
+// int printf( const char* format, ... );
+extern printf = func(format: String in, ...) -> CInt;
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// TODO:
+
+// comptime
+// generics
+

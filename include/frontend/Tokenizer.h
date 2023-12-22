@@ -120,6 +120,8 @@ namespace panther{
 			EVO_NODISCARD auto getStringValue(TokenID id) const noexcept -> const std::string&;
 			EVO_NODISCARD auto getBoolValue(TokenID id) const noexcept -> bool;
 			EVO_NODISCARD auto getIntegerValue(TokenID id) const noexcept -> uint64_t;
+			EVO_NODISCARD auto getFloatingPointValue(TokenID id) const noexcept -> float128_t;
+
 
 
 			auto error(const std::string& message, uint32_t line, uint32_t collumn) const noexcept -> void;

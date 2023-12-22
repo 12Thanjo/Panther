@@ -58,7 +58,11 @@ namespace panther{
 
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
+
+
 			EVO_NODISCARD auto parse_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_term() noexcept -> Result;
+			EVO_NODISCARD auto parse_literal() noexcept -> Result;
 
 
 
@@ -77,7 +81,9 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Ident> idents{};
+			std::vector<AST::Literal> literals{};
 			std::vector<AST::Type> types{};
+			std::vector<AST::Term> terms{};
 
 			friend class ParserReader;
 	};

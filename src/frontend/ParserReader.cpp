@@ -38,6 +38,7 @@ namespace panther{
 	};
 
 
+
 	auto ParserReader::getType(AST::NodeID id) noexcept -> AST::Type& {
 		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Type, "Not a type");
 
@@ -50,6 +51,22 @@ namespace panther{
 
 		const uint32_t index = this->parser.nodes[id.id].value_index;
 		return this->parser.types[index];
+	};
+
+
+
+	auto ParserReader::getLiteral(AST::NodeID id) noexcept -> AST::Literal& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Literal, "Not a literal");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.literals[index];
+	};
+
+	auto ParserReader::getLiteral(AST::NodeID id) const noexcept -> const AST::Literal& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Literal, "Not a literal");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.literals[index];
 	};
 
 
@@ -166,11 +183,65 @@ namespace panther{
 				evo::logInfo("uninit");
 			} break;
 
+			case AST::Kind::Literal: {
+				this->print_literal(id, indenter);
+			} break;
+
+			case AST::Kind::Ident: {
+				indenter.print();
+				evo::logInfo(this->getIdentName(id));
+			} break;
+
+			case AST::Kind::Null: {
+				indenter.print();
+				evo::logInfo("null");
+			} break;
+
+			case AST::Kind::This: {
+				indenter.print();
+				evo::logInfo("this");
+			} break;
+
 
 			default: {
 				EVO_FATAL_BREAK("Unknown Expr type");
 			} break;
 		};
+	};
+
+
+	auto ParserReader::print_literal(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::Literal& literal = this->getLiteral(id);
+
+		switch(this->parser.reader.getKind(literal.token)){
+			case Token::LiteralBool: {
+				indenter.print();
+				evo::logInfo(std::format("{} [LiteralBool]", evo::boolStr(this->parser.reader.getBoolValue(literal.token))));
+			} break;
+
+			case Token::LiteralString: {
+				indenter.print();
+				evo::logInfo(std::format("{} [LiteralString]", this->parser.reader.getStringValue(literal.token)));
+			} break;
+
+			case Token::LiteralChar: {
+				indenter.print();
+				evo::logInfo(std::format("{} [LiteralChar]", this->parser.reader.getStringValue(literal.token)));
+			} break;
+
+
+			case Token::LiteralInt: {
+				indenter.print();
+				evo::logInfo(std::format("{} [LiteralInt]", this->parser.reader.getIntegerValue(literal.token)));
+			} break;
+
+			case Token::LiteralFloat: {
+				indenter.print();
+				evo::logInfo(std::format("{} [LiteralFloat]", this->parser.reader.getFloatingPointValue(literal.token)));
+			} break;
+		};
+
+
 	};
 
 

@@ -19,7 +19,6 @@ namespace panther{
 			break; case Token::Kind::LiteralInt: return "LiteralInt";
 			break; case Token::Kind::LiteralFloat: return "LiteralFloat";
 
-			break; case Token::Kind::LiteralNull: return "LiteralNull";
 
 
 			///////////////////////////////////
@@ -27,6 +26,8 @@ namespace panther{
 
 			break; case Token::Kind::TypeVoid: return "Void";
 			break; case Token::Kind::TypeBool: return "Bool";
+			break; case Token::Kind::TypeString: return "String";
+			break; case Token::Kind::TypeChar: return "Char";
 
 			break; case Token::Kind::TypeInt: return "Int";
 			break; case Token::Kind::TypeIntN: return "IntN";
@@ -86,6 +87,7 @@ namespace panther{
 			break; case Token::Kind::KeywordThis: return "this";
 			break; case Token::Kind::KeywordUnderscore: return "_";
 			break; case Token::Kind::KeywordUninit: return "uninit";
+			break; case Token::Kind::KeywordNull: return "LiteralNull";
 
 
 			///////////////////////////////////

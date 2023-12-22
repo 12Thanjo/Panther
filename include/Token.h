@@ -25,14 +25,14 @@ namespace panther{
 			LiteralInt,
 			LiteralFloat,
 
-			LiteralNull,
-
 
 			///////////////////////////////////
 			// types
 
 			TypeVoid,
 			TypeBool,
+			TypeString,
+			TypeChar,
 
 			TypeInt,
 			TypeIntN,
@@ -99,6 +99,8 @@ namespace panther{
 			KeywordThis,
 			KeywordUnderscore,
 			KeywordUninit,
+			KeywordNull,
+
 
 
 
