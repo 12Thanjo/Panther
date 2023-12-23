@@ -3,13 +3,14 @@
 
 #include <Evo.h>
 
+#include "./Printer.h"
 
 namespace panther{
 
 
 	class SourceManager{
 		public:
-			SourceManager() = default;
+			SourceManager(const Printer& _printer) : printer(_printer) {};
 			~SourceManager() = default;
 
 
@@ -58,6 +59,7 @@ namespace panther{
 		private:
 			std::vector<SourceFile> sources{};
 
+			const Printer& printer;
 			bool has_errored = false;
 
 	};

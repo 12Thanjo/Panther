@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.0.10
+- Added parsing of expression operators
+- Added parsing of parenthesis enclosed expressions
+- Added Printer class to manage logging
+	- ability to disable colors
+
 ### v0.0.9
 - Added the description.pthr file
 - Added tokenizing of the builtin `String` and `Char` types

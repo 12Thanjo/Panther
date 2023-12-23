@@ -3,6 +3,7 @@
 
 #include <Evo.h>
 
+#include "Printer.h"
 #include "CharStream.h"
 #include "Token.h"
 
@@ -95,7 +96,8 @@ namespace panther{
 
 	class TokenizerReader{
 		public:
-			TokenizerReader(Tokenizer& _tokenizer) : tokenizer(_tokenizer) {};
+			TokenizerReader(Tokenizer& _tokenizer, const Printer& _printer)
+				: tokenizer(_tokenizer), printer(_printer) {};
 			~TokenizerReader() = default;
 
 
@@ -145,6 +147,7 @@ namespace panther{
 
 		private:
 			Tokenizer& tokenizer;
+			const Printer& printer;
 
 			int64_t cursor = 0;
 	};

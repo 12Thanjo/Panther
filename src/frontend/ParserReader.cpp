@@ -39,6 +39,54 @@ namespace panther{
 
 
 
+	auto ParserReader::getPrefix(AST::NodeID id) noexcept -> AST::Prefix& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Prefix, "Not a prefix");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.prefixes[index];
+	};
+
+	auto ParserReader::getPrefix(AST::NodeID id) const noexcept -> const AST::Prefix& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Prefix, "Not a prefix");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.prefixes[index];
+	};
+
+
+	auto ParserReader::getInfix(AST::NodeID id) noexcept -> AST::Infix& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Infix, "Not an infix");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.infixes[index];
+	};
+
+	auto ParserReader::getInfix(AST::NodeID id) const noexcept -> const AST::Infix& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Infix, "Not an infix");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.infixes[index];
+	};
+
+
+	auto ParserReader::getPostfix(AST::NodeID id) noexcept -> AST::Postfix& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Postfix, "Not a postfix");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.postfixes[index];
+	};
+
+	auto ParserReader::getPostfix(AST::NodeID id) const noexcept -> const AST::Postfix& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Postfix, "Not a postfix");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.postfixes[index];
+	};
+
+
+
+
+
 	auto ParserReader::getType(AST::NodeID id) noexcept -> AST::Type& {
 		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Type, "Not a type");
 
@@ -76,7 +124,7 @@ namespace panther{
 
 
 	auto ParserReader::print_to_console() const noexcept -> void {
-		auto indenter = Indenter{};
+		auto indenter = Indenter{this->printer};
 
 		for(const AST::NodeID& stmt : this->parser.top_level_statements){
 			switch(this->getNodeKind(stmt)){
@@ -92,52 +140,57 @@ namespace panther{
 
 		indenter.print();
 		
-		evo::logInfo("Variable Declaration:");
+		this->printer.info("Variable Declaration:\n");
 		
 		indenter.push();
 		indenter.print();
-		evo::logInfo(std::format("Ident: {}", this->getIdentName(var_decl.ident)));
+		this->printer.info("Ident: ");
+		this->printer.debug(this->getIdentName(var_decl.ident) + '\n');
 
 		indenter.set_arrow();
 		indenter.print();
 		if(var_decl.type.has_value()){
-			evo::logInfo("Type: ");
+			this->printer.info("Type: \n");
 			indenter.push();
 			indenter.set_end();
 			this->print_type(*var_decl.type, indenter);
 			indenter.pop();
 		}else{
-			evo::logInfo("Type: [INFER]");
+			this->printer.info("Type: ");
+			this->printer.debug("[INFER]\n");
 		}
 
 
 		indenter.set_arrow();
 		indenter.print();
+		this->printer.info("Decl Type: ");
 		if(var_decl.decl_type == AST::VarDecl::DeclType::Var){
-			evo::logInfo("Decl Type: var");
+			this->printer.debug("var\n");
 		}else{
-			evo::logInfo("Decl Type: def");
+			this->printer.debug("def\n");
 		}
 
 		indenter.set_arrow();
 		indenter.print();
+		this->printer.info("Static: ");
 		if(var_decl.is_static){
-			evo::logInfo("Static: true");
+			this->printer.debug("true\n");
 		}else{
-			evo::logInfo("Static: false");
+			this->printer.debug("false\n");
 		}
 
 		indenter.set_arrow();
 		indenter.print();
+		this->printer.info("Static: ");
 		if(var_decl.is_public){
-			evo::logInfo("Public: true");
+			this->printer.debug("true\n");
 		}else{
-			evo::logInfo("Public: false");
+			this->printer.debug("false\n");
 		}
 
 		indenter.set_end();
 		indenter.print();
-		evo::logInfo("Value: ");
+		this->printer.info("Value: \n");
 		indenter.push();
 		indenter.set_end();
 		this->print_expr(var_decl.expr, indenter);
@@ -158,14 +211,14 @@ namespace panther{
 		switch(type.kind){
 			case AST::Type::Kind::Ident: {
 				indenter.print();
-				evo::logInfo(this->parser.reader.getStringValue(type.value.builtin.token));
+				this->printer.debug(this->parser.reader.getStringValue(type.value.builtin.token) + '\n');
 
 			} break;
 
 			case AST::Type::Kind::Builtin: {
 				indenter.print();
 				const Token::Kind kind = this->parser.reader.getKind(type.value.builtin.token);
-				evo::logInfo(std::format("{} [BUILTIN]", Token::print_kind(kind)));
+				this->printer.debug(std::format("{} [BUILTIN]\n", Token::print_kind(kind)));
 			} break;
 
 
@@ -180,7 +233,7 @@ namespace panther{
 		switch(this->getNodeKind(id)){
 			case AST::Kind::Uninit: {
 				indenter.print();
-				evo::logInfo("uninit");
+				this->printer.debug("uninit\n");
 			} break;
 
 			case AST::Kind::Literal: {
@@ -189,17 +242,81 @@ namespace panther{
 
 			case AST::Kind::Ident: {
 				indenter.print();
-				evo::logInfo(this->getIdentName(id));
+				this->printer.debug(this->getIdentName(id) + '\n');
 			} break;
 
 			case AST::Kind::Null: {
 				indenter.print();
-				evo::logInfo("null");
+				this->printer.debug("null\n");
 			} break;
 
 			case AST::Kind::This: {
 				indenter.print();
-				evo::logInfo("this");
+				this->printer.debug("this\n");
+			} break;
+
+
+			case AST::Kind::Type: {
+				this->print_type(id, indenter);
+			} break;
+
+
+			case AST::Kind::Prefix: {
+				const AST::Prefix& infix = this->getPrefix(id);
+
+				indenter.print();
+				this->printer.info("Prefix Operator:\n");
+
+				indenter.push();
+
+					indenter.set_arrow();
+					indenter.print();
+					this->printer.info("Op: ");
+					this->printer.debug(std::format("{}\n", Token::print_kind(this->parser.reader.getKind(infix.op))));
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Right-Hand Side: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(infix.rhs, indenter);
+					indenter.pop();
+
+
+				indenter.pop();
+			} break;
+
+			case AST::Kind::Infix: {
+				const AST::Infix& infix = this->getInfix(id);
+
+				indenter.print();
+				this->printer.info("Infix Operator:\n");
+
+				indenter.push();
+
+					indenter.set_arrow();
+					indenter.print();
+					this->printer.info("Op: ");
+					this->printer.debug(std::format("{}\n", Token::print_kind(this->parser.reader.getKind(infix.op))));
+
+					indenter.set_arrow();
+					indenter.print();
+					this->printer.info("Left-Hand Side: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(infix.lhs, indenter);
+					indenter.pop();
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Right-Hand Side: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(infix.rhs, indenter);
+					indenter.pop();
+
+
+				indenter.pop();
 			} break;
 
 
@@ -216,28 +333,28 @@ namespace panther{
 		switch(this->parser.reader.getKind(literal.token)){
 			case Token::LiteralBool: {
 				indenter.print();
-				evo::logInfo(std::format("{} [LiteralBool]", evo::boolStr(this->parser.reader.getBoolValue(literal.token))));
+				this->printer.debug(std::format("{} [LiteralBool]\n", evo::boolStr(this->parser.reader.getBoolValue(literal.token))));
 			} break;
 
 			case Token::LiteralString: {
 				indenter.print();
-				evo::logInfo(std::format("{} [LiteralString]", this->parser.reader.getStringValue(literal.token)));
+				this->printer.debug(std::format("{} [LiteralString]\n", this->parser.reader.getStringValue(literal.token)));
 			} break;
 
 			case Token::LiteralChar: {
 				indenter.print();
-				evo::logInfo(std::format("{} [LiteralChar]", this->parser.reader.getStringValue(literal.token)));
+				this->printer.debug(std::format("{} [LiteralChar]\n", this->parser.reader.getStringValue(literal.token)));
 			} break;
 
 
 			case Token::LiteralInt: {
 				indenter.print();
-				evo::logInfo(std::format("{} [LiteralInt]", this->parser.reader.getIntegerValue(literal.token)));
+				this->printer.debug(std::format("{} [LiteralInt]\n", this->parser.reader.getIntegerValue(literal.token)));
 			} break;
 
 			case Token::LiteralFloat: {
 				indenter.print();
-				evo::logInfo(std::format("{} [LiteralFloat]", this->parser.reader.getFloatingPointValue(literal.token)));
+				this->printer.debug(std::format("{} [LiteralFloat]\n", this->parser.reader.getFloatingPointValue(literal.token)));
 			} break;
 		};
 

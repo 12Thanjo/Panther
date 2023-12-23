@@ -37,9 +37,8 @@ namespace panther{
 			};
 		}
 
-		evo::styleConsoleTrace();
-		evo::log(print_string);
-		evo::styleConsoleReset();
+
+		this->printer.trace(print_string);
 
 
 		// change types

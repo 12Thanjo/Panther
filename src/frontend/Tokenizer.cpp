@@ -984,7 +984,7 @@ namespace panther{
 				case Token::Kind::LiteralChar:
 				{
 					const std::string& token_value_string = this->tokenizer.token_value_strings[token.value.index];
-					evo::logInfo(std::format("{} ({})", Token::print_kind(token.kind), token_value_string));
+					this->printer.info(std::format("{} ({})", Token::print_kind(token.kind), token_value_string) + '\n');
 				} break;
 
 
@@ -998,30 +998,30 @@ namespace panther{
 					}();
 
 
-					evo::logInfo(std::format("LiteralBool ({})", token_value));
+					this->printer.info(std::format("LiteralBool ({})", token_value) + '\n');
 				} break;
 
 
 				case Token::Kind::LiteralInt: {
-					evo::logInfo(std::format("LiteralInt ({})", token.value.integer));
+					this->printer.info(std::format("LiteralInt ({})", token.value.integer) + '\n');
 				} break;
 
 				case Token::Kind::LiteralFloat: {
-					evo::logInfo(std::format("LiteralFloat ({})", token.value.floating_point));
+					this->printer.info(std::format("LiteralFloat ({})", token.value.floating_point) + '\n');
 				} break;
 
 
 				case Token::Kind::TypeIntN: {
-					evo::logInfo(std::format("I{}", token.value.integer));
+					this->printer.info(std::format("I{}", token.value.integer) + '\n');
 				} break;
 
 				case Token::Kind::TypeUIntN: {
-					evo::logInfo(std::format("UI{}", token.value.integer));
+					this->printer.info(std::format("UI{}", token.value.integer) + '\n');
 				} break;
 
 
 				default: {
-					evo::logInfo(std::format("{}", Token::print_kind(token.kind)));
+					this->printer.info(std::format("{}", Token::print_kind(token.kind)) + '\n');
 				} break;
 			};
 

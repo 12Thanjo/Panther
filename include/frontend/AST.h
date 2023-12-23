@@ -12,6 +12,10 @@ namespace panther{
 		enum class Kind{
 			VarDecl,
 
+			Prefix,
+			Infix,
+			Postfix,
+
 			Ident,
 			Literal,
 			Type,
@@ -61,6 +65,24 @@ namespace panther{
 			NodeID ident;
 			std::optional<NodeID> type; // null optional means type needs to be inferenced
 			NodeID expr;
+		};
+
+
+
+		struct Prefix{
+			TokenID op;
+			NodeID rhs;
+		};
+
+		struct Infix{
+			NodeID lhs;
+			TokenID op;
+			NodeID rhs;
+		};
+
+		struct Postfix{
+			NodeID lhs;
+			TokenID op;
 		};
 
 

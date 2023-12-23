@@ -3,12 +3,15 @@
 
 #include <Evo.h>
 
+
+#include "frontend/Printer.h"
+
 namespace panther{
 
 	
 	class Indenter{
 		public:
-			Indenter() = default;
+			Indenter(const Printer& _printer) : printer(_printer) {};
 			~Indenter() = default;
 
 
@@ -22,6 +25,8 @@ namespace panther{
 
 	
 		private:
+			const Printer& printer;
+
 			enum class Type{
 				Line,
 				Arrow,

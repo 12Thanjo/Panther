@@ -61,8 +61,23 @@ namespace panther{
 
 
 			EVO_NODISCARD auto parse_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_infix_expr(int prec_level = 1) noexcept -> Result;
+
+			// EVO_NODISCARD auto parse_logical_expr() noexcept -> Result;
+			// EVO_NODISCARD auto parse_equality_expr() noexcept -> Result;
+			// EVO_NODISCARD auto parse_bitshift_expr() noexcept -> Result;
+			// EVO_NODISCARD auto parse_pm_expr() noexcept -> Result;
+			// EVO_NODISCARD auto parse_tdm_expr() noexcept -> Result;
+			// EVO_NODISCARD auto parse_casting_expr() noexcept -> Result;
+			
+			EVO_NODISCARD auto parse_prefix_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_postfix_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_paren_expr() noexcept -> Result;
+
 			EVO_NODISCARD auto parse_term() noexcept -> Result;
 			EVO_NODISCARD auto parse_literal() noexcept -> Result;
+
+
 
 
 
@@ -80,6 +95,9 @@ namespace panther{
 
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
+			std::vector<AST::Prefix> prefixes{};
+			std::vector<AST::Infix> infixes{};
+			std::vector<AST::Postfix> postfixes{};
 			std::vector<AST::Ident> idents{};
 			std::vector<AST::Literal> literals{};
 			std::vector<AST::Type> types{};

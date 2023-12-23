@@ -345,7 +345,13 @@ namespace panther{
 	///////////////////////////////////
 	// expressions
 
-	auto Parser:: parse_expr() noexcept -> Result {
+
+	auto Parser::parse_expr() noexcept -> Result {
+		if(this->reader.is_eof()){
+			return Result::WrongType;
+		}
+
+
 		if(this->reader.getKind(this->reader.peek()) == Token::KeywordUninit){
 			this->reader.skip(1);
 
@@ -355,9 +361,11 @@ namespace panther{
 			return AST::NodeID{node_index};
 		}
 
-		const Result term_result = this->parse_term();
-		if(term_result.code() == Result::Success){
-			return term_result;
+		const Result infix_expr = this->parse_infix_expr();
+		if(infix_expr.code() == Result::Success){
+			return infix_expr;
+		}else if(infix_expr.code() == Result::Error){
+			return Result::Error;
 		}
 
 		return Result::WrongType;
@@ -365,19 +373,190 @@ namespace panther{
 
 
 
+
+	constexpr int MAX_PREC = 9;
+	EVO_NODISCARD static constexpr auto get_infix_op_precidence(Token::Kind kind) noexcept -> int {
+		switch(kind){
+			case Token::get("||"): return 1;
+
+			case Token::get("&&"): return 2;
+
+			case Token::get("|"): return 3;
+
+			case Token::get("&"): return 4;
+
+			case Token::get("=="): return 5;
+			case Token::get("!="): return 5;
+
+			case Token::get("<"): return 6;
+			case Token::get("<="): return 6;
+			case Token::get(">"): return 6;
+			case Token::get(">="): return 6;
+
+			case Token::get("<<"): return 7;
+			case Token::get(">>"): return 7;
+
+			case Token::get("+"): return 8;
+			case Token::get("-"): return 8;
+
+			case Token::get("*"): return 9;
+			case Token::get("/"): return 9;
+			case Token::get("%"): return 9;
+		};
+
+		return -1;
+	};
+
+
+	auto Parser::parse_infix_expr(int prec_level) noexcept -> Result {
+		if(prec_level > MAX_PREC){
+			return this->parse_prefix_expr();
+		}
+
+
+		const Result lhs_result = this->parse_infix_expr(prec_level + 1);
+		switch(lhs_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: return Result::WrongType;
+			case Result::Error: return Result::Error;
+			case Result::UnreportedError: return lhs_result; // don't want to report error here (although I'm not sure this will ever happen)
+		};
+
+		if(lhs_result.code() == Result::WrongType){ return lhs_result; }
+
+
+		const TokenID op_token = this->reader.peek();
+		if(get_infix_op_precidence(this->reader.getKind(op_token)) != prec_level){
+			return lhs_result;
+		}
+
+		// skip op
+		this->reader.skip(1);
+
+
+		if(this->reader.is_eof()){
+			this->error("Unexpected end of file in expression", this->reader.peek(-1));
+			return Result::Error;
+		}
+
+
+		// get rhs
+		const Result rhs_result = this->parse_infix_expr(prec_level);
+		switch(rhs_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: return Result::WrongType;
+			case Result::Error: return Result::Error;
+			case Result::UnreportedError: {
+				this->error(
+					std::format("Expected expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))), this->reader.peek()
+				);
+				return Result::Error;
+			}
+		};
+
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t infix_index = uint32_t(this->infixes.size());
+
+		this->nodes.emplace_back(AST::Kind::Infix, infix_index);
+		this->infixes.emplace_back(lhs_result.value(), op_token, rhs_result.value());
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+
+	auto Parser::parse_prefix_expr() noexcept -> Result {
+		// get prefix operation
+		const TokenID op_token = this->reader.peek();
+		bool is_postfix = false;
+		switch(this->reader.getKind(op_token)){
+			case Token::KeywordCopy:
+			case Token::KeywordMove:
+			case Token::KeywordAddr:
+			case Token::get("-"):
+				is_postfix = true;
+		};
+
+		if(is_postfix == false){ return this->parse_postfix_expr(); }
+
+		// skip op
+		this->reader.skip(1);
+
+
+		// get rhs
+		const Result rhs_result = this->parse_prefix_expr();
+		if(rhs_result.code() == Result::WrongType){
+			this->error(
+				std::format("Expected expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))), this->reader.peek()
+			);
+			return Result::Error;
+		}
+
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t prefix_index = uint32_t(this->prefixes.size());
+
+		this->nodes.emplace_back(AST::Kind::Prefix, prefix_index);
+		this->prefixes.emplace_back(op_token, rhs_result.value());
+
+		return AST::NodeID{node_index};
+	};
+
+
+	auto Parser::parse_postfix_expr() noexcept -> Result {
+		// nothing at the moment
+		return this->parse_paren_expr();		
+	};
+
+	auto Parser::parse_paren_expr() noexcept -> Result {
+		if(this->reader.getKind(this->reader.peek()) != Token::get("(")){
+			return this->parse_term();
+		}
+
+		// skip '('
+		this->reader.skip(1);
+
+		const Result expr_result = this->parse_expr();
+		switch(expr_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: return expr_result;
+			case Result::Error: return expr_result;
+			case Result::UnreportedError: return expr_result; // don't want to report error here (although I'm not sure this will ever happen)
+		};
+
+
+		if(this->reader.getKind(this->reader.peek()) != Token::get(")")){
+			this->error("Expected closing parenthesis around expression", this->reader.peek());
+			return Result::Error;
+		}
+
+		// skip ')'
+		this->reader.skip(1);
+
+		return expr_result;
+	};
+
+
+
+
+
 	// TODO: finish terms
 	auto Parser::parse_term() noexcept -> Result {
 		// literals
 		const Result literal_result = this->parse_literal();
-		if(literal_result.code() == Result::Success){
-			return literal_result;
-		}
+		if(literal_result.code() == Result::Success){ return literal_result; }
 
 		// idents
 		const Result ident_result = this->parse_ident();
-		if(ident_result.code() == Result::Success){
-			return ident_result;
-		}
+		if(ident_result.code() == Result::Success){ return ident_result; }
+
+		// types
+		const Result type_result = this->parse_type();
+		if(type_result.code() == Result::Success){ return type_result; }
 
 
 		const TokenID first_token = this->reader.next();

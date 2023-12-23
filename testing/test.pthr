@@ -1,13 +1,19 @@
 
-
-var bool: Bool = true;
-def string = "hello world";
-var char: Char = 'a';
-var int: Int = 12;
-var float: F64 = 18.4;
-
-def ident = foo;
+var asdf: Bool = 1 != 1 * 2 + 3 && 1 == 12;
+// var bar = 1 << 2 + 3;
 
 
-var ptr: Rawptr = null;
-var this_ref = this;
+
+// var foo: Int = (num as Int) * 2 - 3;
+
+// var bool: Bool = true;
+// def string = "hello world";
+// var char: Char = 'a';
+// var int: Int = 12;
+// var float: F64 = 18.4;
+
+// def ident = foo;
+
+
+// var ptr: Rawptr = null;
+// var this_ref = this;

@@ -25,7 +25,7 @@ namespace panther{
 	) noexcept -> void {
 		this->has_errored = true;
 
-		evo::logError("Error: " + message);
+		this->printer.error("Error: " + message + '\n');
 
 		if(line_start != line){
 			this->print_location(MessageType::Error, id, line, 1, collumn);
@@ -39,17 +39,17 @@ namespace panther{
 	auto SourceManager::error(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
 		this->has_errored = true;
 
-		evo::logError("Error: " + message);
+		this->printer.error("Error: " + message + '\n');
 
 		this->print_location(MessageType::Error, id, line, collumn);
 	};
 
 	auto SourceManager::error_info(const std::string& message) noexcept -> void {
-		evo::logInfo('\t' + message);
+		this->printer.info('\t' + message + '\n');
 	};
 	
 	auto SourceManager::error_info(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
-		evo::logInfo('\t' + message);
+		this->printer.info('\t' + message + '\n');
 		this->print_location(MessageType::ErrorInfo, id, line, collumn);
 	};
 
@@ -69,8 +69,8 @@ namespace panther{
 	) noexcept -> void {
 		this->has_errored = true;
 
-		evo::logFatal("Fatal Error: " + message);
-		evo::logFatal("This is an error in the compiler");
+		this->printer.fatal("Fatal Error: " + message + '\n');
+		this->printer.fatal("This is an error in the compiler" + '\n');
 
 		if(line_start != line){
 			this->print_location(MessageType::Error, id, line, 1, collumn);
@@ -125,9 +125,9 @@ namespace panther{
 		};
 
 		if(type == MessageType::ErrorInfo){
-			evo::logTrace("\t\t" + source.location);
+			this->printer.trace("\t\t" + source.location + '\n');
 		}else{
-			evo::logTrace('\t' + source.location);
+			this->printer.trace('\t' + source.location + '\n');
 		}
 
 
@@ -136,7 +136,7 @@ namespace panther{
 			line_str_to_print += '\t';
 		}
 		line_str_to_print += std::format("{}| {}", line, line_str);
-		evo::logTrace(line_str_to_print);
+		this->printer.trace(line_str_to_print + '\n');
 
 		auto point_str = std::string{'\t'};
 		size_t pointer_indentation = line_str_to_print.size() - line_str.size() - 2 + point_collumn;
@@ -154,8 +154,8 @@ namespace panther{
 
 
 		switch(type){
-			break; case MessageType::Error:     evo::logError(point_str);
-			break; case MessageType::ErrorInfo: evo::logInfo(point_str);
+			break; case MessageType::Error:     this->printer.error(point_str + '\n');
+			break; case MessageType::ErrorInfo: this->printer.info(point_str + '\n');
 		};
 	};
 

@@ -5,7 +5,7 @@
 
 
 #include "./Parser.h"
-
+#include "./Printer.h"
 
 
 namespace panther{
@@ -14,7 +14,7 @@ namespace panther{
 
 	class ParserReader{
 		public:
-			ParserReader(Parser& _parser) : parser(_parser) {};
+			ParserReader(Parser& _parser, const Printer& _printer) : parser(_parser), printer(_printer) {};
 			~ParserReader() = default;
 
 
@@ -23,6 +23,17 @@ namespace panther{
 
 			EVO_NODISCARD auto getVarDecl(AST::NodeID id) noexcept -> AST::VarDecl&;
 			EVO_NODISCARD auto getVarDecl(AST::NodeID id) const noexcept -> const AST::VarDecl&;
+
+
+			EVO_NODISCARD auto getPrefix(AST::NodeID id) noexcept -> AST::Prefix&;
+			EVO_NODISCARD auto getPrefix(AST::NodeID id) const noexcept -> const AST::Prefix&;
+
+			EVO_NODISCARD auto getInfix(AST::NodeID id) noexcept -> AST::Infix&;
+			EVO_NODISCARD auto getInfix(AST::NodeID id) const noexcept -> const AST::Infix&;
+
+			EVO_NODISCARD auto getPostfix(AST::NodeID id) noexcept -> AST::Postfix&;
+			EVO_NODISCARD auto getPostfix(AST::NodeID id) const noexcept -> const AST::Postfix&;
+
 
 			EVO_NODISCARD auto getType(AST::NodeID id) noexcept -> AST::Type&;
 			EVO_NODISCARD auto getType(AST::NodeID id) const noexcept -> const AST::Type&;
@@ -44,6 +55,7 @@ namespace panther{
 	
 		private:
 			Parser& parser;
+			const Printer& printer;
 
 			uint32_t cursor;
 	};

@@ -1,7 +1,7 @@
 #include <evo.h>
 #include <iostream>
 
-
+#include "frontend/Printer.h"
 #include "frontend/SourceManager.h"
 #include "frontend/CharStream.h"
 #include "frontend/Tokenizer.h"
@@ -10,20 +10,27 @@
 
 
 
-auto end_early(bool cond) noexcept -> void {
-	if(cond == false){
-		evo::logError("Failed to compile");
-		evo::logTrace("Press Enter to close...");
 
-		std::cin.get();
-
-		std::exit(1);
-	}
-};
 
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexcept -> int {
 	// evo::log("Panther:\n");
+
+	const auto printer = panther::Printer{true};
+
+
+	auto end_early = [&](bool cond) noexcept -> void {
+		if(cond == false){
+			printer.error("Failed to compile\n");
+			printer.trace("Press Enter to close...\n");
+
+			std::cin.get();
+
+			std::exit(1);
+		}
+	};
+
+
 
 
 	std::string const test_file_path = "./testing/test.pthr";
@@ -36,7 +43,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	test_file.close();
 
 
-	auto source_manager = panther::SourceManager{};
+	auto source_manager = panther::SourceManager{printer};
 
 	auto src_id = source_manager.addSourceFile(test_file_path, std::move(test_file_data));
 
@@ -49,23 +56,23 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	end_early(tokenize_successful);
 
 
-	auto tokenizer_reader = panther::TokenizerReader{tokenizer};
+	auto tokenizer_reader = panther::TokenizerReader{tokenizer, printer};
 	tokenizer_reader.print_to_console();
 
 
-	evo::logTrace("--------------------------");
+	printer.trace("--------------------------\n");
 
 	auto parser = panther::Parser{tokenizer_reader};
 	const bool parser_successful = parser.parse();
 
 	end_early(parser_successful);
 
-	auto parser_reader = panther::ParserReader{parser};
+	auto parser_reader = panther::ParserReader{parser, printer};
 	parser_reader.print_to_console();
 
 
 
-	evo::logTrace("Press Enter to close...");
+	printer.trace("Press Enter to close...\n");
 	std::cin.get();
 
 	return 0;

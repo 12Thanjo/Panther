@@ -277,41 +277,42 @@ expr:
 
 
 logical_expr:
-	logical_expr && equality_expr
-	logical_expr || equality_expr
+	equality_expr && logical_expr
+	equality_expr || logical_expr
 	equality_expr
 
 equality_expr:
-	equality_expr == bitshift_expr
-	equality_expr != bitshift_expr
-	equality_expr <  bitshift_expr
-	equality_expr <= bitshift_expr
-	equality_expr >  bitshift_expr
-	equality_expr >= bitshift_expr
+	bitshift_expr == equality_expr
+	bitshift_expr != equality_expr
+	bitshift_expr <  equality_expr
+	bitshift_expr <= equality_expr
+	bitshift_expr >  equality_expr
+	bitshift_expr >= equality_expr
 	bitshift_expr
 
 bitshift_expr:
-	bitshift_expr << pm_expr
-	bitshift_expr >> pm_expr
+	pm_expr << bitshift_expr
+	pm_expr >> bitshift_expr
 	pm_expr
 
 pm_expr:
-	pm_expr +  tdm_expr
-	pm_expr -  tdm_expr
-	pm_expr +| tdm_expr
-	pm_expr -| tdm_expr
+	tdm_expr +  pm_expr
+	tdm_expr -  pm_expr
+	tdm_expr +| pm_expr
+	tdm_expr -| pm_expr
 	tdm_expr
 
 tdm_expr:
-	pmd_expr *| casting_expr
-	pmd_expr / casting_expr
-	pmd_expr % casting_expr
+	casting_expr * pmd_expr
+	casting_expr *| pmd_expr
+	casting_expr / pmd_expr
+	casting_expr % pmd_expr
 	casting_expr
 
 
 casting_expr:
-	casting_expr AS prefix_expr
-	casting_expr CAST prefix_expr
+	prefix_expr AS casting_expr
+	prefix_expr CAST casting_expr
 	prefix_expr
 
 
@@ -320,6 +321,7 @@ prefix_expr:
 	MOVE prefix_expr
 	ADDR prefix_expr
 	- prefix_expr
+	~ prefix_expr
 	// ! prefix_expr
 	postfix_expr
 
@@ -332,16 +334,15 @@ paren_expr:
 	( expr )
 	term
 
-
-// not sure how to represent this one properly
 term:
 	term [ expr ]
 	term ( expr_list )
 	term brace_initializer
-	term . term
+	term . term // not sure how to represent this one properly
 	term .*
 	term .?
 	IDENT
+	type
 	. IDENT
 	INTRINSIC
 	THIS
