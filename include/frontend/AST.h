@@ -11,12 +11,17 @@ namespace panther{
 
 		enum class Kind{
 			VarDecl,
+			FuncDef,
+			FuncParams,
+
+			Block,
 
 			Prefix,
 			Infix,
 			Postfix,
 
 			Ident,
+			Attributes,
 			Literal,
 			Type,
 			Term,
@@ -68,6 +73,66 @@ namespace panther{
 		};
 
 
+		
+
+		struct FuncDef{
+			bool is_public;
+			bool is_static;
+			NodeID ident;
+			NodeID func_params;
+
+			struct Capture{
+				NodeID ident;
+
+				enum class Kind: uint8_t{
+					Read,
+					Write,
+					In,
+				};
+
+				Kind kind;
+			};
+			std::optional<std::vector<Capture>> captures;
+
+			NodeID attributes;
+
+			struct ReturnType{
+				std::optional<NodeID> name;
+				NodeID type;
+			};
+			std::vector<ReturnType> returns;
+			std::vector<ReturnType> errors;
+
+			NodeID block;
+		};
+
+		struct FuncParams{
+			struct Param{
+				NodeID ident;
+				NodeID type;
+
+				enum class Kind: uint8_t{
+					Read,
+					Write,
+					In,
+				};
+
+				Kind kind;
+
+				std::optional<NodeID> default_value;
+			};
+
+			std::vector<Param> params;
+		};
+
+
+
+		struct Block{
+			std::vector<NodeID> stmts;
+		};
+
+
+
 
 		struct Prefix{
 			TokenID op;
@@ -90,6 +155,10 @@ namespace panther{
 
 		struct Ident{
 			TokenID token;
+		};
+
+		struct Attributes{
+			std::vector<TokenID> tokens;
 		};
 
 		struct Literal{
@@ -125,6 +194,7 @@ namespace panther{
 		struct Term{
 			
 		};
+
 
 
 

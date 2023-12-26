@@ -29,7 +29,7 @@ namespace panther{
 
 		if(line_start != line){
 			this->print_location(MessageType::Error, id, line, 1, collumn);
-			this->error_info("Note: begins here", id, line_start, collumn_start);
+			this->error_info("begins here", id, line_start, collumn_start);
 
 		}else{
 			this->print_location(MessageType::Error, id, line, collumn_start, collumn);
@@ -45,11 +45,11 @@ namespace panther{
 	};
 
 	auto SourceManager::error_info(const std::string& message) noexcept -> void {
-		this->printer.info('\t' + message + '\n');
+		this->printer.info("\tNote: " + message + '\n');
 	};
 	
 	auto SourceManager::error_info(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
-		this->printer.info('\t' + message + '\n');
+		this->printer.info("\tNote: " + message + '\n');
 		this->print_location(MessageType::ErrorInfo, id, line, collumn);
 	};
 
@@ -74,7 +74,7 @@ namespace panther{
 
 		if(line_start != line){
 			this->print_location(MessageType::Error, id, line, 1, collumn);
-			this->error_info("Note: begins here", id, line_start, collumn_start);
+			this->error_info("begins here", id, line_start, collumn_start);
 
 		}else{
 			this->print_location(MessageType::Error, id, line, collumn_start, collumn);

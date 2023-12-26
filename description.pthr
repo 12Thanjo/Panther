@@ -79,7 +79,7 @@ func multiple_returns = () -> (Char, F32) {
 //  - the variables associated with the named return values are initially uninit (explained later)
 func named_multiple_returns = (num: I32) -> (larger: I64, unsigned: UI32) {
 	// safe casting use `as` operator
-	// THERE IS NO IMPLICIT TYPE CONVERSIONS FOR VARIABLES
+	// THERE ARE NO IMPLICIT TYPE CONVERSIONS FOR VARIABLES
 	larger = (num as I64);
 
 	// potentially unsafe casting use `cast` operator

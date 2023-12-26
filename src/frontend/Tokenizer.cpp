@@ -437,7 +437,7 @@ namespace panther{
 					this->stream.get_line(), this->stream.get_collumn()
 				);
 
-				this->stream.error_info("Note: the literal integer prefix for base-8 is \"0o\"");
+				this->stream.error_info("the literal integer prefix for base-8 is \"0o\"");
 				return true;
 			}
 		}

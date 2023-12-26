@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.0.11
+- Adding parsing of function definitions
+
 ### v0.0.10
 - Added parsing of expression operators
 - Added parsing of parenthesis enclosed expressions

@@ -1,6 +1,13 @@
 
-var asdf: Bool = 1 != 1 * 2 + 3 && 1 == 12;
-// var bar = 1 << 2 + 3;
+
+
+
+pub func test = (foo: F64 write, bar: Int = 12) [] #may_discard -> (happy: Bool, name: String) <Void> {
+	var foo: Int = 12;
+	static var bar = true;
+}
+
+// var asdf: Bool = 1 != 1 * 2 + 3 && 1 == 12;
 
 
 

@@ -5,48 +5,88 @@ namespace panther{
 	
 	auto Parser::parse() noexcept -> bool {
 		while(this->reader.is_eof() == false && this->reader.get_source_manager().errored() == false){
-			// var_decl
-			{
-				const auto result = this->parse_var_decl();
-				switch(result.code()){
-					case Result::Success: {
-						this->top_level_statements.emplace_back(result.value());
-						continue;
-					}
+			const Result stmt_result = this->parse_stmt();
 
-					case Result::WrongType: break;
+			switch(stmt_result.code()){
+				case Result::Success: {
+					this->top_level_statements.emplace_back(stmt_result.value());
+					continue;
+				} break;
 
-					case Result::Error: continue;
+				case Result::WrongType: {
+					this->error("Failed to parse statement - could not find any matching statement type", this->reader.peek());
+					this->error_info("Above is pointing to the beginning of the statement");
+					return false;
+				} break;
 
-					case Result::UnreportedError:{
-						this->fatal("Failed to parse Variable Declaration", this->reader.peek());
-						continue;
-					}
-				};
-			}
+				case Result::Error: {
+					return false;
+				} break;
 
+				case Result::UnreportedError: {
+					this->fatal("Encountered unknown and unreported error while parsing a statement", this->reader.peek());
+				} break;
+			};
 
-			// func_def
-			// assignment_stmt
-			// multiple_assignment
-			// conditional
-			// iteration
-			// try_catch
-			// while_stmt
-			// do_while_stmt
-			// typedef_stmt
-			// alias_stmt
-			// return_stmt
-			// defer_stmt
-			// struct_def
-			// expr ; // meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
-		
-			this->error("Invalid beginning to statement", this->reader.peek());
 		};
-
 
 		return this->reader.get_source_manager().errored() == false;
 	};
+
+
+
+
+	auto Parser::parse_stmt() noexcept -> Result {
+		// var_decl
+		{
+			const auto result = this->parse_var_decl();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+
+				case Result::UnreportedError:{
+					this->fatal("Failed to parse variable declaration", this->reader.peek());
+					return Result::Error;
+				}
+			};
+		}
+
+
+		// func_def
+		{
+			const auto result = this->parse_func_def();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+
+				case Result::UnreportedError:{
+					this->fatal("Failed to parse function definition", this->reader.peek());
+					return Result::Error;
+				}
+			};
+		}
+
+
+		// assignment_stmt
+		// multiple_assignment
+		// conditional
+		// iteration
+		// try_catch
+		// while_stmt
+		// do_while_stmt
+		// typedef_stmt
+		// alias_stmt
+		// return_stmt
+		// defer_stmt
+		// struct_def
+		// block
+		// expr ; // meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
+		
+		return Result::WrongType;
+	};
+
 
 
 
@@ -62,7 +102,7 @@ namespace panther{
 			this->reader.skip(1);
 
 			if(this->reader.is_eof()){
-				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+				this->unexpected_eof("variable declaration");
 				return Result::Error;
 			}
 		}
@@ -75,7 +115,7 @@ namespace panther{
 			this->reader.skip(1);
 
 			if(this->reader.is_eof()){
-				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+				this->unexpected_eof("variable declaration");
 				return Result::Error;
 			}
 		}
@@ -97,7 +137,7 @@ namespace panther{
 		}
 
 		if(this->reader.is_eof()){
-			this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+			this->unexpected_eof("variable declaration");
 			return Result::Error;
 		}
 
@@ -105,17 +145,12 @@ namespace panther{
 		// identifier
 		const Result ident_result = this->parse_ident();
 		if(ident_result.code() == Result::WrongType){
-			this->error(
-				std::format(
-					"Expected identifer in variable declaration - got ({}) instead", Token::print_kind( this->reader.getKind(this->reader.peek()) )
-				),
-				this->reader.peek()
-			);
+			this->expected_but_got("identifier in variable declaration");
 			return Result::Error;
 		}
 
 		if(this->reader.is_eof()){
-			this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+			this->unexpected_eof("variable declaration");
 			return Result::Error;
 		}
 
@@ -126,7 +161,7 @@ namespace panther{
 			this->reader.skip(1);
 
 			if(this->reader.is_eof()){
-				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+				this->unexpected_eof("variable declaration");
 				return Result::Error;
 			}
 
@@ -138,12 +173,7 @@ namespace panther{
 				} break;
 
 				case Result::WrongType: {
-					this->error(
-						std::format(
-							"Expected type in variable declaration - got ({}) instead", Token::print_kind( this->reader.getKind(this->reader.peek()) )
-						),
-						this->reader.peek()
-					);
+					this->expected_but_got("type in variable declaration");
 					return Result::Error;
 				} break;
 
@@ -158,7 +188,7 @@ namespace panther{
 			};
 			
 			if(this->reader.is_eof()){
-				this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+				this->unexpected_eof("variable declaration");
 				return Result::Error;
 			}
 		}
@@ -168,20 +198,10 @@ namespace panther{
 		// =
 		if(this->reader.getKind(this->reader.peek()) != Token::get("=")){
 			if(type.has_value()){
-				this->error(
-					std::format(
-						"Expected \"=\" in variable declaration - got ({}) instead", Token::print_kind( this->reader.getKind(this->reader.peek()) )
-					),
-					this->reader.peek()
-				);
+				this->expected_but_got("\"=\" in variable declaration");
 
 			}else{
-				this->error(
-					std::format(
-						"Expected either \": Type =\" or \"=\" in variable declaration - got ({}) instead", Token::print_kind( this->reader.getKind(this->reader.peek()) )
-					),
-					this->reader.peek()
-				);
+				this->expected_but_got("either \": Type =\" or \"=\" in variable declaration");
 			}
 
 			return Result::Error;
@@ -191,7 +211,7 @@ namespace panther{
 		}
 
 		if(this->reader.is_eof()){
-			this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
+			this->unexpected_eof("variable declaration");
 			return Result::Error;
 		}
 
@@ -202,12 +222,7 @@ namespace panther{
 			case Result::Success: break;
 
 			case Result::WrongType: {
-				this->error(
-					std::format(
-						"Expected expression in variable declaration - got ({}) instead", Token::print_kind( this->reader.getKind(this->reader.peek()) )
-					),
-					this->reader.peek()
-				);
+				this->expected_but_got("expression in variable declaration");
 				return Result::Error;
 			} break;
 
@@ -229,12 +244,7 @@ namespace panther{
 
 		// ;
 		if(this->reader.getKind(this->reader.peek()) != Token::get(";")){
-			this->error(
-				std::format(
-					"Expected \";\" at end of variable declaration - got ({}) instead", Token::print_kind( this->reader.getKind(this->reader.peek()) )
-				),
-				this->reader.peek()
-			);
+			this->expected_but_got("\";\" in variable declaration");
 
 		}else{
 			this->reader.skip(1);
@@ -250,6 +260,519 @@ namespace panther{
 
 		return AST::NodeID{node_index};
 	};
+
+
+
+
+	// TODO: EOF checking
+	auto Parser::parse_func_def() noexcept -> Result {
+		const TokenID first_token = this->reader.peek();
+
+		// check public
+		bool is_public = false;
+		if(this->reader.getKind(first_token) == Token::Kind::KeywordPub){
+			is_public = true;
+			this->reader.skip(1);
+
+			if(this->reader.is_eof()){
+				this->unexpected_eof("function definition");
+				return Result::Error;
+			}
+		}
+
+
+		// check static
+		bool is_static = false;
+		if(this->reader.getKind(this->reader.peek()) == Token::Kind::KeywordStatic){
+			is_static = true;
+			this->reader.skip(1);
+
+			if(this->reader.is_eof()){
+				this->unexpected_eof("function definition");
+				return Result::Error;
+			}
+		}
+
+
+		// func
+		if(this->reader.getKind(this->reader.next()) != Token::KeywordFunc){
+			this->reader.go_back(first_token);
+			return Result::WrongType;
+		}
+
+		// identifier
+		const Result ident_result = this->parse_ident();
+		if(ident_result.code() == Result::WrongType){
+			this->expected_but_got("identifer in function definition");
+			return Result::Error;
+		}
+
+		// =
+		if(this->reader.getKind(this->reader.next()) != Token::get("=")){
+			this->expected_but_got("\"=\" in function definition", this->reader.peek(-1));
+			return Result::Error;
+		}
+
+
+
+
+		// func params
+		const Result func_params_result = this->parse_func_params();
+		if(func_params_result.code() == Result::WrongType){
+			this->expected_but_got("\"(\" in function definition", this->reader.peek(-1));
+			return Result::Error;
+		}else if(func_params_result.code() == Result::Error){
+			return Result::Error;
+		}
+
+
+		
+
+		// capture
+		auto captures_optional = std::optional<std::vector<AST::FuncDef::Capture>>{};
+		if(this->reader.getKind(this->reader.peek()) == Token::get("[")){
+			const TokenID open_capture = this->reader.next();
+
+
+			auto captures = std::vector<AST::FuncDef::Capture>{};
+
+
+			while(true){
+				if(this->reader.getKind(this->reader.peek()) == Token::get("]")){
+					this->reader.skip(1);
+					break;
+				}
+
+
+				const Result capture_ident_result = this->parse_ident();
+				if(capture_ident_result.code() == Result::WrongType){
+					this->expected_but_got("identifier in function capture");
+					return Result::Error;
+				}
+
+
+				AST::FuncDef::Capture::Kind param_kind = AST::FuncDef::Capture::Kind::Read;
+				switch(this->reader.getKind(this->reader.peek())){
+					case Token::KeywordRead: {
+						this->reader.skip(1);
+					} break;
+
+					case Token::KeywordWrite: {
+						param_kind = AST::FuncDef::Capture::Kind::Write;
+						this->reader.skip(1);
+					} break;
+
+					case Token::KeywordIn: {
+						param_kind = AST::FuncDef::Capture::Kind::In;
+						this->reader.skip(1);
+					} break;
+				};
+
+
+
+				captures.emplace_back(capture_ident_result.value(), param_kind);
+
+				// ,
+				const TokenID after_param_peek = this->reader.next();
+				if(this->reader.getKind(after_param_peek) != Token::get(",")){
+					if(this->reader.getKind(after_param_peek) == Token::get("]")){
+						break;
+						
+					}else{
+						this->expected_but_got("\",\" at end of function capture or \"]\" at end of function captures block", this->reader.peek(-1));
+						return Result::Error;
+					}
+				}
+
+
+			};
+
+			captures_optional = std::move(captures);
+		}
+
+
+		// attributes
+		const Result attributes_result = this->parse_attributes();
+
+
+		// ->
+		if(this->reader.getKind(this->reader.next()) != Token::get("->")){
+			this->expected_but_got("\"->\" in function definition", this->reader.peek(-1));
+			return Result::Error;
+		}
+
+
+		// returns
+		auto returns = std::vector<AST::FuncDef::ReturnType>{};
+		if(this->reader.getKind(this->reader.peek()) == Token::get("(")){
+			this->reader.skip(1);
+
+			while(true){
+				if(this->reader.getKind(this->reader.peek()) == Token::get(")")){
+					this->reader.skip(1);
+					break;
+				}
+
+
+				const Result return_ident_result = this->parse_ident();
+				if(return_ident_result.code() == Result::WrongType){
+					this->expected_but_got("identifier in function return value");
+					return Result::Error;
+				}
+
+
+				// :
+				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+					this->expected_but_got("\":\" in function definition", this->reader.peek(-1));
+					return Result::Error;
+				}
+
+
+
+				const Result return_type_result = this->parse_type();
+				if(return_type_result.code() == Result::WrongType){
+					this->expected_but_got("type in function return value");
+					return Result::Error;
+				}
+
+				returns.emplace_back(return_ident_result.value(), return_type_result.value());
+
+
+				const TokenID after_return_peek = this->reader.next();
+				if(this->reader.getKind(after_return_peek) != Token::get(",")){
+					if(this->reader.getKind(after_return_peek) == Token::get(")")){
+						break;
+						
+					}else{
+						this->expected_but_got("\",\" at end of function return value or \")\" at end of function values block", this->reader.peek(-1));
+						return Result::Error;
+					}
+				}
+
+
+			};
+
+
+
+		}else{
+			const Result return_type = this->parse_type();
+			switch(return_type.code()){
+				case Result::Success: {
+					returns.emplace_back(std::nullopt, return_type.value());
+				} break;
+
+				case Result::WrongType: {
+					this->expected_but_got("function return type");
+					return Result::Error;
+				} break;
+
+				case Result::Error: {
+					return Result::Error;
+				} break;
+
+				case Result::UnreportedError: {
+					this->fatal("Failed to parse function return type", this->reader.peek(-1));
+				} break;
+			};
+		}
+
+
+
+		// eerrors
+		auto errors = std::vector<AST::FuncDef::ReturnType>{};
+		if(this->reader.getKind(this->reader.peek()) == Token::get("<")){
+			this->reader.skip(1);
+
+			const TokenID start_of_errors = this->reader.peek();
+			const Result single_error_type_result = this->parse_type();
+
+			bool is_single_return = false;
+			switch(single_error_type_result.code()){
+				case Result::Success: {
+					if(this->reader.getKind(this->reader.next()) != Token::get(">")){
+						this->reader.go_back(start_of_errors);
+					}else{
+						is_single_return = true;
+						errors.emplace_back(std::nullopt, single_error_type_result.value());
+					}
+				} break;
+
+				case Result::WrongType: {
+					this->reader.go_back(start_of_errors);
+				} break;
+
+				case Result::Error: {
+					return Result::Error;
+				} break;
+
+				case Result::UnreportedError: {
+					this->error("Failed to parse type of function error", this->reader.peek(-1));
+					return Result::Error;
+				} break;
+			};
+
+
+
+			while(is_single_return == false){
+				if(this->reader.getKind(this->reader.peek()) == Token::get(">")){
+					this->reader.skip(1);
+					break;
+				}
+
+
+				const Result return_ident_result = this->parse_ident();
+				if(return_ident_result.code() == Result::WrongType){
+					this->expected_but_got("identifier in function errors value");
+					return Result::Error;
+				}
+
+
+				// :
+				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+					this->expected_but_got("\":\" in function definition", this->reader.peek(-1));
+					return Result::Error;
+				}
+
+
+
+				const Result return_type_result = this->parse_type();
+				if(return_type_result.code() == Result::WrongType){
+					this->expected_but_got("type in function errors value");
+					return Result::Error;
+				}
+
+				errors.emplace_back(return_ident_result.value(), return_type_result.value());
+
+
+				const TokenID after_error_peek = this->reader.next();
+				if(this->reader.getKind(after_error_peek) != Token::get(",")){
+					if(this->reader.getKind(after_error_peek) == Token::get(">")){
+						break;
+						
+					}else{
+						this->expected_but_got("\",\" at end of function errors value or \">\" at end of function values block", this->reader.peek(-1));
+						return Result::Error;
+					}
+				}
+
+			};
+		}
+
+
+
+
+
+		const Result block_result = this->parse_block();
+		switch(block_result.code()){
+			case Result::Success: break;
+
+			case Result::WrongType: {
+				this->expected_but_got("{ } enclosed block after function defintion");
+				return Result::Error;
+			} break;
+
+			case Result::Error: return Result::Error;
+
+			case Result::UnreportedError: {
+				this->fatal("Encoutered error while trying to parse { } enclosed block after function definition", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+		};
+		
+
+
+
+		// create and return
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t func_def_index = uint32_t(this->func_defs.size());
+
+		this->nodes.emplace_back(AST::Kind::FuncDef, func_def_index);
+		this->func_defs.emplace_back(
+			is_public,
+			is_static,
+			ident_result.value(),
+			func_params_result.value(),
+			std::move(captures_optional),
+			attributes_result.value(),
+			std::move(returns),
+			std::move(errors),
+			block_result.value()
+		);
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+	// TODO: check for EOF
+	auto Parser::parse_func_params() noexcept -> Result {
+		// (
+		if(this->reader.getKind(this->reader.peek()) != Token::get("(")){
+			return Result::WrongType;
+		}else{
+			this->reader.skip(1);
+		}
+
+		auto params = std::vector<AST::FuncParams::Param>{};
+
+		while(true){
+			// )
+			if(this->reader.getKind(this->reader.peek()) == Token::get(")")){
+				this->reader.skip(1);
+				break;
+			}
+
+
+			const Result ident_result = this->parse_ident();
+			if(ident_result.code() == Result::WrongType){
+				this->expected_but_got("identifier in function parameter");
+				return Result::Error;
+			}
+
+
+			// :
+			if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+				this->expected_but_got("\":\" in function parameter", this->reader.peek(-1));
+				return Result::Error;
+			}
+
+
+			const Result type_result = this->parse_type();
+			if(type_result.code() == Result::WrongType){
+				this->expected_but_got("type in function parameter");
+				return Result::Error;
+			}
+
+
+			AST::FuncParams::Param::Kind param_kind = AST::FuncParams::Param::Kind::Read;
+			switch(this->reader.getKind(this->reader.peek())){
+				case Token::KeywordRead: {
+					this->reader.skip(1);
+				} break;
+
+				case Token::KeywordWrite: {
+					param_kind = AST::FuncParams::Param::Kind::Write;
+					this->reader.skip(1);
+				} break;
+
+				case Token::KeywordIn: {
+					param_kind = AST::FuncParams::Param::Kind::In;
+					this->reader.skip(1);
+				} break;
+			};
+
+
+			auto default_value = std::optional<AST::NodeID>{};
+			if(this->reader.getKind(this->reader.peek()) == Token::get("=")){
+				this->reader.skip(1);
+
+				const Result expr_result = this->parse_expr();
+				switch(expr_result.code()){
+					case Result::Success: {
+						default_value = expr_result.value();
+					} break;
+
+					case Result::WrongType: {
+						this->expected_but_got("expression in default value for function parameter");
+						return Result::Error;
+					} break;
+
+					case Result::Error: return Result::Error;
+
+					case Result::UnreportedError: {
+						this->error("Failed to parse expression in default value for function parameter", this->reader.peek());
+						return Result::Error;	
+					}
+				};
+
+			}
+
+
+
+			params.emplace_back(ident_result.value(), type_result.value(), param_kind, default_value);
+
+			// ,
+			const TokenID after_param_peek = this->reader.next();
+			if(this->reader.getKind(after_param_peek) != Token::get(",")){
+				if(this->reader.getKind(after_param_peek) == Token::get(")")){
+					break;
+					
+				}else{
+					this->expected_but_got("\",\" at end of function parameter or \")\" at end of function parameters block", this->reader.peek(-1));
+					return Result::Error;
+				}
+			}
+
+		};
+
+
+
+
+		// create and return
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t func_params_index = uint32_t(this->func_params.size());
+
+		this->nodes.emplace_back(AST::Kind::FuncParams, func_params_index);
+		this->func_params.emplace_back(std::move(params));
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+
+	// TODO: check for EOF
+	auto Parser::parse_block() noexcept -> Result {
+		if(this->reader.getKind(this->reader.next()) != Token::get("{")){
+			return Result::WrongType;
+		}
+
+		// TODO: parse statements
+		auto stmts = std::vector<AST::NodeID>{};
+
+		while(true){
+			// }
+			if(this->reader.getKind(this->reader.peek()) == Token::get("}")){
+				this->reader.skip(1);
+				break; 
+			}
+			
+			const Result stmt_result = this->parse_stmt();
+			switch(stmt_result.code()){
+				case Result::Success: {
+					stmts.push_back(stmt_result.value());
+				} break;
+
+				case Result::WrongType: {
+					this->error("Failed to parse statement - could not find any matching statement type", this->reader.peek());
+					this->error_info("Above is pointing to the beginning of the statement");
+					return Result::Error;
+				} break;
+
+				case Result::Error: {
+					return Result::Error;
+				} break;
+
+				case Result::UnreportedError: {
+					this->fatal("Encountered unknown and unreported error while parsing a statement", this->reader.peek());
+				} break;
+			};
+		};
+
+
+
+		// create and return
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t blocks_index = uint32_t(this->blocks.size());
+
+		this->nodes.emplace_back(AST::Kind::Block, blocks_index);
+		this->blocks.emplace_back(std::move(stmts));
+
+		return AST::NodeID{node_index};
+	};
+
+
+
 
 
 
@@ -269,6 +792,26 @@ namespace panther{
 
 		this->nodes.emplace_back(AST::Kind::Ident, ident_index);
 		this->idents.emplace_back(first_token);
+
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+	auto Parser::parse_attributes() noexcept -> Result {
+		auto attributes_list = std::vector<TokenID>{};
+
+		while(this->reader.getKind(this->reader.peek()) == Token::Attribute){
+			attributes_list.emplace_back(this->reader.next());
+		};
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t attribute_index = uint32_t(this->attributes.size());
+
+		this->nodes.emplace_back(AST::Kind::Attributes, attribute_index);
+		this->attributes.emplace_back(std::move(attributes_list));
 
 
 		return AST::NodeID{node_index};
@@ -374,7 +917,7 @@ namespace panther{
 
 
 
-	constexpr int MAX_PREC = 9;
+	constexpr int MAX_PREC = 10;
 	EVO_NODISCARD static constexpr auto get_infix_op_precidence(Token::Kind kind) noexcept -> int {
 		switch(kind){
 			case Token::get("||"): return 1;
@@ -402,6 +945,9 @@ namespace panther{
 			case Token::get("*"): return 9;
 			case Token::get("/"): return 9;
 			case Token::get("%"): return 9;
+
+			case Token::KeywordAs: return 10;
+			case Token::KeywordCast: return 10;
 		};
 
 		return -1;
@@ -435,7 +981,7 @@ namespace panther{
 
 
 		if(this->reader.is_eof()){
-			this->error("Unexpected end of file in expression", this->reader.peek(-1));
+			this->unexpected_eof("expression");
 			return Result::Error;
 		}
 
@@ -447,9 +993,7 @@ namespace panther{
 			case Result::WrongType: return Result::WrongType;
 			case Result::Error: return Result::Error;
 			case Result::UnreportedError: {
-				this->error(
-					std::format("Expected expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))), this->reader.peek()
-				);
+				this->expected_but_got(std::format("expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))));
 				return Result::Error;
 			}
 		};
@@ -489,9 +1033,7 @@ namespace panther{
 		// get rhs
 		const Result rhs_result = this->parse_prefix_expr();
 		if(rhs_result.code() == Result::WrongType){
-			this->error(
-				std::format("Expected expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))), this->reader.peek()
-			);
+			this->expected_but_got(std::format("expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))));
 			return Result::Error;
 		}
 
@@ -517,8 +1059,7 @@ namespace panther{
 			return this->parse_term();
 		}
 
-		// skip '('
-		this->reader.skip(1);
+		const TokenID open_location = this->reader.next();
 
 		const Result expr_result = this->parse_expr();
 		switch(expr_result.code()){
@@ -530,7 +1071,8 @@ namespace panther{
 
 
 		if(this->reader.getKind(this->reader.peek()) != Token::get(")")){
-			this->error("Expected closing parenthesis around expression", this->reader.peek());
+			this->expected_but_got("either closing parenthesis around expression or continuation of expression");
+			this->error_info("parenthesis opened here", open_location);
 			return Result::Error;
 		}
 
@@ -633,6 +1175,15 @@ namespace panther{
 	};
 	auto Parser::fatal(const std::string& message, TokenID token) const noexcept -> void {
 		this->reader.fatal(message, this->reader.getLineStart(token), this->reader.getCollumnStart(token), this->reader.getLine(token), this->reader.getCollumn(token));
+	};
+
+
+	auto Parser::unexpected_eof(const std::string& location) noexcept -> void {
+		this->error(std::format("Unexpected end of file in {}", location), this->reader.peek(-1)); 
+	};
+
+	auto Parser::expected_but_got(const std::string& expected, TokenID token) noexcept -> void {
+		this->error(std::format("Expected {} - got ({}) instead", expected, Token::print_kind( this->reader.getKind(token) )), token);
 	};
 
 

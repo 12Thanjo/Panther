@@ -52,24 +52,24 @@ namespace panther{
 					std::optional<AST::NodeID> data;
 			};
 
+			EVO_NODISCARD auto parse_stmt() noexcept -> Result;
 
 
 			EVO_NODISCARD auto parse_var_decl() noexcept -> Result;
 
+			EVO_NODISCARD auto parse_func_def() noexcept -> Result;
+			EVO_NODISCARD auto parse_func_params() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_block() noexcept -> Result;
+
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
+			EVO_NODISCARD auto parse_attributes() noexcept -> Result;
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
 
 
 			EVO_NODISCARD auto parse_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_infix_expr(int prec_level = 1) noexcept -> Result;
 
-			// EVO_NODISCARD auto parse_logical_expr() noexcept -> Result;
-			// EVO_NODISCARD auto parse_equality_expr() noexcept -> Result;
-			// EVO_NODISCARD auto parse_bitshift_expr() noexcept -> Result;
-			// EVO_NODISCARD auto parse_pm_expr() noexcept -> Result;
-			// EVO_NODISCARD auto parse_tdm_expr() noexcept -> Result;
-			// EVO_NODISCARD auto parse_casting_expr() noexcept -> Result;
-			
 			EVO_NODISCARD auto parse_prefix_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_postfix_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_paren_expr() noexcept -> Result;
@@ -87,6 +87,13 @@ namespace panther{
 			auto error_info(const std::string& message, TokenID token) const noexcept -> void;
 			auto fatal(const std::string& message, TokenID token) const noexcept -> void;
 
+			auto unexpected_eof(const std::string& location) noexcept -> void;
+			auto expected_but_got(const std::string& expected, TokenID token) noexcept -> void;
+			inline auto expected_but_got(const std::string& expected) noexcept -> void {
+				this->expected_but_got(expected, this->reader.peek());
+			};
+
+
 		private:
 			TokenizerReader& reader;
 
@@ -95,10 +102,18 @@ namespace panther{
 
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
+
+			std::vector<AST::FuncDef> func_defs{};
+			std::vector<AST::FuncParams> func_params{};
+
+			std::vector<AST::Block> blocks{};
+
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
 			std::vector<AST::Postfix> postfixes{};
+
 			std::vector<AST::Ident> idents{};
+			std::vector<AST::Attributes> attributes{};
 			std::vector<AST::Literal> literals{};
 			std::vector<AST::Type> types{};
 			std::vector<AST::Term> terms{};
