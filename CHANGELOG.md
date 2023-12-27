@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.0.13
+- Made function output definitions (returns and errors) their own AST node
+- Added parsing of funciton types (function pointers)
+
 ### v0.0.12
 - Removed function captures due to changing design decision
 	- should be added back when the design is finalized

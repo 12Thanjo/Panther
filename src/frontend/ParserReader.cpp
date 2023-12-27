@@ -76,6 +76,21 @@ namespace panther{
 	};
 
 
+	auto ParserReader::getFuncOutputs(AST::NodeID id) noexcept -> AST::FuncOutputs& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::FuncOutputs, "Not a func outputs");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.func_outputs[index];
+	};
+
+	auto ParserReader::getFuncOutputs(AST::NodeID id) const noexcept -> const AST::FuncOutputs& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::FuncOutputs, "Not a func outputs");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.func_outputs[index];
+	};
+
+
 	auto ParserReader::getBlock(AST::NodeID id) noexcept -> AST::Block& {
 		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Block, "Not a block");
 
@@ -403,13 +418,14 @@ namespace panther{
 		indenter.print();
 		this->printer.info("Return Types:\n");
 		indenter.push();
-		if(func_def.returns.size() == 1 && func_def.returns[0].name.has_value() == false){
+		const AST::FuncOutputs& returns = this->getFuncOutputs(func_def.returns);
+		if(returns.values.size() == 1 && returns.values[0].name.has_value() == false){
 			indenter.set_end();
 			// indenter.print();
-			this->print_type(func_def.returns[0].type, indenter);
+			this->print_type(returns.values[0].type, indenter);
 		}else{
-			for(int i = 0; i < func_def.returns.size(); i+=1){
-				if(i < func_def.returns.size() - 1){
+			for(int i = 0; i < returns.values.size(); i+=1){
+				if(i < returns.values.size() - 1){
 					indenter.set_arrow();
 				}else{
 					indenter.set_end();
@@ -423,7 +439,7 @@ namespace panther{
 
 				indenter.print();
 				this->printer.info("Ident: ");
-				this->printer.debug(this->getIdentName(*func_def.returns[i].name) + '\n');
+				this->printer.debug(this->getIdentName(*returns.values[i].name) + '\n');
 
 				indenter.set_end();
 				indenter.print();
@@ -431,7 +447,7 @@ namespace panther{
 
 				indenter.push();
 				indenter.set_end();
-				this->print_type(func_def.returns[i].type, indenter);
+				this->print_type(returns.values[i].type, indenter);
 				indenter.pop();
 
 				indenter.pop();
@@ -444,13 +460,14 @@ namespace panther{
 		indenter.print();
 		this->printer.info("Error Types:\n");
 		indenter.push();
-		if(func_def.errors.size() == 1 && func_def.errors[0].name.has_value() == false){
+		const AST::FuncOutputs& errors = this->getFuncOutputs(func_def.errors);
+		if(errors.values.size() == 1 && errors.values[0].name.has_value() == false){
 			indenter.set_end();
 			// indenter.print();
-			this->print_type(func_def.errors[0].type, indenter);
+			this->print_type(errors.values[0].type, indenter);
 		}else{
-			for(int i = 0; i < func_def.errors.size(); i+=1){
-				if(i < func_def.errors.size() - 1){
+			for(int i = 0; i < errors.values.size(); i+=1){
+				if(i < errors.values.size() - 1){
 					indenter.set_arrow();
 				}else{
 					indenter.set_end();
@@ -464,7 +481,7 @@ namespace panther{
 
 				indenter.print();
 				this->printer.info("Ident: ");
-				this->printer.debug(this->getIdentName(*func_def.errors[i].name) + '\n');
+				this->printer.debug(this->getIdentName(*errors.values[i].name) + '\n');
 
 				indenter.set_end();
 				indenter.print();
@@ -472,7 +489,7 @@ namespace panther{
 				
 				indenter.push();
 				indenter.set_end();
-				this->print_type(func_def.errors[i].type, indenter);
+				this->print_type(errors.values[i].type, indenter);
 				indenter.pop();
 
 				indenter.pop();
@@ -678,6 +695,147 @@ namespace panther{
 
 				indenter.pop();
 
+			} break;
+
+
+			case AST::Type::Kind::Func: {
+				indenter.print();
+
+				this->printer.info("Function Type:\n");
+
+				indenter.push();
+
+					this->print_func_params(type.value.func.func_params, indenter);
+
+					// attributes
+					indenter.set_arrow();
+					indenter.print();
+					const AST::Attributes& attributes = this->getAttributes(type.value.func.attributes);
+					if(attributes.tokens.empty()){
+						this->printer.info("Attributes: ");
+						this->printer.debug("[NONE]\n");
+
+					}else{
+						this->printer.info("Attributes: \n");
+						indenter.push();
+						for(int i = 0; i < attributes.tokens.size(); i+=1){
+							if(i < attributes.tokens.size() - 1){
+								indenter.set_arrow();
+							}else{
+								indenter.set_end();
+							}
+							indenter.print();
+
+							this->printer.debug(this->getAttributeName(attributes.tokens[i]) + '\n');
+						}
+						indenter.pop();
+					}
+
+
+					// return type
+					indenter.set_arrow();
+					indenter.print();
+					this->printer.info("Return Types:\n");
+					indenter.push();
+					const AST::FuncOutputs& returns = this->getFuncOutputs(type.value.func.returns);
+					if(returns.values.size() == 1 && returns.values[0].name.has_value() == false){
+						indenter.set_end();
+						// indenter.print();
+						this->print_type(returns.values[0].type, indenter);
+					}else{
+						for(int i = 0; i < returns.values.size(); i+=1){
+							if(i < returns.values.size() - 1){
+								indenter.set_arrow();
+							}else{
+								indenter.set_end();
+							}
+
+							indenter.print();
+
+							this->printer.info(std::to_string(i) + ": \n");
+
+							indenter.push();
+
+							indenter.print();
+							this->printer.info("Ident: ");
+							this->printer.debug(this->getIdentName(*returns.values[i].name) + '\n');
+
+							indenter.set_end();
+							indenter.print();
+							this->printer.info("Type: \n");
+
+							indenter.push();
+							indenter.set_end();
+							this->print_type(returns.values[i].type, indenter);
+							indenter.pop();
+
+							indenter.pop();
+						}
+					}
+					indenter.pop();
+
+					// error type
+					indenter.set_arrow();
+					indenter.print();
+					this->printer.info("Error Types:\n");
+					indenter.push();
+					const AST::FuncOutputs& errors = this->getFuncOutputs(type.value.func.errors);
+					if(errors.values.size() == 1 && errors.values[0].name.has_value() == false){
+						indenter.set_end();
+						// indenter.print();
+						this->print_type(errors.values[0].type, indenter);
+					}else{
+						for(int i = 0; i < errors.values.size(); i+=1){
+							if(i < errors.values.size() - 1){
+								indenter.set_arrow();
+							}else{
+								indenter.set_end();
+							}
+
+							indenter.print();
+
+							this->printer.info(std::to_string(i) + ": \n");
+
+							indenter.push();
+
+							indenter.print();
+							this->printer.info("Ident: ");
+							this->printer.debug(this->getIdentName(*errors.values[i].name) + '\n');
+
+							indenter.set_end();
+							indenter.print();
+							this->printer.info("Type: \n");
+							
+							indenter.push();
+							indenter.set_end();
+							this->print_type(errors.values[i].type, indenter);
+							indenter.pop();
+
+							indenter.pop();
+						}
+					}
+					indenter.pop();
+
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Qualifiers:");
+
+					if(type.qualifiers.empty()){
+						this->printer.debug(" [NONE]\n");
+
+					}else{
+						for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+							this->printer.debug(' ');
+							if(qualifier.is_pointer){ this->printer.debug('*'); }
+							if(qualifier.is_const){ this->printer.debug('|'); }
+							if(qualifier.is_optional){ this->printer.debug('?'); }
+						}
+						this->printer.debug('\n');
+					}
+
+
+				indenter.pop();
 			} break;
 
 

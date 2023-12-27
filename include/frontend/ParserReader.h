@@ -31,6 +31,9 @@ namespace panther{
 			EVO_NODISCARD auto getFuncParams(AST::NodeID id) noexcept -> AST::FuncParams&;
 			EVO_NODISCARD auto getFuncParams(AST::NodeID id) const noexcept -> const AST::FuncParams&;
 
+			EVO_NODISCARD auto getFuncOutputs(AST::NodeID id) noexcept -> AST::FuncOutputs&;
+			EVO_NODISCARD auto getFuncOutputs(AST::NodeID id) const noexcept -> const AST::FuncOutputs&;
+
 			EVO_NODISCARD auto getBlock(AST::NodeID id) noexcept -> AST::Block&;
 			EVO_NODISCARD auto getBlock(AST::NodeID id) const noexcept -> const AST::Block&;
 

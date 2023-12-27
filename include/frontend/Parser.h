@@ -59,6 +59,9 @@ namespace panther{
 
 			EVO_NODISCARD auto parse_func_def() noexcept -> Result;
 			EVO_NODISCARD auto parse_func_params() noexcept -> Result;
+			EVO_NODISCARD auto parse_func_returns() noexcept -> Result;
+			EVO_NODISCARD auto parse_func_errors() noexcept -> Result;
+
 
 			EVO_NODISCARD auto parse_block() noexcept -> Result;
 
@@ -111,6 +114,7 @@ namespace panther{
 
 			std::vector<AST::FuncDef> func_defs{};
 			std::vector<AST::FuncParams> func_params{};
+			std::vector<AST::FuncOutputs> func_outputs{};
 
 			std::vector<AST::Block> blocks{};
 

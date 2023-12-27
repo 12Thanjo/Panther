@@ -403,159 +403,18 @@ namespace panther{
 
 
 		// returns
-		auto returns = std::vector<AST::FuncDef::ReturnType>{};
-		if(this->reader.getKind(this->reader.peek()) == Token::get("(")){
-			this->reader.skip(1);
-
-			while(true){
-				if(this->reader.getKind(this->reader.peek()) == Token::get(")")){
-					this->reader.skip(1);
-					break;
-				}
-
-
-				const Result return_ident_result = this->parse_ident();
-				if(return_ident_result.code() == Result::WrongType){
-					this->expected_but_got("identifier in function return value");
-					return Result::Error;
-				}
-
-
-				// :
-				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
-					this->expected_but_got("\":\" in function definition", this->reader.peek(-1));
-					return Result::Error;
-				}
-
-
-
-				const Result return_type_result = this->parse_type();
-				if(return_type_result.code() == Result::WrongType){
-					this->expected_but_got("type in function return value");
-					return Result::Error;
-				}
-
-				returns.emplace_back(return_ident_result.value(), return_type_result.value());
-
-
-				const TokenID after_return_peek = this->reader.next();
-				if(this->reader.getKind(after_return_peek) != Token::get(",")){
-					if(this->reader.getKind(after_return_peek) == Token::get(")")){
-						break;
-						
-					}else{
-						this->expected_but_got("\",\" at end of function return value or \")\" at end of function values block", this->reader.peek(-1));
-						return Result::Error;
-					}
-				}
-
-
-			};
-
-
-
-		}else{
-			const Result return_type = this->parse_type();
-			switch(return_type.code()){
-				case Result::Success: {
-					returns.emplace_back(std::nullopt, return_type.value());
-				} break;
-
-				case Result::WrongType: {
-					this->expected_but_got("function return type");
-					return Result::Error;
-				} break;
-
-				case Result::Error: {
-					return Result::Error;
-				} break;
-
-				case Result::UnreportedError: {
-					this->fatal("Failed to parse function return type", this->reader.peek(-1));
-				} break;
-			};
+		const Result returns_result = this->parse_func_returns();
+		if(returns_result.code() == Result::Error){
+			return Result::Error;
 		}
 
 
 
+
 		// errors
-		auto errors = std::vector<AST::FuncDef::ReturnType>{};
-		if(this->reader.getKind(this->reader.peek()) == Token::get("<")){
-			this->reader.skip(1);
-
-			const TokenID start_of_errors = this->reader.peek();
-			const Result single_error_type_result = this->parse_type();
-
-			bool is_single_return = false;
-			switch(single_error_type_result.code()){
-				case Result::Success: {
-					if(this->reader.getKind(this->reader.next()) != Token::get(">")){
-						this->reader.go_back(start_of_errors);
-					}else{
-						is_single_return = true;
-						errors.emplace_back(std::nullopt, single_error_type_result.value());
-					}
-				} break;
-
-				case Result::WrongType: {
-					this->reader.go_back(start_of_errors);
-				} break;
-
-				case Result::Error: {
-					return Result::Error;
-				} break;
-
-				case Result::UnreportedError: {
-					this->error("Failed to parse type of function error", this->reader.peek(-1));
-					return Result::Error;
-				} break;
-			};
-
-
-
-			while(is_single_return == false){
-				if(this->reader.getKind(this->reader.peek()) == Token::get(">")){
-					this->reader.skip(1);
-					break;
-				}
-
-
-				const Result return_ident_result = this->parse_ident();
-				if(return_ident_result.code() == Result::WrongType){
-					this->expected_but_got("identifier in function errors value");
-					return Result::Error;
-				}
-
-
-				// :
-				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
-					this->expected_but_got("\":\" in function definition", this->reader.peek(-1));
-					return Result::Error;
-				}
-
-
-
-				const Result return_type_result = this->parse_type();
-				if(return_type_result.code() == Result::WrongType){
-					this->expected_but_got("type in function errors value");
-					return Result::Error;
-				}
-
-				errors.emplace_back(return_ident_result.value(), return_type_result.value());
-
-
-				const TokenID after_error_peek = this->reader.next();
-				if(this->reader.getKind(after_error_peek) != Token::get(",")){
-					if(this->reader.getKind(after_error_peek) == Token::get(">")){
-						break;
-						
-					}else{
-						this->expected_but_got("\",\" at end of function errors value or \">\" at end of function values block", this->reader.peek(-1));
-						return Result::Error;
-					}
-				}
-
-			};
+		const Result errors_result = this->parse_func_errors();
+		if(errors_result.code() == Result::Error){
+			return Result::Error;
 		}
 
 
@@ -594,8 +453,8 @@ namespace panther{
 			func_params_result.value(),
 			// std::move(captures_optional),
 			attributes_result.value(),
-			std::move(returns),
-			std::move(errors),
+			returns_result.value(),
+			errors_result.value(),
 			block_result.value()
 		);
 
@@ -714,6 +573,192 @@ namespace panther{
 
 		this->nodes.emplace_back(AST::Kind::FuncParams, func_params_index);
 		this->func_params.emplace_back(std::move(params));
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+	// TODO: check for EOF
+	auto Parser::parse_func_returns() noexcept -> Result {
+		auto returns = std::vector<AST::FuncOutputs::Value>{};
+		if(this->reader.getKind(this->reader.peek()) == Token::get("(")){
+			this->reader.skip(1);
+
+			while(true){
+				if(this->reader.getKind(this->reader.peek()) == Token::get(")")){
+					this->reader.skip(1);
+					break;
+				}
+
+
+				const Result return_ident_result = this->parse_ident();
+				if(return_ident_result.code() == Result::WrongType){
+					this->expected_but_got("identifier in function return value");
+					return Result::Error;
+				}
+
+
+				// :
+				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+					this->expected_but_got("\":\" in function definition", this->reader.peek(-1));
+					return Result::Error;
+				}
+
+
+
+				const Result return_type_result = this->parse_type();
+				if(return_type_result.code() == Result::WrongType){
+					this->expected_but_got("type in function return value");
+					return Result::Error;
+				}
+
+				returns.emplace_back(return_ident_result.value(), return_type_result.value());
+
+
+				const TokenID after_return_peek = this->reader.next();
+				if(this->reader.getKind(after_return_peek) != Token::get(",")){
+					if(this->reader.getKind(after_return_peek) == Token::get(")")){
+						break;
+						
+					}else{
+						this->expected_but_got("\",\" at end of function return value or \")\" at end of function values block", this->reader.peek(-1));
+						return Result::Error;
+					}
+				}
+
+
+			};
+
+
+
+		}else{
+			const Result return_type = this->parse_type();
+			switch(return_type.code()){
+				case Result::Success: {
+					returns.emplace_back(std::nullopt, return_type.value());
+				} break;
+
+				case Result::WrongType: {
+					this->expected_but_got("function return type");
+					return Result::Error;
+				} break;
+
+				case Result::Error: {
+					return Result::Error;
+				} break;
+
+				case Result::UnreportedError: {
+					this->fatal("Failed to parse function return type", this->reader.peek(-1));
+				} break;
+			};
+		}
+
+
+
+		// create and return
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t func_output_index = uint32_t(this->func_outputs.size());
+
+		this->nodes.emplace_back(AST::Kind::FuncOutputs, func_output_index);
+		this->func_outputs.emplace_back(std::move(returns));
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+
+	// TODO: check for EOF
+	auto Parser::parse_func_errors() noexcept -> Result {
+		auto errors = std::vector<AST::FuncOutputs::Value>{};
+
+		if(this->reader.getKind(this->reader.peek()) == Token::get("<")){
+			this->reader.skip(1);
+
+			const TokenID start_of_errors = this->reader.peek();
+			const Result single_error_type_result = this->parse_type();
+
+			bool is_single_return = false;
+			switch(single_error_type_result.code()){
+				case Result::Success: {
+					if(this->reader.getKind(this->reader.next()) != Token::get(">")){
+						this->reader.go_back(start_of_errors);
+					}else{
+						is_single_return = true;
+						errors.emplace_back(std::nullopt, single_error_type_result.value());
+					}
+				} break;
+
+				case Result::WrongType: {
+					this->reader.go_back(start_of_errors);
+				} break;
+
+				case Result::Error: {
+					return Result::Error;
+				} break;
+
+				case Result::UnreportedError: {
+					this->error("Failed to parse type of function error", this->reader.peek(-1));
+					return Result::Error;
+				} break;
+			};
+
+
+
+			while(is_single_return == false){
+				if(this->reader.getKind(this->reader.peek()) == Token::get(">")){
+					this->reader.skip(1);
+					break;
+				}
+
+
+				const Result return_ident_result = this->parse_ident();
+				if(return_ident_result.code() == Result::WrongType){
+					this->expected_but_got("identifier in function errors value");
+					return Result::Error;
+				}
+
+
+				// :
+				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+					this->expected_but_got("\":\" in function definition", this->reader.peek(-1));
+					return Result::Error;
+				}
+
+
+
+				const Result return_type_result = this->parse_type();
+				if(return_type_result.code() == Result::WrongType){
+					this->expected_but_got("type in function errors value");
+					return Result::Error;
+				}
+
+				errors.emplace_back(return_ident_result.value(), return_type_result.value());
+
+
+				const TokenID after_error_peek = this->reader.next();
+				if(this->reader.getKind(after_error_peek) != Token::get(",")){
+					if(this->reader.getKind(after_error_peek) == Token::get(">")){
+						break;
+						
+					}else{
+						this->expected_but_got("\",\" at end of function errors value or \">\" at end of function values block", this->reader.peek(-1));
+						return Result::Error;
+					}
+				}
+
+			};
+		}
+
+
+
+		// create and return
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t func_output_index = uint32_t(this->func_outputs.size());
+
+		this->nodes.emplace_back(AST::Kind::FuncOutputs, func_output_index);
+		this->func_outputs.emplace_back(std::move(errors));
 
 		return AST::NodeID{node_index};
 	};
@@ -892,10 +937,8 @@ namespace panther{
 		}
 
 
-		// TODO: maybe change this to unreported
 		if(type_name.has_value() == false){
-			this->expected_but_got("type");
-			return Result::Error;
+			return Result::WrongType;
 		}
 
 
@@ -999,14 +1042,98 @@ namespace panther{
 
 
 
-	// TODO: finish
+
+	// TODO: check for EOF
 	auto Parser::parse_func_type() noexcept -> Result {
-		return Result::WrongType;
+		if(this->reader.getKind(this->reader.peek()) != Token::KeywordFunc){
+			return Result::WrongType;
+		}
+
+		// skip func
+		this->reader.skip(1);
+
+		// func params
+		const Result func_params_result = this->parse_func_params();
+		switch(func_params_result.code()){
+			case Result::Success: break;
+
+			case Result::WrongType: {
+				this->expected_but_got("function paramaters block in function type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+
+			case Result::Error: return Result::Error;
+
+			case Result::UnreportedError: {
+				this->error("Failed to parse function parameters block in function type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+		};
+
+
+		// attributes
+		const Result attributes_result = this->parse_attributes();
+		switch(attributes_result.code()){
+			case Result::Success: break;
+
+			case Result::WrongType: break;
+
+			case Result::Error: return Result::Error;
+
+			case Result::UnreportedError: {
+				this->error("Failed to parse function parameters block in function type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+		};
+
+
+		// ->
+		if(this->reader.getKind(this->reader.next()) != Token::get("->")){
+			this->expected_but_got("\"->\" in function type");
+			return Result::Error;
+		}
+
+
+
+
+		// returns
+		const Result returns_result = this->parse_func_returns();
+		if(returns_result.code() == Result::Error){
+			return Result::Error;
+		}
+
+
+		// errors
+		const Result errors_result = this->parse_func_errors();
+		if(errors_result.code() == Result::Error){
+			return Result::Error;
+		}
+
+
+		// qualifiers
+		std::vector<AST::Type::Qualifier> qualifiers = this->parse_type_qualifiers();
+
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t type_index = uint32_t(this->types.size());
+
+		this->nodes.emplace_back(AST::Kind::Type, type_index);
+		this->types.emplace_back(
+			AST::Type::Kind::Func,
+			func_params_result.value(),
+			attributes_result.value(),
+			returns_result.value(),
+			errors_result.value(),
+			std::move(qualifiers)
+		);
+
+		return AST::NodeID{node_index};
 	};
 
 
 
-
+	// TODO: check for EOF
 	auto Parser::parse_type_qualifiers() noexcept -> std::vector<AST::Type::Qualifier> {
 		auto qualifiers = std::vector<AST::Type::Qualifier>{};
 

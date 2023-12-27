@@ -11,8 +11,10 @@ namespace panther{
 
 		enum class Kind{
 			VarDecl,
+
 			FuncDef,
 			FuncParams,
+			FuncOutputs,
 
 			Block,
 
@@ -77,6 +79,7 @@ namespace panther{
 
 		
 
+
 		struct FuncDef{
 			bool is_public;
 			bool is_static;
@@ -98,12 +101,8 @@ namespace panther{
 
 			NodeID attributes;
 
-			struct ReturnType{
-				std::optional<NodeID> name;
-				NodeID type;
-			};
-			std::vector<ReturnType> returns;
-			std::vector<ReturnType> errors;
+			NodeID returns;
+			NodeID errors;
 
 			NodeID block;
 		};
@@ -136,6 +135,9 @@ namespace panther{
 
 			std::vector<Value> values;
 		};
+
+
+		
 
 
 
@@ -198,9 +200,12 @@ namespace panther{
 					NodeID length;
 				} array;
 
-				// struct {
-
-				// } func;
+				struct {
+					NodeID func_params;
+					NodeID attributes;
+					NodeID returns;
+					NodeID errors;
+				} func;
 			} value;
 
 
@@ -224,6 +229,24 @@ namespace panther{
 				this->value.array.type = type;
 				this->value.array.length = length;
 			};
+
+
+			Type(
+				Kind _kind,
+				NodeID func_params,
+				NodeID attributes,
+				NodeID returns,
+				NodeID errors,
+				std::vector<Qualifier>&& _qualifers
+			)
+				: kind(_kind), qualifiers(std::move(_qualifers))
+			{
+				this->value.func.func_params = func_params;
+				this->value.func.attributes = attributes;
+				this->value.func.returns = returns;
+				this->value.func.errors = errors;
+			};
+
 		};
 
 
