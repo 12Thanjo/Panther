@@ -322,54 +322,54 @@ namespace panther{
 		
 
 		// capture
-		indenter.set_arrow();
-		indenter.print();
-		if(func_def.captures.has_value()){
-			const std::vector<AST::FuncDef::Capture>& captures = *func_def.captures;
+		// indenter.set_arrow();
+		// indenter.print();
+		// if(func_def.captures.has_value()){
+		// 	const std::vector<AST::FuncDef::Capture>& captures = *func_def.captures;
 
-			if(captures.empty()){
-				this->printer.info("Captures: ");
-				this->printer.debug("[NONE]\n");
+		// 	if(captures.empty()){
+		// 		this->printer.info("Captures: ");
+		// 		this->printer.debug("[NONE]\n");
 
-			}else{
-				this->printer.info("Captures: \n");
-				indenter.push();
-				for(int i = 0; i < captures.size(); i+=1){
-					const AST::FuncDef::Capture& capture = captures[i];
+		// 	}else{
+		// 		this->printer.info("Captures: \n");
+		// 		indenter.push();
+		// 		for(int i = 0; i < captures.size(); i+=1){
+		// 			const AST::FuncDef::Capture& capture = captures[i];
 
-					if(i < captures.size() - 1){
-						indenter.set_arrow();
-					}else{
-						indenter.set_end();
-					}
-					indenter.print();
+		// 			if(i < captures.size() - 1){
+		// 				indenter.set_arrow();
+		// 			}else{
+		// 				indenter.set_end();
+		// 			}
+		// 			indenter.print();
 
-					this->printer.info(std::to_string(i) + ":\n");
-					indenter.push();
+		// 			this->printer.info(std::to_string(i) + ":\n");
+		// 			indenter.push();
 
-					indenter.print();
-					this->printer.info("Ident: ");
-					this->printer.debug(this->getIdentName(capture.ident) + '\n');
+		// 			indenter.print();
+		// 			this->printer.info("Ident: ");
+		// 			this->printer.debug(this->getIdentName(capture.ident) + '\n');
 
-					indenter.set_end();
-					indenter.print();
-					this->printer.info("Kind: ");
-					switch(capture.kind){
-						break; case AST::FuncDef::Capture::Kind::Read: this->printer.debug("Read\n");
-						break; case AST::FuncDef::Capture::Kind::Write: this->printer.debug("Write\n");
-						break; case AST::FuncDef::Capture::Kind::In: this->printer.debug("In\n");
-					};
+		// 			indenter.set_end();
+		// 			indenter.print();
+		// 			this->printer.info("Kind: ");
+		// 			switch(capture.kind){
+		// 				break; case AST::FuncDef::Capture::Kind::Read: this->printer.debug("Read\n");
+		// 				break; case AST::FuncDef::Capture::Kind::Write: this->printer.debug("Write\n");
+		// 				break; case AST::FuncDef::Capture::Kind::In: this->printer.debug("In\n");
+		// 			};
 					
 
-					indenter.pop();
-				}
-				indenter.pop();
-			}
+		// 			indenter.pop();
+		// 		}
+		// 		indenter.pop();
+		// 	}
 
-		}else{
-			this->printer.info("Captures: ");
-			this->printer.debug("[OPEN]\n");
-		}
+		// }else{
+		// 	this->printer.info("Captures: ");
+		// 	this->printer.debug("[OPEN]\n");
+		// }
 
 
 
@@ -603,21 +603,86 @@ namespace panther{
 		const AST::Type& type = this->getType(id);
 
 		switch(type.kind){
-			case AST::Type::Kind::Ident: {
+			case AST::Type::Kind::Basic: {
 				indenter.print();
-				this->printer.debug(this->parser.reader.getStringValue(type.value.builtin.token) + '\n');
+				const Token::Kind kind = this->parser.reader.getKind(type.value.basic.token);
+				auto type_str = std::string{};
+
+				if(kind == Token::Ident){
+					type_str = this->parser.reader.getStringValue(type.value.basic.token);
+
+				}else{
+					type_str =  Token::print_kind(kind);
+				}
+
+
+				for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+					type_str += ' ';
+					if(qualifier.is_pointer){ type_str += '*'; }
+					if(qualifier.is_const){ type_str += '|'; }
+					if(qualifier.is_optional){ type_str += '?'; }
+				}
+
+
+				this->printer.debug(type_str + '\n');
 
 			} break;
 
-			case AST::Type::Kind::Builtin: {
+
+			case AST::Type::Kind::Array: {
 				indenter.print();
-				const Token::Kind kind = this->parser.reader.getKind(type.value.builtin.token);
-				this->printer.debug(std::format("{} [BUILTIN]\n", Token::print_kind(kind)));
+				this->printer.info("Array Type:\n");
+
+				indenter.push();
+
+					indenter.print();
+					this->printer.info("Element Type: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_type(type.value.array.type, indenter);
+					indenter.pop();
+
+					indenter.set_arrow();
+					indenter.print();
+					if(this->getNodeKind(type.value.array.length) == AST::Kind::Underscore){
+						this->printer.info("Length: ");
+						this->printer.debug("[INFER]\n");
+						
+
+					}else{
+						this->printer.info("Length: \n");
+						indenter.push();
+							indenter.set_end();
+							this->print_expr(type.value.array.length, indenter);
+						indenter.pop();
+					}
+
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Qualifiers:");
+
+					if(type.qualifiers.empty()){
+						this->printer.debug(" [NONE]\n");
+
+					}else{
+						for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+							this->printer.debug(' ');
+							if(qualifier.is_pointer){ this->printer.debug('*'); }
+							if(qualifier.is_const){ this->printer.debug('|'); }
+							if(qualifier.is_optional){ this->printer.debug('?'); }
+						}
+						this->printer.debug('\n');
+					}
+
+
+				indenter.pop();
+
 			} break;
 
 
 			default: {
-				EVO_FATAL_BREAK("Unknown Type kind");				
+				EVO_FATAL_BREAK("Unknown Type kind");			
 			} break;
 		};
 	};

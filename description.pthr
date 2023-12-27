@@ -205,7 +205,7 @@ func main = () -> Void {
 
 
 	var number: F32 = 12;
-	var number_ptr: F32* = number; // more on variable to pointer in next section
+	var number_ptr: F32* = addr number; // more on variable to pointer in next section
 
 	var optional_ptr: F32*? = null;
 
@@ -214,21 +214,16 @@ func main = () -> Void {
 
 
 
-	// ///////////////////////////////////
-	// // const
-
-	// // create a pointer that can change the pointer location but cannot write to the target 
-	// var const_ptr: const F32* = number;
-
-	// // create a pointer that cannot change the pointer location but can write to the target 
-	// var ptr_const: F32 const* = number;
-
-	// // create a pointer that cannot change the pointer location and cannot write to the target 
-	// var const_ptr_const: const F32 const* = number;
+	///////////////////////////////////
+	// const
 
 
-	// // the statement is semantically equivalent to
-	// def const_var_ptr: F32* = number;
+	def foo: Int* = addr number;
+
+	// "*|" is a const pointer meaning it cannot change the value it points to. This means foo_ptr.*.* is readonly
+	// In this case it is required here because foo is the "def"
+	//   Note: the address the pointer points to can change
+	var foo_ptr: Int*|?* = addr foo;
 
 };
 

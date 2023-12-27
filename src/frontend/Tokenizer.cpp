@@ -379,6 +379,7 @@ namespace panther{
 		// length 1
 
 		else if(is_op("=")){ set_op("="); return true; }
+		else if(is_op("?")){ set_op("?"); return true; }
 
 		else if(is_op(".")){ set_op("."); return true; }
 

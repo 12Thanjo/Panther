@@ -30,6 +30,7 @@ namespace panther{
 			Uninit,
 			Null,
 			This,
+			Underscore,
 		};
 
 		struct NodeID{ uint32_t id; };
@@ -46,6 +47,7 @@ namespace panther{
 					this->kind == Kind::Uninit
 					|| this->kind == Kind::Null
 					|| this->kind == Kind::This
+					|| this->kind == Kind::Underscore
 					, 
 					"This node kind must have a value"
 				);
@@ -81,18 +83,18 @@ namespace panther{
 			NodeID ident;
 			NodeID func_params;
 
-			struct Capture{
-				NodeID ident;
+			// struct Capture{
+			// 	NodeID ident;
 
-				enum class Kind: uint8_t{
-					Read,
-					Write,
-					In,
-				};
+			// 	enum class Kind: uint8_t{
+			// 		Read,
+			// 		Write,
+			// 		In,
+			// 	};
 
-				Kind kind;
-			};
-			std::optional<std::vector<Capture>> captures;
+			// 	Kind kind;
+			// };
+			// std::optional<std::vector<Capture>> captures;
 
 			NodeID attributes;
 
@@ -123,6 +125,16 @@ namespace panther{
 			};
 
 			std::vector<Param> params;
+		};
+
+
+		struct FuncOutputs{
+			struct Value{
+				std::optional<NodeID> name;
+				NodeID type;
+			};
+
+			std::vector<Value> values;
 		};
 
 
@@ -169,24 +181,49 @@ namespace panther{
 
 		struct Type{
 			enum class Kind{
-				Ident,
-				Builtin,
+				Basic,
+				Array,
+				Func,
 			};
 
 			Kind kind;
 
-
 			union {
-				Ident ident;
-
 				struct {
 					TokenID token;
-				} builtin;
+				} basic;
+
+				struct {
+					NodeID type;
+					NodeID length;
+				} array;
+
+				// struct {
+
+				// } func;
 			} value;
 
 
-			explicit Type(Kind _kind, Ident ident) : kind(_kind), value(ident) {};
-			explicit Type(Kind _kind, TokenID token) : kind(_kind) { this->value.builtin.token = token; };
+			struct Qualifier{
+				bool is_pointer;
+				bool is_const;
+				bool is_optional;
+			};
+
+			std::vector<Qualifier> qualifiers;
+
+
+
+			Type(Kind _kind, TokenID token, std::vector<Qualifier>&& _qualifers)
+				: kind(_kind), qualifiers(std::move(_qualifers)) { this->value.basic.token = token; };
+
+
+			Type(Kind _kind, NodeID type, NodeID length, std::vector<Qualifier>&& _qualifers)
+				: kind(_kind), qualifiers(std::move(_qualifers))
+			{
+				this->value.array.type = type;
+				this->value.array.length = length;
+			};
 		};
 
 

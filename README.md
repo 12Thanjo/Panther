@@ -1,6 +1,6 @@
 ![Logo](art_assets/Logo_scaled.png)
 # Panther
-Statically typed, compiled, high-performance, programming language.
+Statically typed, compiled, high-performance, general-purpose programming language.
 
 ### Notes:
 - This compiler is currently super early into development, so it doesn't really do much yet.

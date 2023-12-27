@@ -329,66 +329,66 @@ namespace panther{
 		
 
 		// capture
-		auto captures_optional = std::optional<std::vector<AST::FuncDef::Capture>>{};
-		if(this->reader.getKind(this->reader.peek()) == Token::get("[")){
-			const TokenID open_capture = this->reader.next();
+		// auto captures_optional = std::optional<std::vector<AST::FuncDef::Capture>>{};
+		// if(this->reader.getKind(this->reader.peek()) == Token::get("[")){
+		// 	const TokenID open_capture = this->reader.next();
 
 
-			auto captures = std::vector<AST::FuncDef::Capture>{};
+		// 	auto captures = std::vector<AST::FuncDef::Capture>{};
 
 
-			while(true){
-				if(this->reader.getKind(this->reader.peek()) == Token::get("]")){
-					this->reader.skip(1);
-					break;
-				}
+		// 	while(true){
+		// 		if(this->reader.getKind(this->reader.peek()) == Token::get("]")){
+		// 			this->reader.skip(1);
+		// 			break;
+		// 		}
 
 
-				const Result capture_ident_result = this->parse_ident();
-				if(capture_ident_result.code() == Result::WrongType){
-					this->expected_but_got("identifier in function capture");
-					return Result::Error;
-				}
+		// 		const Result capture_ident_result = this->parse_ident();
+		// 		if(capture_ident_result.code() == Result::WrongType){
+		// 			this->expected_but_got("identifier in function capture");
+		// 			return Result::Error;
+		// 		}
 
 
-				AST::FuncDef::Capture::Kind param_kind = AST::FuncDef::Capture::Kind::Read;
-				switch(this->reader.getKind(this->reader.peek())){
-					case Token::KeywordRead: {
-						this->reader.skip(1);
-					} break;
+		// 		AST::FuncDef::Capture::Kind param_kind = AST::FuncDef::Capture::Kind::Read;
+		// 		switch(this->reader.getKind(this->reader.peek())){
+		// 			case Token::KeywordRead: {
+		// 				this->reader.skip(1);
+		// 			} break;
 
-					case Token::KeywordWrite: {
-						param_kind = AST::FuncDef::Capture::Kind::Write;
-						this->reader.skip(1);
-					} break;
+		// 			case Token::KeywordWrite: {
+		// 				param_kind = AST::FuncDef::Capture::Kind::Write;
+		// 				this->reader.skip(1);
+		// 			} break;
 
-					case Token::KeywordIn: {
-						param_kind = AST::FuncDef::Capture::Kind::In;
-						this->reader.skip(1);
-					} break;
-				};
+		// 			case Token::KeywordIn: {
+		// 				param_kind = AST::FuncDef::Capture::Kind::In;
+		// 				this->reader.skip(1);
+		// 			} break;
+		// 		};
 
 
 
-				captures.emplace_back(capture_ident_result.value(), param_kind);
+		// 		captures.emplace_back(capture_ident_result.value(), param_kind);
 
-				// ,
-				const TokenID after_param_peek = this->reader.next();
-				if(this->reader.getKind(after_param_peek) != Token::get(",")){
-					if(this->reader.getKind(after_param_peek) == Token::get("]")){
-						break;
+		// 		// ,
+		// 		const TokenID after_param_peek = this->reader.next();
+		// 		if(this->reader.getKind(after_param_peek) != Token::get(",")){
+		// 			if(this->reader.getKind(after_param_peek) == Token::get("]")){
+		// 				break;
 						
-					}else{
-						this->expected_but_got("\",\" at end of function capture or \"]\" at end of function captures block", this->reader.peek(-1));
-						return Result::Error;
-					}
-				}
+		// 			}else{
+		// 				this->expected_but_got("\",\" at end of function capture or \"]\" at end of function captures block", this->reader.peek(-1));
+		// 				return Result::Error;
+		// 			}
+		// 		}
 
 
-			};
+		// 	};
 
-			captures_optional = std::move(captures);
-		}
+		// 	captures_optional = std::move(captures);
+		// }
 
 
 		// attributes
@@ -478,7 +478,7 @@ namespace panther{
 
 
 
-		// eerrors
+		// errors
 		auto errors = std::vector<AST::FuncDef::ReturnType>{};
 		if(this->reader.getKind(this->reader.peek()) == Token::get("<")){
 			this->reader.skip(1);
@@ -592,7 +592,7 @@ namespace panther{
 			is_static,
 			ident_result.value(),
 			func_params_result.value(),
-			std::move(captures_optional),
+			// std::move(captures_optional),
 			attributes_result.value(),
 			std::move(returns),
 			std::move(errors),
@@ -818,34 +818,44 @@ namespace panther{
 	};
 
 
-
-	// TODO: finish parsing all types
+	// TODO: check EOF
 	auto Parser::parse_type() noexcept -> Result {
-		// IDENT
-		// builtin_types
-		// type *
-		// type CONST *
-		// type ?
-		// type CONST // should be marked only once
-		// [ type : expr ] // array
-		// [ type : UNDERSCORE ] // array (infer length)
-		// FUNC ( func_params ) ->   type                                     
-		// FUNC ( func_params ) -> ( func_return_types )                      
-		// FUNC ( func_params ) ->   type                < func_return_types >
-		// FUNC ( func_params ) -> ( func_return_types ) < func_return_types >
+		// array type
+		const Result arr_type_result = this->parse_arr_type();		
+		switch(arr_type_result.code()){
+			case Result::Success: return arr_type_result;
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t type_index = uint32_t(this->types.size());
+			case Result::WrongType: break;
 
+			case Result::Error: return Result::Error;
+
+			case Result::UnreportedError: {
+				this->error("Failed to parse array type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+		};
 
 
-		// ident
-		if(this->reader.getKind(this->reader.peek()) == Token::Ident){
-			this->nodes.emplace_back(AST::Kind::Type, type_index);
-			this->types.emplace_back(AST::Type::Kind::Ident, AST::Ident{this->reader.next()});
+		// function type
+		const Result func_type_result = this->parse_func_type();		
+		switch(func_type_result.code()){
+			case Result::Success: return func_type_result;
 
-			return AST::NodeID{node_index};
-		}
+			case Result::WrongType: break;
+
+			case Result::Error: return Result::Error;
+
+			case Result::UnreportedError: {
+				this->error("Failed to parse function type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+		};
+
+
+		///////////////////////////////////
+		// basic types
+
+		auto type_name = std::optional<TokenID>{};
 
 
 		// builtin types
@@ -871,16 +881,167 @@ namespace panther{
 
 			case Token::TypeCInt:
 			case Token::TypeCUInt: {
-				this->nodes.emplace_back(AST::Kind::Type, type_index);
-				this->types.emplace_back(AST::Type::Kind::Builtin, this->reader.next());
-
-				return AST::NodeID{node_index};
+				type_name = this->reader.next();
 			}
 		};
 
 
+		// ident
+		if(type_name.has_value() == false && this->reader.getKind(this->reader.peek()) == Token::Ident){
+			type_name = this->reader.next();
+		}
+
+
+		// TODO: maybe change this to unreported
+		if(type_name.has_value() == false){
+			this->expected_but_got("type");
+			return Result::Error;
+		}
+
+
+		std::vector<AST::Type::Qualifier> qualifiers = this->parse_type_qualifiers();
+
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t type_index = uint32_t(this->types.size());
+
+		this->nodes.emplace_back(AST::Kind::Type, type_index);
+		this->types.emplace_back(AST::Type::Kind::Basic, *type_name, std::move(qualifiers));
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+	// TODO: check for EOF
+	auto Parser::parse_arr_type() noexcept -> Result {
+		if(this->reader.getKind(this->reader.peek()) != Token::get("[")){
+			return Result::WrongType;
+		}
+
+		// skip [
+		this->reader.skip(1);
+
+		const Result arr_type = this->parse_type();
+		switch(arr_type.code()){
+			case Result::Success: break;
+
+			case Result::WrongType: {
+				this->expected_but_got("type in array type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+
+			case Result::Error: return Result::Error;
+
+			case Result::UnreportedError: {
+				this->error("Failed to parse array element type", this->reader.peek(-1));
+				return Result::Error;
+			} break;
+		};
+
+
+		// :
+		if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+			this->expected_but_got("\":\" in array type", this->reader.peek(-1));
+			return Result::Error;
+		}
+
+
+		AST::NodeID arr_length;
+		if(this->reader.getKind(this->reader.peek()) == Token::KeywordUnderscore){
+			this->reader.skip(1);
+
+			const uint32_t node_index = uint32_t(this->nodes.size());
+			this->nodes.emplace_back(AST::Kind::Underscore);
+
+			arr_length = AST::NodeID{node_index};
+
+		}else{
+			const Result expr_result = this->parse_expr();
+			switch(expr_result.code()){
+				case Result::Success: break;
+
+				case Result::WrongType: {
+					this->expected_but_got("length expr in array type", this->reader.peek(-1));
+					return Result::Error;
+				} break;
+
+				case Result::Error: return Result::Error;
+
+				case Result::UnreportedError: {
+					this->error("Failed to parse array element length expr", this->reader.peek(-1));
+					return Result::Error;
+				} break;
+			};
+
+			arr_length = expr_result.value();
+		}
+
+
+		// ]
+		if(this->reader.getKind(this->reader.next()) != Token::get("]")){
+			this->expected_but_got("\"]\" in array type", this->reader.peek(-1));
+			return Result::Error;
+		}
+
+		std::vector<AST::Type::Qualifier> qualifiers = this->parse_type_qualifiers();
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t type_index = uint32_t(this->types.size());
+
+		this->nodes.emplace_back(AST::Kind::Type, type_index);
+		this->types.emplace_back(AST::Type::Kind::Array, arr_type.value(), arr_length, std::move(qualifiers));
+
+		return AST::NodeID{node_index};
+	};
+
+
+
+	// TODO: finish
+	auto Parser::parse_func_type() noexcept -> Result {
 		return Result::WrongType;
 	};
+
+
+
+
+	auto Parser::parse_type_qualifiers() noexcept -> std::vector<AST::Type::Qualifier> {
+		auto qualifiers = std::vector<AST::Type::Qualifier>{};
+
+		while(true){
+			if(this->reader.getKind(this->reader.peek()) == Token::get("*")){
+				// is pointer
+				this->reader.skip(1);
+				AST::Type::Qualifier& qualifer = qualifiers.emplace_back(true, false, false);
+
+				// is const
+				if(this->reader.getKind(this->reader.peek()) == Token::get("|")){
+					this->reader.skip(1);
+					qualifer.is_const = true;
+				}
+
+				// is optional
+				if(this->reader.getKind(this->reader.peek()) == Token::get("?")){
+					this->reader.skip(1);
+					qualifer.is_optional = true;
+				}
+
+
+			}else if(this->reader.getKind(this->reader.peek()) == Token::get("?")){
+				// is optional
+				this->reader.skip(1);
+				qualifiers.emplace_back(false, false, true);
+
+			}else{
+				break;
+			}
+		};
+
+		return qualifiers;
+	};
+
 
 
 

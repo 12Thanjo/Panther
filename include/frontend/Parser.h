@@ -64,7 +64,13 @@ namespace panther{
 
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
 			EVO_NODISCARD auto parse_attributes() noexcept -> Result;
+
+
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
+			EVO_NODISCARD auto parse_arr_type() noexcept -> Result;
+			EVO_NODISCARD auto parse_func_type() noexcept -> Result;
+			EVO_NODISCARD auto parse_type_qualifiers() noexcept -> std::vector<AST::Type::Qualifier>;
+
 
 
 			EVO_NODISCARD auto parse_expr() noexcept -> Result;

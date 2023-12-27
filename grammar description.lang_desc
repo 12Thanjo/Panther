@@ -394,7 +394,7 @@ type:
 	type CONST // should be marked only once
 	[ type : expr ] // array
 	[ type : UNDERSCORE ] // array (infer length)
-	FUNC ( func_params ) func_attributes ->   type                                      
+	FUNC ( func_params ) func_attributes ->   type                                    
 	FUNC ( func_params ) func_attributes -> ( func_return_types )                       
 	FUNC ( func_params ) func_attributes ->   type                < func_return_types > 
 	FUNC ( func_params ) func_attributes -> ( func_return_types ) < func_return_types > 

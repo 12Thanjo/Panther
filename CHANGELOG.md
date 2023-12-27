@@ -1,5 +1,15 @@
 # Changelog
 
+### v0.0.12
+- Removed function captures due to changing design decision
+	- should be added back when the design is finalized
+- Added optional type operator (`?`) to tokenizing
+- Added parsing of complex types
+	- pointer qualifier (`*`)
+	- const pointer qualifier (`|`)
+	- optional qualifier (`?`)
+	- Arrays
+
 ### v0.0.11
 - Adding parsing of function definitions
 
@@ -33,7 +43,7 @@
 ### v0.0.5
 - Added tokenizing of number literals
 	- integers
-	- floating-point
+	- floating-point 
 	- binary, octal, and hex
 	- exponents (positive and negative)
 	- underscores as separators (`10_000`)

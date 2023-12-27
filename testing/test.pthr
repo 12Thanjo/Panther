@@ -1,26 +1,12 @@
 
 
 
+def foo: Int *? *|? = 12;
+def arr: [Int: 3 + foo as Int] = uninit;
 
-pub func test = (foo: F64 write, bar: Int = 12) [] #may_discard -> (happy: Bool, name: String) <Void> {
+
+pub func test = (foo: F64 write, bar: Int = 12) #may_discard -> (happy: Bool, name: T) <Void> {
 	var foo: Int = 12;
 	static var bar = true;
 }
 
-// var asdf: Bool = 1 != 1 * 2 + 3 && 1 == 12;
-
-
-
-// var foo: Int = (num as Int) * 2 - 3;
-
-// var bool: Bool = true;
-// def string = "hello world";
-// var char: Char = 'a';
-// var int: Int = 12;
-// var float: F64 = 18.4;
-
-// def ident = foo;
-
-
-// var ptr: Rawptr = null;
-// var this_ref = this;

@@ -108,6 +108,7 @@ namespace panther{
 			// operators
 			
 			Equals, // =
+			Optional, // ?
 
 			Accessor, // .
 			Dereference, // .*
@@ -207,6 +208,7 @@ namespace panther{
 			// length 1
 
 			else if(IS_TOKEN("=")){ return Token::Kind::Equals; }
+			else if(IS_TOKEN("?")){ return Token::Kind::Optional; }
 
 			else if(IS_TOKEN(".")){ return Token::Kind::Accessor; }
 
@@ -245,7 +247,7 @@ namespace panther{
 
 
 			// TODO: errors
-			evo::logFatal("Unknown token kind");
+			evo::logFatal("Unknown token kind => " __FUNCTION__);
 			evo::unreachable();
 		};
 
