@@ -843,6 +843,28 @@ namespace panther{
 	};
 
 
+	auto Parser::parse_intrinsic() noexcept -> Result {
+		const TokenID first_token = this->reader.peek();
+
+		if(this->reader.getKind(first_token) == Token::Intrinsic){
+			this->reader.skip(1);
+
+		}else{
+			return Result::WrongType;
+		}
+
+
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t intrinsic_index = uint32_t(this->intrinsics.size());
+
+		this->nodes.emplace_back(AST::Kind::Intrinsic, intrinsic_index);
+		this->intrinsics.emplace_back(first_token);
+
+
+		return AST::NodeID{node_index};
+	};
+
+
 
 	auto Parser::parse_attributes() noexcept -> Result {
 		auto attributes_list = std::vector<TokenID>{};
@@ -1206,7 +1228,7 @@ namespace panther{
 
 
 	constexpr int MAX_PREC = 10;
-	EVO_NODISCARD static constexpr auto get_infix_op_precidence(Token::Kind kind) noexcept -> int {
+	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
 		switch(kind){
 			case Token::get("||"): return 1;
 
@@ -1242,13 +1264,9 @@ namespace panther{
 	};
 
 
-	auto Parser::parse_infix_expr(int prec_level) noexcept -> Result {
-		if(prec_level > MAX_PREC){
-			return this->parse_prefix_expr();
-		}
 
-
-		const Result lhs_result = this->parse_infix_expr(prec_level + 1);
+	auto Parser::parse_infix_expr() noexcept -> Result {
+		const Result lhs_result = this->parse_prefix_expr();
 		switch(lhs_result.code()){
 			case Result::Success: break;
 			case Result::WrongType: return Result::WrongType;
@@ -1256,34 +1274,44 @@ namespace panther{
 			case Result::UnreportedError: return lhs_result; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
-		if(lhs_result.code() == Result::WrongType){ return lhs_result; }
+		return this->parse_infix_expr_impl(lhs_result.value(), 1);
+	};
 
 
-		const TokenID op_token = this->reader.peek();
-		if(get_infix_op_precidence(this->reader.getKind(op_token)) != prec_level){
-			return lhs_result;
+
+	auto Parser::parse_infix_expr_impl(AST::NodeID lhs, int prec_level) noexcept -> Result {
+		const TokenID peeked_op = this->reader.peek();
+		const Token::Kind peeked_kind = this->reader.getKind(peeked_op);
+
+		const int next_op_prec = get_infix_op_precedence(peeked_kind);
+
+		// if not an infix operator or is same or lower precedence
+		// 		next_op_prec == -1 if its not an infix op
+		//   	< to maintain operator precedence
+		// 		<= to prevent `a + b + c` from being parsed as `a + (b + c)`
+		if(next_op_prec <= prec_level){
+			return lhs;
 		}
 
-		// skip op
+		// skip operator
 		this->reader.skip(1);
 
 
-		if(this->reader.is_eof()){
-			this->unexpected_eof("expression");
-			return Result::Error;
-		}
+		const Result next_term = this->parse_prefix_expr();
+		switch(next_term.code()){
+			case Result::Success: break;
+			case Result::WrongType: return Result::WrongType;
+			case Result::Error: return Result::Error;
+			case Result::UnreportedError: return next_term; // don't want to report error here (although I'm not sure this will ever happen)
+		};
 
 
-		// get rhs
-		const Result rhs_result = this->parse_infix_expr(prec_level);
+		const Result rhs_result = this->parse_infix_expr_impl(next_term.value(), next_op_prec);
 		switch(rhs_result.code()){
 			case Result::Success: break;
 			case Result::WrongType: return Result::WrongType;
 			case Result::Error: return Result::Error;
-			case Result::UnreportedError: {
-				this->expected_but_got(std::format("expression on right-hand side of ({}) operator", Token::print_kind(this->reader.getKind(op_token))));
-				return Result::Error;
-			}
+			case Result::UnreportedError: return Result::UnreportedError; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
 
@@ -1292,9 +1320,10 @@ namespace panther{
 		const uint32_t infix_index = uint32_t(this->infixes.size());
 
 		this->nodes.emplace_back(AST::Kind::Infix, infix_index);
-		this->infixes.emplace_back(lhs_result.value(), op_token, rhs_result.value());
+		this->infixes.emplace_back(lhs, peeked_op, rhs_result.value());
 
-		return AST::NodeID{node_index};
+		// make sure operator chaining works
+		return this->parse_infix_expr_impl(AST::NodeID{node_index}, prec_level);
 	};
 
 
@@ -1339,9 +1368,126 @@ namespace panther{
 
 	auto Parser::parse_postfix_expr() noexcept -> Result {
 		// nothing at the moment
-		return this->parse_paren_expr();		
+		return this->parse_accessor_expr();		
 	};
 
+
+
+	// TODO: check for EOF
+	auto Parser::parse_accessor_expr() noexcept -> Result {
+		Result output = this->parse_paren_expr();
+		switch(output.code()){
+			case Result::Success: break;
+			case Result::WrongType: return Result::WrongType;
+			case Result::Error: return Result::Error;
+			case Result::UnreportedError: return output; // don't want to report error here (although I'm not sure this will ever happen)
+		};
+
+
+
+		while(true){
+			if(this->reader.getKind(this->reader.peek()) == Token::get(".")){
+				const TokenID accessor_op_token = this->reader.next();
+
+				const Result rhs_result = this->parse_ident();
+				switch(rhs_result.code()){
+					case Result::Success: break;
+
+					case Result::WrongType: {
+						this->expected_but_got("expression on right-hand side of accessor operator");
+						return Result::Error;
+					} break;
+
+					case Result::Error: return Result::Error;
+
+					case Result::UnreportedError: {
+						this->error("Failed to parse expression on right-hand side of accessor operator", this->reader.peek(-1));
+						return Result::Error;
+					} break;
+				};
+
+
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				const uint32_t infix_index = uint32_t(this->infixes.size());
+
+				this->nodes.emplace_back(AST::Kind::Infix, infix_index);
+				this->infixes.emplace_back(output.value(), accessor_op_token, rhs_result.value());
+
+				output = AST::NodeID{node_index};
+
+				continue;
+
+			}else if(this->reader.getKind(this->reader.peek()) == Token::get(".?") || this->reader.getKind(this->reader.peek()) == Token::get(".*")){
+				const TokenID op_token = this->reader.next();
+
+
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				const uint32_t postfix_index = uint32_t(this->postfixes.size());
+
+				this->nodes.emplace_back(AST::Kind::Postfix, postfix_index);
+				this->postfixes.emplace_back(output.value(), op_token);
+
+				output = AST::NodeID{node_index};
+
+				continue;
+				
+			}else if(this->reader.getKind(this->reader.peek()) == Token::get("[")){
+				this->reader.skip(1);
+
+				const Result expr_result = this->parse_expr();
+				switch(expr_result.code()){
+					case Result::Success: break;
+
+					case Result::WrongType: {
+						this->expected_but_got("expression inside index operator");
+						return Result::Error;
+					} break;
+
+					case Result::Error: return Result::Error;
+
+					case Result::UnreportedError: {
+						this->error("Failed to parse expression inside index operator", this->reader.peek(-1));
+						return Result::Error;
+					} break;
+				};
+
+
+				if(this->reader.getKind(this->reader.peek()) != Token::get("]")){
+					this->expected_but_got("closing \"]\" at end of index operator");
+					return Result::Error;
+
+				}else{
+					this->reader.skip(1);
+				}
+
+
+
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				const uint32_t index_op_index = uint32_t(this->index_ops.size());
+
+				this->nodes.emplace_back(AST::Kind::IndexOp, index_op_index);
+				this->index_ops.emplace_back(output.value(), expr_result.value());
+
+				output = AST::NodeID{node_index};
+
+
+
+				continue;
+
+			}else{
+				break;
+			}
+		};
+
+
+
+		return output;
+	};
+
+
+
+
+	// TODO: check for EOF
 	auto Parser::parse_paren_expr() noexcept -> Result {
 		if(this->reader.getKind(this->reader.peek()) != Token::get("(")){
 			return this->parse_term();
@@ -1380,13 +1526,18 @@ namespace panther{
 		const Result literal_result = this->parse_literal();
 		if(literal_result.code() == Result::Success){ return literal_result; }
 
+		// types
+		const Result type_result = this->parse_type();
+		if(type_result.code() == Result::Success){ return type_result; }
+
 		// idents
 		const Result ident_result = this->parse_ident();
 		if(ident_result.code() == Result::Success){ return ident_result; }
 
-		// types
-		const Result type_result = this->parse_type();
-		if(type_result.code() == Result::Success){ return type_result; }
+		// intrinsics
+		const Result intrinsic_result = this->parse_intrinsic();
+		if(intrinsic_result.code() == Result::Success){ return intrinsic_result; }
+
 
 
 		const TokenID first_token = this->reader.next();

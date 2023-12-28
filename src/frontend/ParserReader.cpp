@@ -19,6 +19,14 @@ namespace panther{
 		return this->parser.reader.getStringValue(ident.token);
 	};
 
+	auto ParserReader::getIntrinsicName(AST::NodeID id) const noexcept -> const std::string& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Intrinsic, "Not an intrinsic");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		const AST::Intrinsic& intrinsic = this->parser.intrinsics[index];
+		return this->parser.reader.getStringValue(intrinsic.token);
+	};
+
 
 	auto ParserReader::getAttributeName(TokenID id) const noexcept -> const std::string& {
 		evo::debugAssert(this->parser.reader.getKind(id) == Token::Attribute, "Not an attribute");
@@ -166,6 +174,21 @@ namespace panther{
 
 		const uint32_t index = this->parser.nodes[id.id].value_index;
 		return this->parser.postfixes[index];
+	};
+
+
+	auto ParserReader::getIndexOp(AST::NodeID id) noexcept -> AST::IndexOp& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::IndexOp, "Not an index op");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.index_ops[index];
+	};
+
+	auto ParserReader::getIndexOp(AST::NodeID id) const noexcept -> const AST::IndexOp& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::IndexOp, "Not an index op");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.index_ops[index];
 	};
 
 
@@ -863,6 +886,11 @@ namespace panther{
 				this->printer.debug(this->getIdentName(id) + '\n');
 			} break;
 
+			case AST::Kind::Intrinsic: {
+				indenter.print();
+				this->printer.debug("@" + this->getIntrinsicName(id) + '\n');
+			} break;
+
 			case AST::Kind::Null: {
 				indenter.print();
 				this->printer.debug("null\n");
@@ -933,6 +961,56 @@ namespace panther{
 						this->print_expr(infix.rhs, indenter);
 					indenter.pop();
 
+
+				indenter.pop();
+			} break;
+
+
+			case AST::Kind::Postfix: {
+				const AST::Postfix& infix = this->getPostfix(id);
+
+				indenter.print();
+				this->printer.info("Postfix Operator:\n");
+
+				indenter.push();
+
+					indenter.print();
+					this->printer.info("Left-Hand Side: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(infix.lhs, indenter);
+					indenter.pop();
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Op: ");
+					this->printer.debug(std::format("{}\n", Token::print_kind(this->parser.reader.getKind(infix.op))));
+
+				indenter.pop();
+			} break;
+
+			case AST::Kind::IndexOp: {
+				const AST::IndexOp& infix = this->getIndexOp(id);
+
+				indenter.print();
+				this->printer.info("Index Operator:\n");
+
+				indenter.push();
+
+					indenter.print();
+					this->printer.info("Target: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(infix.target, indenter);
+					indenter.pop();
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Index: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(infix.index, indenter);
+					indenter.pop();
 
 				indenter.pop();
 			} break;

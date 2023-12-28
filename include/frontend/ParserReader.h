@@ -20,6 +20,7 @@ namespace panther{
 
 			EVO_NODISCARD auto getNodeKind(AST::NodeID id) const noexcept -> AST::Kind;
 			EVO_NODISCARD auto getIdentName(AST::NodeID id) const noexcept -> const std::string&;
+			EVO_NODISCARD auto getIntrinsicName(AST::NodeID id) const noexcept -> const std::string&;
 			EVO_NODISCARD auto getAttributeName(TokenID id) const noexcept -> const std::string&;
 
 			EVO_NODISCARD auto getVarDecl(AST::NodeID id) noexcept -> AST::VarDecl&;
@@ -50,6 +51,9 @@ namespace panther{
 
 			EVO_NODISCARD auto getPostfix(AST::NodeID id) noexcept -> AST::Postfix&;
 			EVO_NODISCARD auto getPostfix(AST::NodeID id) const noexcept -> const AST::Postfix&;
+
+			EVO_NODISCARD auto getIndexOp(AST::NodeID id) noexcept -> AST::IndexOp&;
+			EVO_NODISCARD auto getIndexOp(AST::NodeID id) const noexcept -> const AST::IndexOp&;
 
 
 			EVO_NODISCARD auto getType(AST::NodeID id) noexcept -> AST::Type&;

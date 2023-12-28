@@ -66,6 +66,7 @@ namespace panther{
 			EVO_NODISCARD auto parse_block() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
+			EVO_NODISCARD auto parse_intrinsic() noexcept -> Result;
 			EVO_NODISCARD auto parse_attributes() noexcept -> Result;
 
 
@@ -77,11 +78,16 @@ namespace panther{
 
 
 			EVO_NODISCARD auto parse_expr() noexcept -> Result;
-			EVO_NODISCARD auto parse_infix_expr(int prec_level = 1) noexcept -> Result;
 
+			EVO_NODISCARD auto parse_infix_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_infix_expr_impl(AST::NodeID lhs, int prec_level) noexcept -> Result;
 			EVO_NODISCARD auto parse_prefix_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_postfix_expr() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_accessor_expr() noexcept -> Result;
+
 			EVO_NODISCARD auto parse_paren_expr() noexcept -> Result;
+
 
 			EVO_NODISCARD auto parse_term() noexcept -> Result;
 			EVO_NODISCARD auto parse_literal() noexcept -> Result;
@@ -110,6 +116,7 @@ namespace panther{
 			std::vector<AST::NodeID> top_level_statements{};
 
 			std::vector<AST::Node> nodes{};
+
 			std::vector<AST::VarDecl> var_decls{};
 
 			std::vector<AST::FuncDef> func_defs{};
@@ -121,12 +128,13 @@ namespace panther{
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
 			std::vector<AST::Postfix> postfixes{};
+			std::vector<AST::IndexOp> index_ops{};
 
 			std::vector<AST::Ident> idents{};
+			std::vector<AST::Intrinsic> intrinsics{};
 			std::vector<AST::Attributes> attributes{};
 			std::vector<AST::Literal> literals{};
 			std::vector<AST::Type> types{};
-			std::vector<AST::Term> terms{};
 
 			friend class ParserReader;
 	};

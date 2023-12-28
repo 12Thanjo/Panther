@@ -21,12 +21,13 @@ namespace panther{
 			Prefix,
 			Infix,
 			Postfix,
+			IndexOp,
 
 			Ident,
+			Intrinsic,
 			Attributes,
 			Literal,
 			Type,
-			Term,
 
 			// no data
 			Uninit,
@@ -164,12 +165,22 @@ namespace panther{
 			TokenID op;
 		};
 
+		struct IndexOp{
+			NodeID target;
+			NodeID index;
+		};
+
 
 
 
 		struct Ident{
 			TokenID token;
 		};
+
+		struct Intrinsic{
+			TokenID token;
+		};
+
 
 		struct Attributes{
 			std::vector<TokenID> tokens;
@@ -247,12 +258,6 @@ namespace panther{
 				this->value.func.errors = errors;
 			};
 
-		};
-
-
-
-		struct Term{
-			
 		};
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.0.14
+- Fixed `a + b + c` from being parsed like `a + (b + c)`
+- Added parsing of accessing operators
+	- accessor (`a.b`)
+	- dereference (`a.*`)
+	- unwrap (`a.?`)
+	- index (`a[b]`)
+
 ### v0.0.13
 - Made function output definitions (returns and errors) their own AST node
 - Added parsing of funciton types (function pointers)
@@ -50,7 +58,7 @@
 	- floating-point 
 	- binary, octal, and hex
 	- exponents (positive and negative)
-	- underscores as separators (`10_000`)
+	- underscores as separators (for example: `10_000`)
 	- checking that the number fits in a `UI64` or `F128` for integers and floating-points respectively
 
 ### v0.0.4

@@ -1,16 +1,20 @@
 
 
 
-def foo: Int *? *|? = 12;
-def arr: [Int: 3 + foo as Int] = uninit;
-
-
-pub func test = (foo: F64 write, bar: Int = 12) #may_discard -> (happy: Bool, name: T) <code: ErrCode, message: String> {
-	var foo: Int = 12;
-	static var bar = true;
-}
+var foo: Int*? = (a.b[12 + (19.1 as Int) * 3].*).?.c;
 
 
 
-def test_func: func(foo: F64 write, bar: Int = 12) -> Void = test;
+// def foo: Int *? *|? = 12;
+// def arr: [Int: 3 + foo as Int] = uninit;
+
+
+// pub func test = (foo: F64 write, bar: Int = 12) #may_discard -> (happy: Bool, name: T) <code: ErrCode, message: String> {
+// 	var foo: Int = 12;
+// 	static var bar = true;
+// }
+
+
+
+// def test_func: func(foo: F64 write, bar: Int = 12) -> Void = test;
 
