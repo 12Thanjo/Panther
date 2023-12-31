@@ -29,7 +29,6 @@ namespace panther{
 						Success,
 						WrongType,
 						Error,
-						UnreportedError,
 					};
 
 					using enum class Code;
@@ -56,6 +55,7 @@ namespace panther{
 
 
 			EVO_NODISCARD auto parse_var_decl() noexcept -> Result;
+			EVO_NODISCARD auto parse_assignment() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_func_def() noexcept -> Result;
 			EVO_NODISCARD auto parse_func_params() noexcept -> Result;
@@ -129,6 +129,7 @@ namespace panther{
 			std::vector<AST::Infix> infixes{};
 			std::vector<AST::Postfix> postfixes{};
 			std::vector<AST::IndexOp> index_ops{};
+			std::vector<AST::FuncCall> func_calls{};
 
 			std::vector<AST::Ident> idents{};
 			std::vector<AST::Intrinsic> intrinsics{};

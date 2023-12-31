@@ -1,7 +1,27 @@
 
 
 
-var foo: Int*? = (a.b[12 + (19.1 as Int) * 3].*).?.c;
+
+// var foo: Int = 12;
+// var bar: F32 = (foo cast F32) * 12.6;
+
+
+// def asdf: Thing^? = null;
+// def meow = asdf.^.foo;
+
+
+
+{
+	var foo: USize = asdf.^.foo(12)[19];
+	foo *= 12;
+	asdf();
+}
+
+
+
+// func foo = (a: Int = asdf as Int * 2) -> Void {
+	
+// }
 
 
 

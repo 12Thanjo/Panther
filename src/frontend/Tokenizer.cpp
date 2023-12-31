@@ -351,7 +351,7 @@ namespace panther{
 
 
 		// length 2
-			 if(is_op(".*")){ set_op(".*"); return true; }
+			 if(is_op(".^")){ set_op(".^"); return true; }
 		else if(is_op(".?")){ set_op(".?"); return true; }
 
 		else if(is_op("+=")){ set_op("+="); return true; }
@@ -381,6 +381,7 @@ namespace panther{
 		else if(is_op("=")){ set_op("="); return true; }
 		else if(is_op("?")){ set_op("?"); return true; }
 
+		else if(is_op("^")){ set_op("^"); return true; }
 		else if(is_op(".")){ set_op("."); return true; }
 
 		else if(is_op("+")){ set_op("+"); return true; }

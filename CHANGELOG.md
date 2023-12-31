@@ -1,5 +1,14 @@
 # Changelog
 
+### v0.0.15
+- Simplified operator precedences
+- changed pointer to `^`
+	- dereference operator is now `a.^`
+- Added parsing of function calls
+- Added parsing of expression statements
+- Added parsing of anonymous blocks
+- Added parsing of assignment statements
+
 ### v0.0.14
 - Fixed `a + b + c` from being parsed like `a + (b + c)`
 - Added parsing of accessing operators
@@ -10,7 +19,7 @@
 
 ### v0.0.13
 - Made function output definitions (returns and errors) their own AST node
-- Added parsing of funciton types (function pointers)
+- Added parsing of function types (function pointers)
 
 ### v0.0.12
 - Removed function captures due to changing design decision

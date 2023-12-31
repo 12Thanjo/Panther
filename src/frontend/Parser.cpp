@@ -23,9 +23,6 @@ namespace panther{
 					return false;
 				} break;
 
-				case Result::UnreportedError: {
-					this->fatal("Encountered unknown and unreported error while parsing a statement", this->reader.peek());
-				} break;
 			};
 
 		};
@@ -44,11 +41,6 @@ namespace panther{
 				case Result::Success: return result;
 				case Result::WrongType: break;
 				case Result::Error: return Result::Error;
-
-				case Result::UnreportedError:{
-					this->fatal("Failed to parse variable declaration", this->reader.peek());
-					return Result::Error;
-				}
 			};
 		}
 
@@ -60,16 +52,21 @@ namespace panther{
 				case Result::Success: return result;
 				case Result::WrongType: break;
 				case Result::Error: return Result::Error;
-
-				case Result::UnreportedError:{
-					this->fatal("Failed to parse function definition", this->reader.peek());
-					return Result::Error;
-				}
 			};
 		}
 
 
-		// assignment_stmt
+		// assignment
+		{
+			const auto result = this->parse_assignment();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
+
+
 		// multiple_assignment
 		// conditional
 		// iteration
@@ -81,8 +78,37 @@ namespace panther{
 		// return_stmt
 		// defer_stmt
 		// struct_def
+
 		// block
-		// expr ; // meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
+		{
+			const auto result = this->parse_block();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
+
+
+		// meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
+		// expr
+		{
+			const auto result = this->parse_expr();
+			switch(result.code()){
+				case Result::Success: {
+					if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+						this->expected_but_got("semicolon at end of expression statement", this->reader.peek(-1));
+						return Result::Error;
+					}
+
+					return result;
+				} break;
+
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
+
 		
 		return Result::WrongType;
 	};
@@ -180,11 +206,6 @@ namespace panther{
 				case Result::Error: {
 					return Result::Error;
 				} break;
-
-				case Result::UnreportedError: {
-					this->error("Invalid type in variable declaration", this->reader.peek());
-					return Result::Error;
-				} break;
 			};
 			
 			if(this->reader.is_eof()){
@@ -229,11 +250,6 @@ namespace panther{
 			case Result::Error: {
 				return Result::Error;
 			} break;
-
-			case Result::UnreportedError: {
-				this->error("Failed to parse expression in variable declaration", this->reader.peek());
-				return Result::Error;
-			} break;
 		};
 
 		// if(this->reader.is_eof()){
@@ -260,6 +276,65 @@ namespace panther{
 
 		return AST::NodeID{node_index};
 	};
+
+
+
+
+	// TODO: EOF checking
+	auto Parser::parse_assignment() noexcept -> Result {
+		const TokenID first_token = this->reader.peek();
+
+		const Result lhs_result = this->parse_expr();
+		switch(lhs_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: return Result::WrongType;
+			case Result::Error: return Result::Error;
+		};
+
+
+		const TokenID assignemnt_op = this->reader.next();
+		switch(this->reader.getKind(assignemnt_op)){
+			case Token::get("="):
+			case Token::get("+="):
+			case Token::get("-="):
+			case Token::get("*="):
+			case Token::get("/="):
+			case Token::get("%="):
+				break;
+			default:
+				this->reader.go_back(first_token);
+				return Result::WrongType;
+		};
+
+
+		const Result rhs_result = this->parse_expr();
+		switch(rhs_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: {
+				this->expected_but_got("value expression for assignment statement");
+				return Result::Error;
+			} break;
+			case Result::Error: return Result::Error;
+		};
+
+
+		// ;
+		if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+			this->expected_but_got("semicolon at end of assignment statement");
+			return Result::Error;
+		}
+
+
+		// create and return
+		const uint32_t node_index = uint32_t(this->nodes.size());
+		const uint32_t infix_index = uint32_t(this->infixes.size());
+
+		this->nodes.emplace_back(AST::Kind::Infix, infix_index);
+		this->infixes.emplace_back(lhs_result.value(), assignemnt_op, rhs_result.value());
+
+		return AST::NodeID{node_index};
+	};
+
 
 
 
@@ -431,11 +506,6 @@ namespace panther{
 			} break;
 
 			case Result::Error: return Result::Error;
-
-			case Result::UnreportedError: {
-				this->fatal("Encoutered error while trying to parse { } enclosed block after function definition", this->reader.peek(-1));
-				return Result::Error;
-			} break;
 		};
 		
 
@@ -537,11 +607,6 @@ namespace panther{
 					} break;
 
 					case Result::Error: return Result::Error;
-
-					case Result::UnreportedError: {
-						this->error("Failed to parse expression in default value for function parameter", this->reader.peek());
-						return Result::Error;	
-					}
 				};
 
 			}
@@ -647,10 +712,6 @@ namespace panther{
 				case Result::Error: {
 					return Result::Error;
 				} break;
-
-				case Result::UnreportedError: {
-					this->fatal("Failed to parse function return type", this->reader.peek(-1));
-				} break;
 			};
 		}
 
@@ -695,11 +756,6 @@ namespace panther{
 				} break;
 
 				case Result::Error: {
-					return Result::Error;
-				} break;
-
-				case Result::UnreportedError: {
-					this->error("Failed to parse type of function error", this->reader.peek(-1));
 					return Result::Error;
 				} break;
 			};
@@ -768,9 +824,11 @@ namespace panther{
 
 	// TODO: check for EOF
 	auto Parser::parse_block() noexcept -> Result {
-		if(this->reader.getKind(this->reader.next()) != Token::get("{")){
+		if(this->reader.getKind(this->reader.peek()) != Token::get("{")){
 			return Result::WrongType;
 		}
+
+		this->reader.skip(1);
 
 		// TODO: parse statements
 		auto stmts = std::vector<AST::NodeID>{};
@@ -796,10 +854,6 @@ namespace panther{
 
 				case Result::Error: {
 					return Result::Error;
-				} break;
-
-				case Result::UnreportedError: {
-					this->fatal("Encountered unknown and unreported error while parsing a statement", this->reader.peek());
 				} break;
 			};
 		};
@@ -895,11 +949,6 @@ namespace panther{
 			case Result::WrongType: break;
 
 			case Result::Error: return Result::Error;
-
-			case Result::UnreportedError: {
-				this->error("Failed to parse array type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
 		};
 
 
@@ -911,11 +960,6 @@ namespace panther{
 			case Result::WrongType: break;
 
 			case Result::Error: return Result::Error;
-
-			case Result::UnreportedError: {
-				this->error("Failed to parse function type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
 		};
 
 
@@ -998,11 +1042,6 @@ namespace panther{
 			} break;
 
 			case Result::Error: return Result::Error;
-
-			case Result::UnreportedError: {
-				this->error("Failed to parse array element type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
 		};
 
 
@@ -1033,11 +1072,6 @@ namespace panther{
 				} break;
 
 				case Result::Error: return Result::Error;
-
-				case Result::UnreportedError: {
-					this->error("Failed to parse array element length expr", this->reader.peek(-1));
-					return Result::Error;
-				} break;
 			};
 
 			arr_length = expr_result.value();
@@ -1085,11 +1119,6 @@ namespace panther{
 			} break;
 
 			case Result::Error: return Result::Error;
-
-			case Result::UnreportedError: {
-				this->error("Failed to parse function parameters block in function type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
 		};
 
 
@@ -1101,11 +1130,6 @@ namespace panther{
 			case Result::WrongType: break;
 
 			case Result::Error: return Result::Error;
-
-			case Result::UnreportedError: {
-				this->error("Failed to parse function parameters block in function type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
 		};
 
 
@@ -1160,7 +1184,7 @@ namespace panther{
 		auto qualifiers = std::vector<AST::Type::Qualifier>{};
 
 		while(true){
-			if(this->reader.getKind(this->reader.peek()) == Token::get("*")){
+			if(this->reader.getKind(this->reader.peek()) == Token::get("^")){
 				// is pointer
 				this->reader.skip(1);
 				AST::Type::Qualifier& qualifer = qualifiers.emplace_back(true, false, false);
@@ -1227,37 +1251,34 @@ namespace panther{
 
 
 
-	constexpr int MAX_PREC = 10;
+	constexpr int MAX_PREC = 7;
 	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
 		switch(kind){
 			case Token::get("||"): return 1;
+			case Token::get("&&"): return 1;
 
-			case Token::get("&&"): return 2;
+			case Token::get("|"): return 2;
+			case Token::get("&"): return 2;
 
-			case Token::get("|"): return 3;
+			case Token::get("=="): return 3;
+			case Token::get("!="): return 3;
+			case Token::get("<"): return 3;
+			case Token::get("<="): return 3;
+			case Token::get(">"): return 3;
+			case Token::get(">="): return 3;
 
-			case Token::get("&"): return 4;
+			case Token::get("<<"): return 4;
+			case Token::get(">>"): return 4;
 
-			case Token::get("=="): return 5;
-			case Token::get("!="): return 5;
+			case Token::get("+"): return 5;
+			case Token::get("-"): return 5;
 
-			case Token::get("<"): return 6;
-			case Token::get("<="): return 6;
-			case Token::get(">"): return 6;
-			case Token::get(">="): return 6;
+			case Token::get("*"): return 6;
+			case Token::get("/"): return 6;
+			case Token::get("%"): return 6;
 
-			case Token::get("<<"): return 7;
-			case Token::get(">>"): return 7;
-
-			case Token::get("+"): return 8;
-			case Token::get("-"): return 8;
-
-			case Token::get("*"): return 9;
-			case Token::get("/"): return 9;
-			case Token::get("%"): return 9;
-
-			case Token::KeywordAs: return 10;
-			case Token::KeywordCast: return 10;
+			case Token::KeywordAs: return 7;
+			case Token::KeywordCast: return 7;
 		};
 
 		return -1;
@@ -1271,7 +1292,6 @@ namespace panther{
 			case Result::Success: break;
 			case Result::WrongType: return Result::WrongType;
 			case Result::Error: return Result::Error;
-			case Result::UnreportedError: return lhs_result; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
 		return this->parse_infix_expr_impl(lhs_result.value(), 1);
@@ -1290,6 +1310,10 @@ namespace panther{
 		//   	< to maintain operator precedence
 		// 		<= to prevent `a + b + c` from being parsed as `a + (b + c)`
 		if(next_op_prec <= prec_level){
+
+			// TODO: fix the cast operator thinking multiply is pointer
+
+
 			return lhs;
 		}
 
@@ -1302,7 +1326,6 @@ namespace panther{
 			case Result::Success: break;
 			case Result::WrongType: return Result::WrongType;
 			case Result::Error: return Result::Error;
-			case Result::UnreportedError: return next_term; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
 
@@ -1311,7 +1334,6 @@ namespace panther{
 			case Result::Success: break;
 			case Result::WrongType: return Result::WrongType;
 			case Result::Error: return Result::Error;
-			case Result::UnreportedError: return Result::UnreportedError; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
 
@@ -1380,7 +1402,6 @@ namespace panther{
 			case Result::Success: break;
 			case Result::WrongType: return Result::WrongType;
 			case Result::Error: return Result::Error;
-			case Result::UnreportedError: return output; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
 
@@ -1399,11 +1420,6 @@ namespace panther{
 					} break;
 
 					case Result::Error: return Result::Error;
-
-					case Result::UnreportedError: {
-						this->error("Failed to parse expression on right-hand side of accessor operator", this->reader.peek(-1));
-						return Result::Error;
-					} break;
 				};
 
 
@@ -1417,7 +1433,7 @@ namespace panther{
 
 				continue;
 
-			}else if(this->reader.getKind(this->reader.peek()) == Token::get(".?") || this->reader.getKind(this->reader.peek()) == Token::get(".*")){
+			}else if(this->reader.getKind(this->reader.peek()) == Token::get(".?") || this->reader.getKind(this->reader.peek()) == Token::get(".^")){
 				const TokenID op_token = this->reader.next();
 
 
@@ -1444,11 +1460,6 @@ namespace panther{
 					} break;
 
 					case Result::Error: return Result::Error;
-
-					case Result::UnreportedError: {
-						this->error("Failed to parse expression inside index operator", this->reader.peek(-1));
-						return Result::Error;
-					} break;
 				};
 
 
@@ -1470,6 +1481,58 @@ namespace panther{
 
 				output = AST::NodeID{node_index};
 
+
+
+				continue;
+
+			}else if(this->reader.getKind(this->reader.peek()) == Token::get("(")){
+				this->reader.skip(1);
+
+
+				auto arguments = std::vector<AST::NodeID>{};
+
+				while(true){
+					if(this->reader.getKind(this->reader.peek()) == Token::get(")")){
+						this->reader.skip(1);	
+						break;
+					}
+
+
+					const Result expr_result = this->parse_expr();
+					switch(expr_result.code()){
+						case Result::Success: {
+							arguments.emplace_back(expr_result.value());
+						} break;
+
+						case Result::WrongType: {
+							this->expected_but_got("expression inside function call operator");
+							return Result::Error;
+						} break;
+
+						case Result::Error: return Result::Error;
+					};
+
+
+					const TokenID after_param_peek = this->reader.next();
+					if(this->reader.getKind(after_param_peek) != Token::get(",")){
+						if(this->reader.getKind(after_param_peek) == Token::get(")")){
+							break;
+							
+						}else{
+							this->expected_but_got("\",\" at end of function call argument or \")\" at end of function call", this->reader.peek(-1));
+							return Result::Error;
+						}
+					}
+				};
+
+
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				const uint32_t func_call_index = uint32_t(this->func_calls.size());
+
+				this->nodes.emplace_back(AST::Kind::FuncCall, func_call_index);
+				this->func_calls.emplace_back(output.value(), std::move(arguments));
+
+				output = AST::NodeID{node_index};
 
 
 				continue;
@@ -1500,7 +1563,6 @@ namespace panther{
 			case Result::Success: break;
 			case Result::WrongType: return expr_result;
 			case Result::Error: return expr_result;
-			case Result::UnreportedError: return expr_result; // don't want to report error here (although I'm not sure this will ever happen)
 		};
 
 
@@ -1520,7 +1582,7 @@ namespace panther{
 
 
 
-	// TODO: finish terms
+	// TODO: check for EOF
 	auto Parser::parse_term() noexcept -> Result {
 		// literals
 		const Result literal_result = this->parse_literal();
@@ -1563,7 +1625,7 @@ namespace panther{
 
 
 
-
+	// TODO: check for EOF
 	auto Parser::parse_literal() noexcept -> Result {
 		const TokenID token = this->reader.next();
 

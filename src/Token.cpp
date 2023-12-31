@@ -98,8 +98,9 @@ namespace panther{
 			break; case Token::Kind::Equals: return "=";
 			break; case Token::Kind::Optional: return "?";
 
+			break; case Token::Kind::Pointer: return "^";
 			break; case Token::Kind::Accessor: return ".";
-			break; case Token::Kind::Dereference: return ".*";
+			break; case Token::Kind::Dereference: return ".^";
 			break; case Token::Kind::Unwrap: return ".?";
 
 			break; case Token::Kind::Plus: return "+";

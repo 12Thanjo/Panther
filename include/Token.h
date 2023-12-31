@@ -110,8 +110,9 @@ namespace panther{
 			Equals, // =
 			Optional, // ?
 
+			Pointer, // ^
 			Accessor, // .
-			Dereference, // .*
+			Dereference, // .^
 			Unwrap, // .?
 
 			Plus, // +
@@ -180,7 +181,7 @@ namespace panther{
 
 
 			// length 2
-				 if(IS_TOKEN(".*")){ return Token::Kind::Dereference; }
+				 if(IS_TOKEN(".^")){ return Token::Kind::Dereference; }
 			else if(IS_TOKEN(".?")){ return Token::Kind::Unwrap; }
 
 			else if(IS_TOKEN("+=")){ return Token::Kind::PlusEquals; }
@@ -210,6 +211,7 @@ namespace panther{
 			else if(IS_TOKEN("=")){ return Token::Kind::Equals; }
 			else if(IS_TOKEN("?")){ return Token::Kind::Optional; }
 
+			else if(IS_TOKEN("^")){ return Token::Kind::Pointer; }
 			else if(IS_TOKEN(".")){ return Token::Kind::Accessor; }
 
 			else if(IS_TOKEN("+")){ return Token::Kind::Plus; }
@@ -247,7 +249,7 @@ namespace panther{
 
 
 			// TODO: errors
-			evo::logFatal("Unknown token kind => " __FUNCTION__);
+			evo::logFatal(std::format("Unknown token kind ({}) => {}", token_str, __FUNCTION__));
 			evo::unreachable();
 		};
 

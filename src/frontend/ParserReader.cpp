@@ -192,6 +192,21 @@ namespace panther{
 	};
 
 
+	auto ParserReader::getFuncCall(AST::NodeID id) noexcept -> AST::FuncCall& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::FuncCall, "Not an func call");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.func_calls[index];
+	};
+
+	auto ParserReader::getFuncCall(AST::NodeID id) const noexcept -> const AST::FuncCall& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::FuncCall, "Not an func call");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.func_calls[index];
+	};
+
+
 
 
 
@@ -245,8 +260,17 @@ namespace panther{
 			break; case AST::Kind::VarDecl: this->print_var_decl(id, indenter);
 			break; case AST::Kind::FuncDef: this->print_func_def(id, indenter);
 
+			break; case AST::Kind::Block: {
+				indenter.print();
+				this->printer.info("Block:\n");
+
+				indenter.push();
+				this->print_block(id, indenter);
+				indenter.pop();
+			} break;
+
 			break; default:
-				EVO_FATAL_BREAK("Unknown statement kind");
+				this->print_expr(id, indenter);
 		};
 	};
 
@@ -658,7 +682,7 @@ namespace panther{
 
 				for(const AST::Type::Qualifier& qualifier : type.qualifiers){
 					type_str += ' ';
-					if(qualifier.is_pointer){ type_str += '*'; }
+					if(qualifier.is_pointer){ type_str += '^'; }
 					if(qualifier.is_const){ type_str += '|'; }
 					if(qualifier.is_optional){ type_str += '?'; }
 				}
@@ -1010,6 +1034,47 @@ namespace panther{
 					indenter.push();
 						indenter.set_end();
 						this->print_expr(infix.index, indenter);
+					indenter.pop();
+
+				indenter.pop();
+			} break;
+
+
+			case AST::Kind::FuncCall: {
+				const AST::FuncCall& func_call = this->getFuncCall(id);
+
+				indenter.print();
+				this->printer.info("Function Call:\n");
+
+				indenter.push();
+
+					indenter.print();
+					this->printer.info("Target: \n");
+					indenter.push();
+						indenter.set_end();
+						this->print_expr(func_call.target, indenter);
+					indenter.pop();
+
+					indenter.set_end();
+					indenter.print();
+					this->printer.info("Arguments: \n");
+					indenter.push();
+						for(int i = 0; i < func_call.arguments.size(); i+=1){
+							if(i < func_call.arguments.size() - 1){
+								indenter.set_arrow();
+							}else{
+								indenter.set_end();
+							}
+
+							indenter.print();
+							this->printer.info(std::to_string(i) + ":\n");
+
+							indenter.push();
+								indenter.set_end();
+								this->print_expr(func_call.arguments[i], indenter);
+							indenter.pop();
+						}
+
 					indenter.pop();
 
 				indenter.pop();

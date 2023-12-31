@@ -22,6 +22,7 @@ namespace panther{
 			Infix,
 			Postfix,
 			IndexOp,
+			FuncCall,
 
 			Ident,
 			Intrinsic,
@@ -168,6 +169,11 @@ namespace panther{
 		struct IndexOp{
 			NodeID target;
 			NodeID index;
+		};
+
+		struct FuncCall{
+			NodeID target;
+			std::vector<NodeID> arguments;
 		};
 
 

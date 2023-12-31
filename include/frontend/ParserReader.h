@@ -55,6 +55,10 @@ namespace panther{
 			EVO_NODISCARD auto getIndexOp(AST::NodeID id) noexcept -> AST::IndexOp&;
 			EVO_NODISCARD auto getIndexOp(AST::NodeID id) const noexcept -> const AST::IndexOp&;
 
+			EVO_NODISCARD auto getFuncCall(AST::NodeID id) noexcept -> AST::FuncCall&;
+			EVO_NODISCARD auto getFuncCall(AST::NodeID id) const noexcept -> const AST::FuncCall&;
+
+
 
 			EVO_NODISCARD auto getType(AST::NodeID id) noexcept -> AST::Type&;
 			EVO_NODISCARD auto getType(AST::NodeID id) const noexcept -> const AST::Type&;
