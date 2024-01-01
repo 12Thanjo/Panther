@@ -26,6 +26,10 @@ namespace panther{
 			EVO_NODISCARD auto getVarDecl(AST::NodeID id) noexcept -> AST::VarDecl&;
 			EVO_NODISCARD auto getVarDecl(AST::NodeID id) const noexcept -> const AST::VarDecl&;
 
+			EVO_NODISCARD auto getMultipleAssignment(AST::NodeID id) noexcept -> AST::MultipleAssignment&;
+			EVO_NODISCARD auto getMultipleAssignment(AST::NodeID id) const noexcept -> const AST::MultipleAssignment&;
+
+
 			EVO_NODISCARD auto getFuncDef(AST::NodeID id) noexcept -> AST::FuncDef&;
 			EVO_NODISCARD auto getFuncDef(AST::NodeID id) const noexcept -> const AST::FuncDef&;
 
@@ -40,6 +44,16 @@ namespace panther{
 
 			EVO_NODISCARD auto getAttributes(AST::NodeID id) noexcept -> AST::Attributes&;
 			EVO_NODISCARD auto getAttributes(AST::NodeID id) const noexcept -> const AST::Attributes&;
+
+
+			EVO_NODISCARD auto getConditional(AST::NodeID id) noexcept -> AST::Conditional&;
+			EVO_NODISCARD auto getConditional(AST::NodeID id) const noexcept -> const AST::Conditional&;
+
+			EVO_NODISCARD auto getWhileLoop(AST::NodeID id) noexcept -> AST::WhileLoop&;
+			EVO_NODISCARD auto getWhileLoop(AST::NodeID id) const noexcept -> const AST::WhileLoop&;
+
+			EVO_NODISCARD auto getReturn(AST::NodeID id) noexcept -> AST::Return&;
+			EVO_NODISCARD auto getReturn(AST::NodeID id) const noexcept -> const AST::Return&;
 
 
 
@@ -75,11 +89,17 @@ namespace panther{
 			auto print_stmt(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
 			auto print_var_decl(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_multiple_assignment(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+
 
 			auto print_func_def(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_func_params(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
 			auto print_block(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+
+			auto print_conditional(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_while_loop(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_return(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
 			auto print_type(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_expr(AST::NodeID id, class Indenter& indenter) const noexcept -> void;

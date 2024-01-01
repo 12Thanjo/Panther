@@ -88,12 +88,14 @@ alias_stmt:
 
 
 return_stmt:
+	RETURN ;
 	RETURN ... ;
 	RETURN expr ;
-	RETURN [ expr_list ] ;
+	// RETURN [ expr_list ] ;
+	ERROR ;
 	ERROR  ... ;
 	ERROR  expr ;
-	ERROR  [ expr_list ] ;
+	// ERROR  [ expr_list ] ;
 
 
 defer_stmt:

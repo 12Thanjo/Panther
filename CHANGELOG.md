@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.0.16
+- Added parsing of multiple assignment
+- Added parsing of conditionals (`if`, `else`, `else if`)
+- Added parsing of while loops
+- Added parsing of return / throw statements
+
 ### v0.0.15
 - Simplified operator precedences
 - changed pointer to `^`

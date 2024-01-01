@@ -197,9 +197,10 @@ namespace panther{
 			else if(ident_name == "in")    { this->add_token(Token::Kind::KeywordIn);    }
 
 			else if(ident_name == "return") { this->add_token(Token::Kind::KeywordReturn); }
-			else if(ident_name == "error")  { this->add_token(Token::Kind::KeywordError);  }
+			else if(ident_name == "throw")  { this->add_token(Token::Kind::KeywordThrow);  }
 			else if(ident_name == "defer")  { this->add_token(Token::Kind::KeywordDefer);  }
 			else if(ident_name == "break")  { this->add_token(Token::Kind::KeywordBreak);  }
+			else if(ident_name == "continue")  { this->add_token(Token::Kind::KeywordContinue);  }
 
 			else if(ident_name == "try")   { this->add_token(Token::Kind::KeywordTry);   }
 			else if(ident_name == "catch") { this->add_token(Token::Kind::KeywordCatch); }
@@ -349,9 +350,12 @@ namespace panther{
 		};
 
 
+		// length 3
+		if(is_op("...")){ set_op("..."); return true; }
+
 
 		// length 2
-			 if(is_op(".^")){ set_op(".^"); return true; }
+		else  if(is_op(".^")){ set_op(".^"); return true; }
 		else if(is_op(".?")){ set_op(".?"); return true; }
 
 		else if(is_op("+=")){ set_op("+="); return true; }

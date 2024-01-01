@@ -55,6 +55,15 @@ namespace panther{
 			};
 		}
 
+		// multiple_assignment
+		{
+			const auto result = this->parse_multiple_assignment();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
 
 		// assignment
 		{
@@ -66,18 +75,46 @@ namespace panther{
 			};
 		}
 
-
-		// multiple_assignment
 		// conditional
-		// iteration
-		// try_catch
-		// while_stmt
-		// do_while_stmt
-		// typedef_stmt
-		// alias_stmt
-		// return_stmt
-		// defer_stmt
-		// struct_def
+		{
+			const auto result = this->parse_conditional();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
+
+		// TODO: iteration
+		// TODO: try_catch
+
+		// while
+		{
+			const auto result = this->parse_while();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
+
+		// TODO: do_while
+		// TODO: typedef_stmt
+		// TODO: alias_stmt
+
+		// return / throw
+		{
+			const auto result = this->parse_return();
+			switch(result.code()){
+				case Result::Success: return result;
+				case Result::WrongType: break;
+				case Result::Error: return Result::Error;
+			};
+		}
+
+
+		// TODO: defer_stmt
+		// TODO: struct_def
 
 		// block
 		{
@@ -171,8 +208,8 @@ namespace panther{
 		// identifier
 		const Result ident_result = this->parse_ident();
 		if(ident_result.code() == Result::WrongType){
-			this->expected_but_got("identifier in variable declaration");
-			return Result::Error;
+			this->reader.go_back(first_token);
+			return Result::WrongType;
 		}
 
 		if(this->reader.is_eof()){
@@ -268,13 +305,10 @@ namespace panther{
 
 
 		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t var_decl_index = uint32_t(this->var_decls.size());
-
-		this->nodes.emplace_back(AST::Kind::VarDecl, var_decl_index);
-		this->var_decls.emplace_back(is_public, is_static, decl_type, ident_result.value(), type, expr_result.value());
-
-		return AST::NodeID{node_index};
+		return this->create_node(
+			this->var_decls, AST::Kind::VarDecl,
+			is_public, is_static, decl_type, ident_result.value(), type, expr_result.value()
+		);
 	};
 
 
@@ -326,13 +360,126 @@ namespace panther{
 
 
 		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t infix_index = uint32_t(this->infixes.size());
+		return this->create_node(this->infixes, AST::Kind::Infix, lhs_result.value(), assignemnt_op, rhs_result.value());
+	};
 
-		this->nodes.emplace_back(AST::Kind::Infix, infix_index);
-		this->infixes.emplace_back(lhs_result.value(), assignemnt_op, rhs_result.value());
 
-		return AST::NodeID{node_index};
+	// TODO: check EOF
+	auto Parser::parse_multiple_assignment() noexcept -> Result {
+		const TokenID first_token = this->reader.peek();
+
+		// check public
+		bool is_public = false;
+		if(this->reader.getKind(first_token) == Token::Kind::KeywordPub){
+			is_public = true;
+			this->reader.skip(1);
+
+			if(this->reader.is_eof()){
+				this->unexpected_eof("multiple assignment");
+				return Result::Error;
+			}
+		}
+
+
+		// check static
+		bool is_static = false;
+		if(this->reader.getKind(this->reader.peek()) == Token::Kind::KeywordStatic){
+			is_static = true;
+			this->reader.skip(1);
+
+			if(this->reader.is_eof()){
+				this->unexpected_eof("multiple assignment");
+				return Result::Error;
+			}
+		}
+
+
+		// decl type
+		using DeclType = AST::MultipleAssignment::DeclType;
+		DeclType decl_type;
+		switch(this->reader.getKind(this->reader.peek())){
+			break; case Token::KeywordVar: decl_type = DeclType::Var; this->reader.skip(1);
+			break; case Token::KeywordDef: decl_type = DeclType::Def; this->reader.skip(1);
+			break; default: decl_type = DeclType::None;
+		};
+
+
+
+		if(this->reader.getKind(this->reader.next()) != Token::get("[")){
+			this->reader.go_back(first_token);
+			return Result::WrongType;
+		}
+
+
+		auto assignment_values = std::vector<AST::NodeID>{};
+
+		while(true){
+			if(this->reader.getKind(this->reader.peek()) == Token::get("]")){
+				this->reader.skip(1);	
+				break;
+			}
+
+			const Result expr_result = this->parse_expr();
+			switch(expr_result.code()){
+				case Result::Success: {
+					assignment_values.emplace_back(expr_result.value());
+				} break;
+
+				case Result::WrongType: {
+					this->expected_but_got("expression in multiple assignment block");
+					return Result::Error;
+				} break;
+
+				case Result::Error: return Result::Error;
+			};
+
+
+			const TokenID after_param_peek = this->reader.next();
+			if(this->reader.getKind(after_param_peek) != Token::get(",")){
+				if(this->reader.getKind(after_param_peek) == Token::get("]")){
+					break;
+					
+				}else{
+					this->expected_but_got("\",\" at end of multiple assignment value \"]\" at end of multiple assignment block", this->reader.peek(-1));
+					return Result::Error;
+				}
+			}
+		};
+
+
+		// =
+		if(this->reader.getKind(this->reader.next()) != Token::get("=")){
+			this->expected_but_got("\"=\" in multiple assignment");
+			return Result::Error;
+		}
+
+
+		// expr
+		const Result expr_result = this->parse_expr();
+		switch(expr_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: {
+				this->expected_but_got("expression on right-hand side of multiple assignment");
+				return Result::Error;
+			} break;
+			case Result::Error: return Result::Error;
+		};
+
+
+		// ;
+		if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+			this->expected_but_got("\";\" at end of multiple assignment");
+			return Result::Error;
+		}
+
+
+		return this->create_node(this->multiple_assignments, AST::Kind::MultipleAssignment,
+			is_public,
+			is_static,
+			decl_type,
+			std::move(assignment_values),
+			expr_result.value()
+		);
 	};
 
 
@@ -501,7 +648,7 @@ namespace panther{
 			case Result::Success: break;
 
 			case Result::WrongType: {
-				this->expected_but_got("{ } enclosed block after function defintion");
+				this->expected_but_got("{ } enclosed block after function definition");
 				return Result::Error;
 			} break;
 
@@ -512,11 +659,7 @@ namespace panther{
 
 
 		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t func_def_index = uint32_t(this->func_defs.size());
-
-		this->nodes.emplace_back(AST::Kind::FuncDef, func_def_index);
-		this->func_defs.emplace_back(
+		return this->create_node(this->func_defs, AST::Kind::FuncDef,
 			is_public,
 			is_static,
 			ident_result.value(),
@@ -527,8 +670,6 @@ namespace panther{
 			errors_result.value(),
 			block_result.value()
 		);
-
-		return AST::NodeID{node_index};
 	};
 
 
@@ -632,21 +773,16 @@ namespace panther{
 
 
 
+
 		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t func_params_index = uint32_t(this->func_params.size());
-
-		this->nodes.emplace_back(AST::Kind::FuncParams, func_params_index);
-		this->func_params.emplace_back(std::move(params));
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->func_params, AST::Kind::FuncParams, std::move(params));
 	};
 
 
 
 	// TODO: check for EOF
 	auto Parser::parse_func_returns() noexcept -> Result {
-		auto returns = std::vector<AST::FuncOutputs::Value>{};
+		auto func_returns = std::vector<AST::FuncOutputs::Value>{};
 		if(this->reader.getKind(this->reader.peek()) == Token::get("(")){
 			this->reader.skip(1);
 
@@ -678,7 +814,7 @@ namespace panther{
 					return Result::Error;
 				}
 
-				returns.emplace_back(return_ident_result.value(), return_type_result.value());
+				func_returns.emplace_back(return_ident_result.value(), return_type_result.value());
 
 
 				const TokenID after_return_peek = this->reader.next();
@@ -701,7 +837,7 @@ namespace panther{
 			const Result return_type = this->parse_type();
 			switch(return_type.code()){
 				case Result::Success: {
-					returns.emplace_back(std::nullopt, return_type.value());
+					func_returns.emplace_back(std::nullopt, return_type.value());
 				} break;
 
 				case Result::WrongType: {
@@ -716,15 +852,7 @@ namespace panther{
 		}
 
 
-
-		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t func_output_index = uint32_t(this->func_outputs.size());
-
-		this->nodes.emplace_back(AST::Kind::FuncOutputs, func_output_index);
-		this->func_outputs.emplace_back(std::move(returns));
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->func_outputs, AST::Kind::FuncOutputs, std::move(func_returns));
 	};
 
 
@@ -809,14 +937,7 @@ namespace panther{
 
 
 
-		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t func_output_index = uint32_t(this->func_outputs.size());
-
-		this->nodes.emplace_back(AST::Kind::FuncOutputs, func_output_index);
-		this->func_outputs.emplace_back(std::move(errors));
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->func_outputs, AST::Kind::FuncOutputs, std::move(errors));
 	};
 
 
@@ -830,7 +951,6 @@ namespace panther{
 
 		this->reader.skip(1);
 
-		// TODO: parse statements
 		auto stmts = std::vector<AST::NodeID>{};
 
 		while(true){
@@ -859,18 +979,195 @@ namespace panther{
 		};
 
 
-
-		// create and return
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t blocks_index = uint32_t(this->blocks.size());
-
-		this->nodes.emplace_back(AST::Kind::Block, blocks_index);
-		this->blocks.emplace_back(std::move(stmts));
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->blocks, AST::Kind::Block, std::move(stmts));
 	};
 
 
+
+
+	// TODO: check for EOF
+	auto Parser::parse_conditional() noexcept -> Result {
+		if(this->reader.getKind(this->reader.peek()) != Token::KeywordIf){
+			return Result::WrongType;
+		}
+
+		this->reader.skip(1);
+
+		// (
+		if(this->reader.getKind(this->reader.next()) != Token::get("(")){
+			this->expected_but_got("\"(\" in conditional");
+			return Result::WrongType;
+		}
+
+
+		const Result if_stmt_result = this->parse_expr();
+		switch(if_stmt_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: {
+				this->expected_but_got("expression in conditional");
+				return Result::Error;
+			} break;
+			case Result::Error: return Result::Error;
+		};
+
+
+		// )
+		if(this->reader.getKind(this->reader.next()) != Token::get(")")){
+			this->expected_but_got("\")\" in conditional");
+			return Result::WrongType;
+		}
+
+
+		const Result then_stmt_result = this->parse_block();
+		switch(then_stmt_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: {
+				this->expected_but_got("block in conditional");
+				return Result::Error;
+			} break;
+			case Result::Error: return Result::Error;
+		};
+
+
+		auto else_stmt = std::optional<AST::NodeID>{};
+		if(this->reader.getKind(this->reader.peek()) == Token::KeywordElse){
+			this->reader.skip(1);
+
+			if(this->reader.getKind(this->reader.peek()) == Token::KeywordIf){
+				const Result else_stmt_result = this->parse_conditional();
+				switch(else_stmt_result.code()){
+					case Result::Success: break;
+					case Result::WrongType: {
+						this->expected_but_got("conditional");
+						return Result::Error;
+					} break;
+					case Result::Error: return Result::Error;
+				};
+
+				else_stmt = else_stmt_result.value();
+
+			}else{
+				const Result else_stmt_result = this->parse_block();
+				switch(else_stmt_result.code()){
+					case Result::Success: break;
+					case Result::WrongType: {
+						this->expected_but_got("conditional");
+						return Result::Error;
+					} break;
+					case Result::Error: return Result::Error;
+				};
+
+				else_stmt = else_stmt_result.value();
+			}
+		}
+				
+		
+		return this->create_node(this->conditionals, AST::Kind::Conditional, if_stmt_result.value(), then_stmt_result.value(), else_stmt);
+	};
+
+
+
+	auto Parser::parse_while() noexcept -> Result {
+		if(this->reader.getKind(this->reader.peek()) != Token::KeywordWhile){
+			return Result::WrongType;
+		}
+
+		this->reader.skip(1);
+
+
+		// (
+		if(this->reader.getKind(this->reader.next()) != Token::get("(")){
+			this->expected_but_got("\"(\" in while loop condition");
+			return Result::Error;
+		}
+
+
+		const Result condition_result = this->parse_expr();
+		switch(condition_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: {
+				this->expected_but_got("expression in while loop condition");
+				return Result::Error;
+			} break;
+			case Result::Error: return Result::Error;
+		};
+
+
+		// )
+		if(this->reader.getKind(this->reader.next()) != Token::get(")")){
+			this->expected_but_got("\")\" in while loop condition");
+			return Result::Error;
+		}
+
+
+		const Result block_stmt_result = this->parse_block();
+		switch(block_stmt_result.code()){
+			case Result::Success: break;
+			case Result::WrongType: {
+				this->expected_but_got("block in while loop");
+				return Result::Error;
+			} break;
+			case Result::Error: return Result::Error;
+		};
+
+
+		return this->create_node(this->while_loops, AST::Kind::WhileLoop, false, condition_result.value(), block_stmt_result.value());
+	};
+
+
+
+	auto Parser::parse_return() noexcept -> Result {
+		const TokenID first_token = this->reader.peek();
+		const Token::Kind token_kind = this->reader.getKind(first_token);
+
+		if(token_kind != Token::KeywordReturn && token_kind != Token::KeywordThrow){
+			return Result::WrongType;
+		}
+
+		const bool is_throw = token_kind == Token::KeywordThrow ? true : false;
+
+		this->reader.skip(1);
+
+		AST::Return::Kind kind;
+		auto expr = std::optional<AST::NodeID>{};
+
+		if(this->reader.getKind(this->reader.peek()) == Token::get(";")){
+			kind = AST::Return::Kind::Nothing;
+			this->reader.skip(1);
+
+		}else if(this->reader.getKind(this->reader.peek()) == Token::get("...")){
+			kind = AST::Return::Kind::Ellipsis;
+			this->reader.skip(1);
+
+			if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+				this->expected_but_got(std::format("\";\" at end of {} statement", is_throw ? "throw" : "error"));
+				return Result::Error;
+			}
+
+		}else{
+			kind = AST::Return::Kind::Expr;
+
+			const Result return_expr = this->parse_expr();
+			switch(return_expr.code()){
+				case Result::Success: break;
+				case Result::WrongType: {
+					this->expected_but_got(std::format("expression in {} statement", is_throw ? "throw" : "error"));
+					return Result::Error;
+				} break;
+				case Result::Error: return Result::Error;
+			};
+
+			expr = return_expr.value();
+
+			if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+				this->expected_but_got(std::format("\";\" at end of {} statement", is_throw ? "throw" : "error"));
+				return Result::Error;
+			}
+		}
+
+		
+		return this->create_node(this->returns, AST::Kind::Return, is_throw, kind, expr);
+	};
 
 
 
@@ -886,14 +1183,7 @@ namespace panther{
 		}
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t ident_index = uint32_t(this->idents.size());
-
-		this->nodes.emplace_back(AST::Kind::Ident, ident_index);
-		this->idents.emplace_back(first_token);
-
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->idents, AST::Kind::Ident, first_token);
 	};
 
 
@@ -908,14 +1198,7 @@ namespace panther{
 		}
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t intrinsic_index = uint32_t(this->intrinsics.size());
-
-		this->nodes.emplace_back(AST::Kind::Intrinsic, intrinsic_index);
-		this->intrinsics.emplace_back(first_token);
-
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->intrinsics, AST::Kind::Intrinsic, first_token);
 	};
 
 
@@ -928,14 +1211,7 @@ namespace panther{
 		};
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t attribute_index = uint32_t(this->attributes.size());
-
-		this->nodes.emplace_back(AST::Kind::Attributes, attribute_index);
-		this->attributes.emplace_back(std::move(attributes_list));
-
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->attributes, AST::Kind::Attributes);
 	};
 
 
@@ -1011,14 +1287,10 @@ namespace panther{
 		std::vector<AST::Type::Qualifier> qualifiers = this->parse_type_qualifiers();
 
 
-
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t type_index = uint32_t(this->types.size());
-
-		this->nodes.emplace_back(AST::Kind::Type, type_index);
-		this->types.emplace_back(AST::Type::Kind::Basic, *type_name, std::move(qualifiers));
-
-		return AST::NodeID{node_index};
+		return this->create_node(
+			this->types, AST::Kind::Type,
+			AST::Type::Kind::Basic, *type_name, std::move(qualifiers)
+		);
 	};
 
 
@@ -1056,10 +1328,7 @@ namespace panther{
 		if(this->reader.getKind(this->reader.peek()) == Token::KeywordUnderscore){
 			this->reader.skip(1);
 
-			const uint32_t node_index = uint32_t(this->nodes.size());
-			this->nodes.emplace_back(AST::Kind::Underscore);
-
-			arr_length = AST::NodeID{node_index};
+			arr_length = this->create_node(AST::Kind::Underscore);
 
 		}else{
 			const Result expr_result = this->parse_expr();
@@ -1087,13 +1356,10 @@ namespace panther{
 		std::vector<AST::Type::Qualifier> qualifiers = this->parse_type_qualifiers();
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t type_index = uint32_t(this->types.size());
-
-		this->nodes.emplace_back(AST::Kind::Type, type_index);
-		this->types.emplace_back(AST::Type::Kind::Array, arr_type.value(), arr_length, std::move(qualifiers));
-
-		return AST::NodeID{node_index};
+		return this->create_node(
+			this->types, AST::Kind::Type,
+			AST::Type::Kind::Array, arr_type.value(), arr_length, std::move(qualifiers)
+		);
 	};
 
 
@@ -1161,11 +1427,7 @@ namespace panther{
 
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t type_index = uint32_t(this->types.size());
-
-		this->nodes.emplace_back(AST::Kind::Type, type_index);
-		this->types.emplace_back(
+		return this->create_node(this->types, AST::Kind::Type,
 			AST::Type::Kind::Func,
 			func_params_result.value(),
 			attributes_result.value(),
@@ -1173,8 +1435,6 @@ namespace panther{
 			errors_result.value(),
 			std::move(qualifiers)
 		);
-
-		return AST::NodeID{node_index};
 	};
 
 
@@ -1232,10 +1492,7 @@ namespace panther{
 		if(this->reader.getKind(this->reader.peek()) == Token::KeywordUninit){
 			this->reader.skip(1);
 
-			const uint32_t node_index = uint32_t(this->nodes.size());
-			this->nodes.emplace_back(AST::Kind::Uninit);
-
-			return AST::NodeID{node_index};
+			return this->create_node(AST::Kind::Uninit);
 		}
 
 		const Result infix_expr = this->parse_infix_expr();
@@ -1338,14 +1595,9 @@ namespace panther{
 
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t infix_index = uint32_t(this->infixes.size());
-
-		this->nodes.emplace_back(AST::Kind::Infix, infix_index);
-		this->infixes.emplace_back(lhs, peeked_op, rhs_result.value());
-
-		// make sure operator chaining works
-		return this->parse_infix_expr_impl(AST::NodeID{node_index}, prec_level);
+		return this->create_node(this->infixes, AST::Kind::Infix, 
+			lhs, peeked_op, rhs_result.value()
+		);
 	};
 
 
@@ -1377,14 +1629,7 @@ namespace panther{
 		}
 
 
-
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t prefix_index = uint32_t(this->prefixes.size());
-
-		this->nodes.emplace_back(AST::Kind::Prefix, prefix_index);
-		this->prefixes.emplace_back(op_token, rhs_result.value());
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->prefixes, AST::Kind::Prefix, op_token, rhs_result.value());
 	};
 
 
@@ -1423,28 +1668,14 @@ namespace panther{
 				};
 
 
-				const uint32_t node_index = uint32_t(this->nodes.size());
-				const uint32_t infix_index = uint32_t(this->infixes.size());
-
-				this->nodes.emplace_back(AST::Kind::Infix, infix_index);
-				this->infixes.emplace_back(output.value(), accessor_op_token, rhs_result.value());
-
-				output = AST::NodeID{node_index};
+				output = this->create_node(this->infixes, AST::Kind::Infix, output.value(), accessor_op_token, rhs_result.value());
 
 				continue;
 
 			}else if(this->reader.getKind(this->reader.peek()) == Token::get(".?") || this->reader.getKind(this->reader.peek()) == Token::get(".^")){
 				const TokenID op_token = this->reader.next();
 
-
-				const uint32_t node_index = uint32_t(this->nodes.size());
-				const uint32_t postfix_index = uint32_t(this->postfixes.size());
-
-				this->nodes.emplace_back(AST::Kind::Postfix, postfix_index);
-				this->postfixes.emplace_back(output.value(), op_token);
-
-				output = AST::NodeID{node_index};
-
+				output = this->create_node(this->postfixes, AST::Kind::Postfix, output.value(), op_token);
 				continue;
 				
 			}else if(this->reader.getKind(this->reader.peek()) == Token::get("[")){
@@ -1472,17 +1703,7 @@ namespace panther{
 				}
 
 
-
-				const uint32_t node_index = uint32_t(this->nodes.size());
-				const uint32_t index_op_index = uint32_t(this->index_ops.size());
-
-				this->nodes.emplace_back(AST::Kind::IndexOp, index_op_index);
-				this->index_ops.emplace_back(output.value(), expr_result.value());
-
-				output = AST::NodeID{node_index};
-
-
-
+				output = this->create_node(this->index_ops, AST::Kind::IndexOp, output.value(), expr_result.value());
 				continue;
 
 			}else if(this->reader.getKind(this->reader.peek()) == Token::get("(")){
@@ -1526,15 +1747,7 @@ namespace panther{
 				};
 
 
-				const uint32_t node_index = uint32_t(this->nodes.size());
-				const uint32_t func_call_index = uint32_t(this->func_calls.size());
-
-				this->nodes.emplace_back(AST::Kind::FuncCall, func_call_index);
-				this->func_calls.emplace_back(output.value(), std::move(arguments));
-
-				output = AST::NodeID{node_index};
-
-
+				output = this->create_node(this->func_calls, AST::Kind::FuncCall, output.value(), std::move(arguments));
 				continue;
 
 			}else{
@@ -1605,15 +1818,11 @@ namespace panther{
 		const TokenID first_token = this->reader.next();
 		switch(this->reader.getKind(first_token)){
 			case Token::KeywordNull: {
-				const uint32_t node_index = uint32_t(this->nodes.size());
-				this->nodes.emplace_back(AST::Kind::Null);
-				return AST::NodeID{node_index};
+				return this->create_node(AST::Kind::Null);
 			} break;
 
 			case Token::KeywordThis: {
-				const uint32_t node_index = uint32_t(this->nodes.size());
-				this->nodes.emplace_back(AST::Kind::This);
-				return AST::NodeID{node_index};
+				return this->create_node(AST::Kind::This);
 			} break;
 		};
 
@@ -1647,13 +1856,7 @@ namespace panther{
 		}
 
 
-		const uint32_t node_index = uint32_t(this->nodes.size());
-		const uint32_t literal_index = uint32_t(this->literals.size());
-
-		this->nodes.emplace_back(AST::Kind::Literal, literal_index);
-		this->literals.emplace_back(token);
-
-		return AST::NodeID{node_index};
+		return this->create_node(this->literals, AST::Kind::Literal, token);
 	};
 
 
@@ -1686,9 +1889,6 @@ namespace panther{
 	auto Parser::expected_but_got(const std::string& expected, TokenID token) noexcept -> void {
 		this->error(std::format("Expected {} - got ({}) instead", expected, Token::print_kind( this->reader.getKind(token) )), token);
 	};
-
-
-
 
 
 };

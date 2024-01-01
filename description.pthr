@@ -1,7 +1,7 @@
 
 //////////////////////////////////////////////////////////////////////
 // 																    //
-// Ideas for syntax / workings  of Panther   						//
+// Ideas for syntax / workings of Panther   						//
 // 																    //
 // NOTE: SYNTAX IS NOT FINAL                                        //
 // 																	//
@@ -100,6 +100,7 @@ func main = () -> Void {
 	// defines variables a and b
 	// variables coorespond with multiple return values
 	var [a, b] = multiple_returns();
+
 
 
 	// variable can be declared without assigning a value (storage is allocated)

@@ -56,14 +56,18 @@ namespace panther{
 
 			EVO_NODISCARD auto parse_var_decl() noexcept -> Result;
 			EVO_NODISCARD auto parse_assignment() noexcept -> Result;
+			EVO_NODISCARD auto parse_multiple_assignment() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_func_def() noexcept -> Result;
 			EVO_NODISCARD auto parse_func_params() noexcept -> Result;
 			EVO_NODISCARD auto parse_func_returns() noexcept -> Result;
 			EVO_NODISCARD auto parse_func_errors() noexcept -> Result;
 
-
 			EVO_NODISCARD auto parse_block() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_conditional() noexcept -> Result;
+			EVO_NODISCARD auto parse_while() noexcept -> Result;
+			EVO_NODISCARD auto parse_return() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
 			EVO_NODISCARD auto parse_intrinsic() noexcept -> Result;
@@ -109,6 +113,28 @@ namespace panther{
 			};
 
 
+
+
+			template<typename T, typename... Args>
+			EVO_NODISCARD inline auto create_node(std::vector<T>& instances, AST::Kind kind, Args&&... constructor_args) noexcept -> AST::NodeID {
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				const uint32_t instance_index = uint32_t(instances.size());
+
+				this->nodes.emplace_back(kind, instance_index);
+				instances.emplace_back(std::forward<decltype(constructor_args)>(constructor_args)...);
+
+				return AST::NodeID{node_index};
+			};
+
+
+			EVO_NODISCARD inline auto create_node(AST::Kind kind) noexcept -> AST::NodeID {
+				const uint32_t node_index = uint32_t(this->nodes.size());
+				this->nodes.emplace_back(kind);
+
+				return AST::NodeID{node_index};
+			};
+
+
 		private:
 			TokenizerReader& reader;
 
@@ -118,12 +144,17 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 
 			std::vector<AST::VarDecl> var_decls{};
+			std::vector<AST::MultipleAssignment> multiple_assignments{};
 
 			std::vector<AST::FuncDef> func_defs{};
 			std::vector<AST::FuncParams> func_params{};
 			std::vector<AST::FuncOutputs> func_outputs{};
 
 			std::vector<AST::Block> blocks{};
+
+			std::vector<AST::Conditional> conditionals{};
+			std::vector<AST::WhileLoop> while_loops{};
+			std::vector<AST::Return> returns{};
 
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};

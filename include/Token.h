@@ -89,9 +89,10 @@ namespace panther{
 			KeywordIn,
 
 			KeywordReturn,
-			KeywordError,
+			KeywordThrow,
 			KeywordDefer,
 			KeywordBreak,
+			KeywordContinue,
 
 			KeywordTry,
 			KeywordCatch,
@@ -147,6 +148,7 @@ namespace panther{
 
 
 			LeftArrow, // ->
+			Ellipsis, // ...
 
 
 			///////////////////////////////////
@@ -179,9 +181,12 @@ namespace panther{
 			///////////////////////////////////
 			// operators
 
+			// length 3
+			 if(IS_TOKEN("...")){ return Token::Kind::Ellipsis; }
+
 
 			// length 2
-				 if(IS_TOKEN(".^")){ return Token::Kind::Dereference; }
+			else if(IS_TOKEN(".^")){ return Token::Kind::Dereference; }
 			else if(IS_TOKEN(".?")){ return Token::Kind::Unwrap; }
 
 			else if(IS_TOKEN("+=")){ return Token::Kind::PlusEquals; }

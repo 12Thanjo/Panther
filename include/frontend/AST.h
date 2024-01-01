@@ -11,12 +11,17 @@ namespace panther{
 
 		enum class Kind{
 			VarDecl,
+			MultipleAssignment,
 
 			FuncDef,
 			FuncParams,
 			FuncOutputs,
 
 			Block,
+
+			Conditional,
+			WhileLoop,
+			Return,
 
 			Prefix,
 			Infix,
@@ -76,6 +81,23 @@ namespace panther{
 			NodeID ident;
 			std::optional<NodeID> type; // null optional means type needs to be inferenced
 			NodeID expr;
+		};
+
+
+		struct MultipleAssignment{
+			bool is_public;
+			bool is_static;
+
+			enum class DeclType : uint8_t{
+				Var,
+				Def,
+				None,
+			};
+
+			DeclType decl_type;
+
+			std::vector<NodeID> targets;
+			NodeID value;
 		};
 
 
@@ -145,6 +167,35 @@ namespace panther{
 
 		struct Block{
 			std::vector<NodeID> stmts;
+		};
+
+
+		struct Conditional{
+			NodeID if_stmt;
+			NodeID then_stmt;
+			std::optional<NodeID> else_stmt;
+		};
+
+
+		struct WhileLoop{
+			bool is_do_while;
+			NodeID condition;
+			NodeID block;
+		};
+
+
+		struct Return{
+			bool is_throw;
+
+			enum class Kind{
+				Nothing,
+				Ellipsis,
+				Expr
+			};
+
+			Kind kind;
+
+			std::optional<NodeID> expr; // is std::nullopt when kind is Nohting or Ellipsis
 		};
 
 

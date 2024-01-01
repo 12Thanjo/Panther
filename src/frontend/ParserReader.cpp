@@ -54,6 +54,24 @@ namespace panther{
 	};
 
 
+	auto ParserReader::getMultipleAssignment(AST::NodeID id) noexcept -> AST::MultipleAssignment& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::MultipleAssignment, "Not a multiple assignment");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.multiple_assignments[index];
+	};
+
+	auto ParserReader::getMultipleAssignment(AST::NodeID id) const noexcept -> const AST::MultipleAssignment& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::MultipleAssignment, "Not a multiple assignment");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.multiple_assignments[index];
+	};
+
+
+
+
+
 	auto ParserReader::getFuncDef(AST::NodeID id) noexcept -> AST::FuncDef& {
 		evo::debugAssert(this->getNodeKind(id) == AST::Kind::FuncDef, "Not a func def");
 
@@ -112,6 +130,54 @@ namespace panther{
 		const uint32_t index = this->parser.nodes[id.id].value_index;
 		return this->parser.blocks[index];
 	};
+
+
+
+	auto ParserReader::getConditional(AST::NodeID id) noexcept -> AST::Conditional& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Conditional, "Not a conditional");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.conditionals[index];
+	};
+
+	auto ParserReader::getConditional(AST::NodeID id) const noexcept -> const AST::Conditional& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Conditional, "Not a conditional");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.conditionals[index];
+	};
+
+
+	auto ParserReader::getWhileLoop(AST::NodeID id) noexcept -> AST::WhileLoop& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::WhileLoop, "Not a while loop");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.while_loops[index];
+	};
+
+	auto ParserReader::getWhileLoop(AST::NodeID id) const noexcept -> const AST::WhileLoop& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::WhileLoop, "Not a while loop");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.while_loops[index];
+	};
+
+
+	auto ParserReader::getReturn(AST::NodeID id) noexcept -> AST::Return& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Return, "Not a return");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.returns[index];
+	};
+
+	auto ParserReader::getReturn(AST::NodeID id) const noexcept -> const AST::Return& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Return, "Not a return");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.returns[index];
+	};
+
+
 
 
 
@@ -258,7 +324,11 @@ namespace panther{
 	auto ParserReader::print_stmt(AST::NodeID id, Indenter& indenter) const noexcept -> void {
 		switch(this->getNodeKind(id)){
 			break; case AST::Kind::VarDecl: this->print_var_decl(id, indenter);
+			break; case AST::Kind::MultipleAssignment: this->print_multiple_assignment(id, indenter);
 			break; case AST::Kind::FuncDef: this->print_func_def(id, indenter);
+			break; case AST::Kind::Conditional: this->print_conditional(id, indenter);
+			break; case AST::Kind::WhileLoop: this->print_while_loop(id, indenter);
+			break; case AST::Kind::Return: this->print_return(id, indenter);
 
 			break; case AST::Kind::Block: {
 				indenter.print();
@@ -343,6 +413,86 @@ namespace panther{
 	};
 
 
+
+	auto ParserReader::print_multiple_assignment(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::MultipleAssignment& multi_assign = this->getMultipleAssignment(id);
+
+		indenter.print();
+		
+		this->printer.info("MultipleAssignment:\n");
+
+		indenter.push();
+
+		// static
+		indenter.set_arrow();
+		indenter.print();
+		this->printer.info("Static: ");
+		if(multi_assign.is_static){
+			this->printer.debug("yes\n");
+		}else{
+			this->printer.debug("no\n");
+		}
+
+		// public
+		indenter.set_arrow();
+		indenter.print();
+		this->printer.info("Public: ");
+		if(multi_assign.is_public){
+			this->printer.debug("yes\n");
+		}else{
+			this->printer.debug("no\n");
+		}
+
+
+
+		indenter.set_arrow();
+		indenter.print();
+		this->printer.info("Decl Type: ");
+		switch(multi_assign.decl_type){
+			break; case AST::MultipleAssignment::DeclType::Var: this->printer.debug("var\n");
+			break; case AST::MultipleAssignment::DeclType::Def: this->printer.debug("var\n");
+			break; case AST::MultipleAssignment::DeclType::None: this->printer.debug("[NONE]\n");
+		};
+
+
+		indenter.set_arrow();
+		indenter.print();
+		this->printer.info("Targets:\n");
+		indenter.push();
+		for(int i = 0; i < multi_assign.targets.size(); i+=1){
+			if(i < multi_assign.targets.size() - 1){
+				indenter.set_arrow();
+			}else{
+				indenter.set_end();
+			}
+
+			indenter.print();
+
+			this->printer.info(std::to_string(i) + ":\n");
+
+			indenter.push();
+			indenter.set_end();
+			this->print_expr(multi_assign.targets[i], indenter);
+			indenter.pop();
+		}
+		indenter.pop();
+
+
+
+		indenter.set_end();
+		indenter.print();
+		this->printer.info("Value:\n");
+		indenter.push();
+		indenter.set_end();
+		this->print_expr(multi_assign.value, indenter);
+		indenter.pop();
+
+
+
+		indenter.pop();
+	};
+
+
 	auto ParserReader::print_func_def(AST::NodeID id, Indenter& indenter) const noexcept -> void {
 		const AST::FuncDef& func_def = this->getFuncDef(id);
 
@@ -362,7 +512,7 @@ namespace panther{
 		indenter.print();
 		this->printer.info("Static: ");
 		if(func_def.is_static){
-			this->printer.debug("`/\n");
+			this->printer.debug("yes\n");
 		}else{
 			this->printer.debug("no\n");
 		}
@@ -633,7 +783,7 @@ namespace panther{
 
 
 
-	auto ParserReader::print_block(AST::NodeID id, class Indenter& indenter) const noexcept -> void {
+	auto ParserReader::print_block(AST::NodeID id, Indenter& indenter) const noexcept -> void {
 		const AST::Block& block = this->getBlock(id);
 
 		if(block.stmts.empty()){
@@ -657,6 +807,109 @@ namespace panther{
 	};
 
 
+
+
+	auto ParserReader::print_conditional(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::Conditional& conditional = this->getConditional(id);
+
+		indenter.print();
+
+		this->printer.info("Conditional:\n");
+
+		indenter.push();
+
+		indenter.print();
+		this->printer.info("If:\n");
+		indenter.push();
+		indenter.set_end();
+		this->print_expr(conditional.if_stmt, indenter);
+		indenter.pop();
+
+		indenter.set_arrow();
+		indenter.print();
+		this->printer.info("Then:\n");
+		indenter.push();
+		indenter.set_end();
+		this->print_block(conditional.then_stmt, indenter);
+		indenter.pop();
+
+		indenter.set_end();
+		indenter.print();
+		if(conditional.else_stmt.has_value()){
+			this->printer.info("Else:\n");
+			indenter.push();
+			indenter.set_end();
+			this->print_stmt(*conditional.else_stmt, indenter);
+			indenter.pop();
+		}else{
+			this->printer.info("Else: ");
+			this->printer.debug("[NONE]\n");
+		}
+
+		indenter.pop();
+	};
+
+
+
+	auto ParserReader::print_while_loop(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::WhileLoop& while_loop = this->getWhileLoop(id);
+
+		indenter.print();
+
+		if(while_loop.is_do_while){
+			this->printer.info("Do-While Loop:\n");
+		}else{
+			this->printer.info("While Loop:\n");
+		}
+
+		indenter.push();
+
+			indenter.print();
+			this->printer.info("Condition:\n");
+			indenter.push();
+				indenter.set_end();
+				this->print_expr(while_loop.condition, indenter);
+			indenter.pop();
+
+			indenter.set_end();
+			indenter.print();
+			this->printer.info("Then:\n");
+			indenter.push();
+				indenter.set_end();
+				this->print_block(while_loop.block, indenter);
+			indenter.pop();
+
+		indenter.pop();
+	};
+
+
+	auto ParserReader::print_return(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::Return& return_stmt = this->getReturn(id);
+
+		indenter.print();
+
+		if(return_stmt.is_throw){
+			this->printer.info("Throw:");
+		}else{
+			this->printer.info("Return:");
+		}
+
+
+		if(return_stmt.kind == AST::Return::Kind::Nothing){
+			this->printer.debug(" [NONE]\n");
+
+		}else if(return_stmt.kind == AST::Return::Kind::Ellipsis){
+			this->printer.debug(" ...\n");
+
+		}else if(return_stmt.kind == AST::Return::Kind::Expr){
+			this->printer.info("\n");
+			indenter.push();
+				indenter.set_end();
+				this->print_expr(*return_stmt.expr, indenter);
+			indenter.pop();
+		}
+
+	};
 
 
 
@@ -1057,25 +1310,32 @@ namespace panther{
 
 					indenter.set_end();
 					indenter.print();
-					this->printer.info("Arguments: \n");
-					indenter.push();
-						for(int i = 0; i < func_call.arguments.size(); i+=1){
-							if(i < func_call.arguments.size() - 1){
-								indenter.set_arrow();
-							}else{
-								indenter.set_end();
+
+					if(func_call.arguments.empty()){
+						this->printer.info("Arguments: ");
+						this->printer.debug("[NONE]\n");
+
+					}else{
+						this->printer.info("Arguments: \n");
+						indenter.push();
+							for(int i = 0; i < func_call.arguments.size(); i+=1){
+								if(i < func_call.arguments.size() - 1){
+									indenter.set_arrow();
+								}else{
+									indenter.set_end();
+								}
+
+								indenter.print();
+								this->printer.info(std::to_string(i) + ":\n");
+
+								indenter.push();
+									indenter.set_end();
+									this->print_expr(func_call.arguments[i], indenter);
+								indenter.pop();
 							}
 
-							indenter.print();
-							this->printer.info(std::to_string(i) + ":\n");
-
-							indenter.push();
-								indenter.set_end();
-								this->print_expr(func_call.arguments[i], indenter);
-							indenter.pop();
-						}
-
-					indenter.pop();
+						indenter.pop();
+					}
 
 				indenter.pop();
 			} break;

@@ -81,7 +81,10 @@ namespace panther{
 			break; case Token::Kind::KeywordIn: return "in";
 
 			break; case Token::Kind::KeywordReturn: return "return";
-			break; case Token::Kind::KeywordError: return "error";
+			break; case Token::Kind::KeywordThrow: return "throw";
+			break; case Token::Kind::KeywordDefer: return "defer";
+			break; case Token::Kind::KeywordBreak: return "break";
+			break; case Token::Kind::KeywordContinue: return "continue";
 
 			break; case Token::Kind::KeywordTry: return "try";
 			break; case Token::Kind::KeywordCatch: return "catch";
@@ -135,6 +138,7 @@ namespace panther{
 
 
 			break; case Token::Kind::LeftArrow: return "->";
+			break; case Token::Kind::Ellipsis: return "...";
 
 
 			///////////////////////////////////
