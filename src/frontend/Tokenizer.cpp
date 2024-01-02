@@ -649,9 +649,7 @@ namespace panther{
 				return true;
 			}
 
-
-
-			if(std::numeric_limits<float128_t>::max() / parsed_number < std::pow(10, exponent_number)){
+			if(parsed_number == 0.0 && std::numeric_limits<float128_t>::max() / parsed_number < std::pow(10, exponent_number)){
 				this->stream.error(
 					"Literal number exponent too large to fit into an F128. This limitation will be removed when the compiler is self hosted.",
 					number_beginning_line, number_beginning_collumn
@@ -687,7 +685,7 @@ namespace panther{
 			}
 
 
-			if(std::numeric_limits<uint64_t>::max() / parsed_number < std::pow(10, exponent_number)){
+			if(parsed_number != 0 && std::numeric_limits<uint64_t>::max() / parsed_number < std::pow(10, exponent_number)){
 				this->stream.error(
 					"Literal number exponent too large to fit into a UI64. This limitation will be removed when the compiler is self hosted.",
 					number_beginning_line, number_beginning_collumn

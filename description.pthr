@@ -389,7 +389,7 @@ struct Phone = {
 		if(this.battery_percentage > 100){
 
 			// dereferences "this" first (parentheses not required)
-			(this.*).battery_percentage = 100;
+			(this.^).battery_percentage = 100;
 		}
 
 		// yes I'm aware the code in this function is technically unsafe (wrapping errors)
@@ -417,7 +417,7 @@ struct Phone = {
 		// 		- when making a function call before the @init(), the "this" can only be the value of a read parameter
 		@init();
 		
-		return this.*;
+		return this.^;
 	};
 
 
@@ -431,7 +431,7 @@ struct Phone = {
 		// 		- explicitly call "this.generation = uninit;"
 		// 		- change Phone.generation to an optional type (UInt?)
 
-		return this.*;
+		return this.^;
 	};
 
 
@@ -504,7 +504,7 @@ struct Counter = {
 		this.max = max;
 		this.current_number = starting_count;
 
-		return this.*;
+		return this.^;
 	};
 
 
@@ -736,7 +736,7 @@ def IntIter = struct : Iterator {
 	func init = (this write, ptr: Int* in) -> IntIter {
 		this.ptr = move ptr;
 
-		return this.*;
+		return this.^;
 	};
 
 

@@ -178,6 +178,36 @@ namespace panther{
 	};
 
 
+	auto ParserReader::getStruct(AST::NodeID id) noexcept -> AST::Struct& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Struct, "Not a struct");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.structs[index];
+	};
+
+	auto ParserReader::getStruct(AST::NodeID id) const noexcept -> const AST::Struct& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Struct, "Not a struct");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.structs[index];
+	};
+
+
+	auto ParserReader::getTryCatch(AST::NodeID id) noexcept -> AST::TryCatch& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::TryCatch, "Not a try catch");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.try_catches[index];
+	};
+
+	auto ParserReader::getTryCatch(AST::NodeID id) const noexcept -> const AST::TryCatch& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::TryCatch, "Not a try catch");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.try_catches[index];
+	};
+
+
 
 
 
@@ -329,6 +359,8 @@ namespace panther{
 			break; case AST::Kind::Conditional: this->print_conditional(id, indenter);
 			break; case AST::Kind::WhileLoop: this->print_while_loop(id, indenter);
 			break; case AST::Kind::Return: this->print_return(id, indenter);
+			break; case AST::Kind::Struct: this->print_struct(id, indenter);
+			break; case AST::Kind::TryCatch: this->print_try_catch(id, indenter);
 
 			break; case AST::Kind::Block: {
 				indenter.print();
@@ -402,11 +434,16 @@ namespace panther{
 
 		indenter.set_end();
 		indenter.print();
-		this->printer.info("Value: \n");
-		indenter.push();
-		indenter.set_end();
-		this->print_expr(var_decl.expr, indenter);
-		indenter.pop();
+		if(var_decl.expr.has_value()){
+			this->printer.info("Value:\n");
+			indenter.push();
+			indenter.set_end();
+			this->print_expr(*var_decl.expr, indenter);
+			indenter.pop();
+		}else{
+			this->printer.info("Value: ");
+			this->printer.debug("[NONE]\n");
+		}
 
 
 		indenter.pop();
@@ -912,6 +949,119 @@ namespace panther{
 	};
 
 
+
+	auto ParserReader::print_struct(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::Struct& struct_def = this->getStruct(id);
+
+		indenter.print();
+		this->printer.info("Struct:\n");
+
+
+		indenter.push();
+
+			indenter.print();
+			this->printer.info("Ident: ");
+			this->printer.debug(this->getIdentName(struct_def.name) + '\n');
+
+
+			indenter.set_end();
+			indenter.print();
+			this->printer.info("Block:\n");
+			indenter.push();
+				indenter.set_end();
+				this->print_block(struct_def.block, indenter);
+			indenter.pop();
+
+		indenter.pop();
+	};
+
+
+
+
+	auto ParserReader::print_try_catch(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::TryCatch& try_catch = this->getTryCatch(id);
+
+		indenter.print();
+		this->printer.info("Try Catch:\n");
+
+
+		indenter.push();
+			indenter.print();
+			this->printer.info("Try Block: \n");
+			indenter.push();
+				this->print_block(try_catch.try_block, indenter);
+			indenter.pop();
+
+			indenter.set_end();
+			indenter.print();
+			this->printer.info("Catches: \n");
+			indenter.push();
+				for(int i = 0; i < try_catch.catches.size(); i+=1){
+					if(i < try_catch.catches.size() - 1){
+						indenter.set_arrow();
+					}else{
+						indenter.set_end();
+					}
+
+					indenter.print();
+					this->printer.info(std::to_string(i) + ":\n");
+
+					indenter.push();
+						indenter.print();
+
+						const std::vector<AST::TryCatch::Catch::Param>& params = try_catch.catches[i].params;
+
+						if(params.empty()){
+							this->printer.info("Params: ");
+							this->printer.debug("[NONE]\n");
+
+						}else{
+							this->printer.info("Params:\n");
+							indenter.push();
+								for(int j = 0; j < params.size(); j+=1){
+									if(j < params.size() - 1){
+										indenter.set_arrow();
+									}else{
+										indenter.set_end();
+									}
+
+									indenter.print();
+									this->printer.info(std::to_string(j) + ":\n");
+
+									indenter.push();
+										indenter.print();
+										this->printer.info("Ident: ");
+										this->printer.debug(this->getIdentName(params[j].ident) + '\n');
+
+										indenter.set_end();
+										indenter.print();
+										this->printer.info("Type:\n");
+										indenter.push();
+											indenter.set_end();
+											this->print_type(params[j].type, indenter);
+										indenter.pop();
+
+
+									indenter.pop();
+								}
+							indenter.pop();
+						}
+						
+
+						indenter.set_end();
+						indenter.print();
+						this->printer.info("Block:\n");
+						indenter.push();
+							this->print_block(try_catch.catches[i].block, indenter);
+						indenter.pop();
+
+					indenter.pop();
+				}
+			indenter.pop();
+
+
+		indenter.pop();
+	};
 
 
 

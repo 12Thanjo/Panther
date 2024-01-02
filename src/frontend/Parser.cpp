@@ -34,117 +34,117 @@ namespace panther{
 
 
 	auto Parser::parse_stmt() noexcept -> Result {
+		Result result;
+
 		// var_decl
-		{
-			const auto result = this->parse_var_decl();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_var_decl();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
+
 
 
 		// func_def
-		{
-			const auto result = this->parse_func_def();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_func_def();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// multiple_assignment
-		{
-			const auto result = this->parse_multiple_assignment();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_multiple_assignment();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// assignment
-		{
-			const auto result = this->parse_assignment();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_assignment();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// conditional
-		{
-			const auto result = this->parse_conditional();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_conditional();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// TODO: iteration
-		// TODO: try_catch
+
+		// try catch
+		result = this->parse_try_catch();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// while
-		{
-			const auto result = this->parse_while();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_while();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// TODO: do_while
 		// TODO: typedef_stmt
 		// TODO: alias_stmt
 
 		// return / throw
-		{
-			const auto result = this->parse_return();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_return();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 
 		// TODO: defer_stmt
-		// TODO: struct_def
+
+
+		// struct
+		result = this->parse_struct();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		// block
-		{
-			const auto result = this->parse_block();
-			switch(result.code()){
-				case Result::Success: return result;
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+		result = this->parse_block();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 
 		// meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
 		// expr
-		{
-			const auto result = this->parse_expr();
-			switch(result.code()){
-				case Result::Success: {
-					if(this->reader.getKind(this->reader.next()) != Token::get(";")){
-						this->expected_but_got("semicolon at end of expression statement", this->reader.peek(-1));
-						return Result::Error;
-					}
+		result = this->parse_expr();
+		switch(result.code()){
+			case Result::Success: {
+				if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+					this->expected_but_got("semicolon at end of expression statement", this->reader.peek(-1));
+					return Result::Error;
+				}
 
-					return result;
-				} break;
+				return result;
+			} break;
 
-				case Result::WrongType: break;
-				case Result::Error: return Result::Error;
-			};
-		}
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
 
 		
 		return Result::WrongType;
@@ -255,14 +255,22 @@ namespace panther{
 
 		// =
 		if(this->reader.getKind(this->reader.peek()) != Token::get("=")){
-			if(type.has_value()){
-				this->expected_but_got("\"=\" in variable declaration");
-
-			}else{
-				this->expected_but_got("either \": Type =\" or \"=\" in variable declaration");
+			if(type.has_value() == false){
+				this->expected_but_got("Variables that don't have explicit typing must have a defined value");
+				return Result::Error;
+			}
+			
+			// ;
+			if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+				this->expected_but_got("\";\" in variable declaration");
+				return Result::Error;
 			}
 
-			return Result::Error;
+			return this->create_node(
+				this->var_decls, AST::Kind::VarDecl,
+				is_public, is_static, decl_type, ident_result.value(), type, std::nullopt
+			);
+
 
 		}else{
 			this->reader.skip(1);
@@ -276,18 +284,8 @@ namespace panther{
 
 		// expression
 		const Result expr_result = this->parse_expr();
-		switch(expr_result.code()){
-			case Result::Success: break;
+		if(this->check_result_fail(expr_result, "expression in variable declaration")){ return Result::Error; }
 
-			case Result::WrongType: {
-				this->expected_but_got("expression in variable declaration");
-				return Result::Error;
-			} break;
-
-			case Result::Error: {
-				return Result::Error;
-			} break;
-		};
 
 		// if(this->reader.is_eof()){
 		// 	this->error("Unexpected end of file in variable declaration", this->reader.peek(-1)); 
@@ -296,15 +294,12 @@ namespace panther{
 
 
 		// ;
-		if(this->reader.getKind(this->reader.peek()) != Token::get(";")){
+		if(this->reader.getKind(this->reader.next()) != Token::get(";")){
 			this->expected_but_got("\";\" in variable declaration");
-
-		}else{
-			this->reader.skip(1);
+			return Result::Error;
 		}
 
 
-		// create and return
 		return this->create_node(
 			this->var_decls, AST::Kind::VarDecl,
 			is_public, is_static, decl_type, ident_result.value(), type, expr_result.value()
@@ -342,14 +337,8 @@ namespace panther{
 
 
 		const Result rhs_result = this->parse_expr();
-		switch(rhs_result.code()){
-			case Result::Success: break;
-			case Result::WrongType: {
-				this->expected_but_got("value expression for assignment statement");
-				return Result::Error;
-			} break;
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(rhs_result, "value expression for assignment statement")){ return Result::Error; }
+
 
 
 		// ;
@@ -456,14 +445,7 @@ namespace panther{
 
 		// expr
 		const Result expr_result = this->parse_expr();
-		switch(expr_result.code()){
-			case Result::Success: break;
-			case Result::WrongType: {
-				this->expected_but_got("expression on right-hand side of multiple assignment");
-				return Result::Error;
-			} break;
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(expr_result, "expression on right-hand side of multiple assignment")){ return Result::Error; }
 
 
 		// ;
@@ -644,16 +626,8 @@ namespace panther{
 
 
 		const Result block_result = this->parse_block();
-		switch(block_result.code()){
-			case Result::Success: break;
+		if(this->check_result_fail(block_result, "{ } enclosed block after function definition")){ return Result::Error; }
 
-			case Result::WrongType: {
-				this->expected_but_got("{ } enclosed block after function definition");
-				return Result::Error;
-			} break;
-
-			case Result::Error: return Result::Error;
-		};
 		
 
 
@@ -1001,14 +975,8 @@ namespace panther{
 
 
 		const Result if_stmt_result = this->parse_expr();
-		switch(if_stmt_result.code()){
-			case Result::Success: break;
-			case Result::WrongType: {
-				this->expected_but_got("expression in conditional");
-				return Result::Error;
-			} break;
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(if_stmt_result, "expression in conditional")){ return Result::Error; }
+
 
 
 		// )
@@ -1019,14 +987,7 @@ namespace panther{
 
 
 		const Result then_stmt_result = this->parse_block();
-		switch(then_stmt_result.code()){
-			case Result::Success: break;
-			case Result::WrongType: {
-				this->expected_but_got("block in conditional");
-				return Result::Error;
-			} break;
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(then_stmt_result, "block in conditional")){ return Result::Error; }
 
 
 		auto else_stmt = std::optional<AST::NodeID>{};
@@ -1035,27 +996,13 @@ namespace panther{
 
 			if(this->reader.getKind(this->reader.peek()) == Token::KeywordIf){
 				const Result else_stmt_result = this->parse_conditional();
-				switch(else_stmt_result.code()){
-					case Result::Success: break;
-					case Result::WrongType: {
-						this->expected_but_got("conditional");
-						return Result::Error;
-					} break;
-					case Result::Error: return Result::Error;
-				};
+				if(this->check_result_fail(else_stmt_result, "conditional")){ return Result::Error; }
 
 				else_stmt = else_stmt_result.value();
 
 			}else{
 				const Result else_stmt_result = this->parse_block();
-				switch(else_stmt_result.code()){
-					case Result::Success: break;
-					case Result::WrongType: {
-						this->expected_but_got("conditional");
-						return Result::Error;
-					} break;
-					case Result::Error: return Result::Error;
-				};
+				if(this->check_result_fail(else_stmt_result, "conditional")){ return Result::Error; }
 
 				else_stmt = else_stmt_result.value();
 			}
@@ -1066,7 +1013,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: check EOF
 	auto Parser::parse_while() noexcept -> Result {
 		if(this->reader.getKind(this->reader.peek()) != Token::KeywordWhile){
 			return Result::WrongType;
@@ -1083,14 +1030,7 @@ namespace panther{
 
 
 		const Result condition_result = this->parse_expr();
-		switch(condition_result.code()){
-			case Result::Success: break;
-			case Result::WrongType: {
-				this->expected_but_got("expression in while loop condition");
-				return Result::Error;
-			} break;
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(condition_result, "expression in while loop condition")){ return Result::Error; }
 
 
 		// )
@@ -1101,21 +1041,14 @@ namespace panther{
 
 
 		const Result block_stmt_result = this->parse_block();
-		switch(block_stmt_result.code()){
-			case Result::Success: break;
-			case Result::WrongType: {
-				this->expected_but_got("block in while loop");
-				return Result::Error;
-			} break;
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(block_stmt_result, "block in while loop")){ return Result::Error; }
 
 
 		return this->create_node(this->while_loops, AST::Kind::WhileLoop, false, condition_result.value(), block_stmt_result.value());
 	};
 
 
-
+	// TODO: check EOF
 	auto Parser::parse_return() noexcept -> Result {
 		const TokenID first_token = this->reader.peek();
 		const Token::Kind token_kind = this->reader.getKind(first_token);
@@ -1148,14 +1081,10 @@ namespace panther{
 			kind = AST::Return::Kind::Expr;
 
 			const Result return_expr = this->parse_expr();
-			switch(return_expr.code()){
-				case Result::Success: break;
-				case Result::WrongType: {
-					this->expected_but_got(std::format("expression in {} statement", is_throw ? "throw" : "error"));
-					return Result::Error;
-				} break;
-				case Result::Error: return Result::Error;
-			};
+			if(this->check_result_fail(return_expr, [&](){
+				this->expected_but_got(std::format("expression in {} statement", is_throw ? "throw" : "error"));
+			})){ return Result::Error; }
+
 
 			expr = return_expr.value();
 
@@ -1170,8 +1099,119 @@ namespace panther{
 	};
 
 
+	// TODO: check EOF
+	auto Parser::parse_struct() noexcept -> Result {
+		if(this->reader.getKind(this->reader.peek()) != Token::KeywordStruct){
+			return Result::WrongType;
+		}
+
+		this->reader.skip(1);
+
+		const Result name_result = this->parse_ident();
+		if(this->check_result_fail(name_result, "identifier in struct definition")){ return Result::Error; }
 
 
+		// =
+		if(this->reader.getKind(this->reader.next()) != Token::get("=")){
+			this->expected_but_got("\"=\" in struct definition");
+			return Result::Error;
+		}
+
+
+		const Result block_result = this->parse_block();
+		if(this->check_result_fail(block_result, "identifier in struct definition")){ return Result::Error; }
+
+
+		return this->create_node(this->structs, AST::Kind::Struct, name_result.value(), block_result.value());
+	};
+
+
+
+
+	// TODO: check EOF
+	auto Parser::parse_try_catch() noexcept -> Result {
+		if(this->reader.getKind(this->reader.peek()) != Token::KeywordTry){
+			return Result::WrongType;
+		}
+
+		this->reader.skip(1);
+
+
+		const Result try_block = this->parse_block();
+		if(this->check_result_fail(try_block, "try block")){ return Result::Error; }
+
+
+		auto catches = std::vector<AST::TryCatch::Catch>{};
+		while(this->reader.getKind(this->reader.peek()) == Token::KeywordCatch){
+			this->reader.skip(1);
+
+
+			if(this->reader.getKind(this->reader.next()) != Token::get("(")){
+				this->expected_but_got("\"(\" after catch keyword");
+				return Result::Error;
+			}
+
+
+			auto params = std::vector<AST::TryCatch::Catch::Param>{};
+			while(true){
+				// )
+				if(this->reader.getKind(this->reader.peek()) == Token::get(")")){
+					this->reader.skip(1);
+					break;
+				}
+
+
+				const Result ident_result = this->parse_ident();
+				if(ident_result.code() == Result::WrongType){
+					this->expected_but_got("identifier in catch parameter");
+					return Result::Error;
+				}
+
+
+				// :
+				if(this->reader.getKind(this->reader.next()) != Token::get(":")){
+					this->expected_but_got("\":\" in catch parameter", this->reader.peek(-1));
+					return Result::Error;
+				}
+
+
+				const Result type_result = this->parse_type();
+				if(type_result.code() == Result::WrongType){
+					this->expected_but_got("type in catch parameter");
+					return Result::Error;
+				}
+
+
+				params.emplace_back(ident_result.value(), type_result.value());
+
+				// ,
+				const TokenID after_param_peek = this->reader.next();
+				if(this->reader.getKind(after_param_peek) != Token::get(",")){
+					if(this->reader.getKind(after_param_peek) == Token::get(")")){
+						break;
+						
+					}else{
+						this->expected_but_got("\",\" at end of catch parameter or \")\" at end of catch parameters block", this->reader.peek(-1));
+						return Result::Error;
+					}
+				}
+
+			};
+
+			const Result block_result = this->parse_block();
+			if(this->check_result_fail(block_result, "catch block")){ return Result::Error; }
+
+			catches.emplace_back(std::move(params), block_result.value());
+		};
+
+
+		return this->create_node(this->try_catches, AST::Kind::TryCatch, try_block.value(), std::move(catches));
+	};
+
+
+
+
+	// TODO: check EOF
 	auto Parser::parse_ident() noexcept -> Result {
 		const TokenID first_token = this->reader.peek();
 
@@ -1187,6 +1227,7 @@ namespace panther{
 	};
 
 
+	// TODO: check EOF
 	auto Parser::parse_intrinsic() noexcept -> Result {
 		const TokenID first_token = this->reader.peek();
 
@@ -1202,7 +1243,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: check EOF
 	auto Parser::parse_attributes() noexcept -> Result {
 		auto attributes_list = std::vector<TokenID>{};
 
@@ -1305,16 +1346,7 @@ namespace panther{
 		this->reader.skip(1);
 
 		const Result arr_type = this->parse_type();
-		switch(arr_type.code()){
-			case Result::Success: break;
-
-			case Result::WrongType: {
-				this->expected_but_got("type in array type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
-
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(arr_type, "type in array type")){ return Result::Error; }
 
 
 		// :
@@ -1332,16 +1364,9 @@ namespace panther{
 
 		}else{
 			const Result expr_result = this->parse_expr();
-			switch(expr_result.code()){
-				case Result::Success: break;
-
-				case Result::WrongType: {
-					this->expected_but_got("length expr in array type", this->reader.peek(-1));
-					return Result::Error;
-				} break;
-
-				case Result::Error: return Result::Error;
-			};
+			if(this->check_result_fail(expr_result, [&](){
+				this->expected_but_got("length expr in array type", this->reader.peek(-1));
+			})){ return Result::Error; }
 
 			arr_length = expr_result.value();
 		}
@@ -1376,25 +1401,16 @@ namespace panther{
 
 		// func params
 		const Result func_params_result = this->parse_func_params();
-		switch(func_params_result.code()){
-			case Result::Success: break;
-
-			case Result::WrongType: {
-				this->expected_but_got("function paramaters block in function type", this->reader.peek(-1));
-				return Result::Error;
-			} break;
-
-			case Result::Error: return Result::Error;
-		};
+		if(this->check_result_fail(func_params_result, [&](){
+			this->expected_but_got("function paramaters block in function type", this->reader.peek(-1));
+		})){ return Result::Error; }
 
 
 		// attributes
 		const Result attributes_result = this->parse_attributes();
 		switch(attributes_result.code()){
 			case Result::Success: break;
-
 			case Result::WrongType: break;
-
 			case Result::Error: return Result::Error;
 		};
 
@@ -1656,16 +1672,7 @@ namespace panther{
 				const TokenID accessor_op_token = this->reader.next();
 
 				const Result rhs_result = this->parse_ident();
-				switch(rhs_result.code()){
-					case Result::Success: break;
-
-					case Result::WrongType: {
-						this->expected_but_got("expression on right-hand side of accessor operator");
-						return Result::Error;
-					} break;
-
-					case Result::Error: return Result::Error;
-				};
+				if(this->check_result_fail(rhs_result, "expression on right-hand side of accessor operator")){ return Result::Error; }
 
 
 				output = this->create_node(this->infixes, AST::Kind::Infix, output.value(), accessor_op_token, rhs_result.value());
@@ -1682,16 +1689,7 @@ namespace panther{
 				this->reader.skip(1);
 
 				const Result expr_result = this->parse_expr();
-				switch(expr_result.code()){
-					case Result::Success: break;
-
-					case Result::WrongType: {
-						this->expected_but_got("expression inside index operator");
-						return Result::Error;
-					} break;
-
-					case Result::Error: return Result::Error;
-				};
+				if(this->check_result_fail(expr_result, "expression inside index operator")){ return Result::Error; }
 
 
 				if(this->reader.getKind(this->reader.peek()) != Token::get("]")){

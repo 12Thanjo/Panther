@@ -22,6 +22,8 @@ namespace panther{
 			Conditional,
 			WhileLoop,
 			Return,
+			Struct,
+			TryCatch,
 
 			Prefix,
 			Infix,
@@ -80,7 +82,7 @@ namespace panther{
 
 			NodeID ident;
 			std::optional<NodeID> type; // null optional means type needs to be inferenced
-			NodeID expr;
+			std::optional<NodeID> expr;
 		};
 
 
@@ -198,7 +200,29 @@ namespace panther{
 			std::optional<NodeID> expr; // is std::nullopt when kind is Nohting or Ellipsis
 		};
 
+		struct Struct{
+			NodeID name;
+			NodeID block;
+		};
 
+
+		struct TryCatch{
+			NodeID try_block;
+
+			struct Catch{
+				struct Param{
+					NodeID ident;
+					NodeID type;
+				};
+
+				std::vector<Param> params;
+				NodeID block;
+			};
+
+			std::vector<Catch> catches;
+		};
+
+		
 
 
 		struct Prefix{

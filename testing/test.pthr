@@ -1,6 +1,25 @@
 
+struct Vec2 = {
+	var x: Int;
+	var y: Int;
+}
+
 
 func foo = () -> Int <Int> {
+	try{
+
+	}catch(a: Int, b: Bool){
+
+	}catch(){
+		var foo: Int = 12;
+	}catch(c: String){
+
+	}
+	
 	throw 12;
 }
+
+
+
+
 

@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.0.17
+- Added parsing of structs
+- Fixed use of literal 0 causing a divide by 0 error
+- Added ability for variables to not have defined values (for use as struct members)
+- Added parsing of try-catch
+
 ### v0.0.16
 - Added parsing of multiple assignment
 - Added parsing of conditionals (`if`, `else`, `else if`)

@@ -8,6 +8,9 @@
 #include "./AST.h"
 
 
+#include <functional>
+
+
 namespace panther{
 
 	
@@ -29,12 +32,14 @@ namespace panther{
 						Success,
 						WrongType,
 						Error,
+
+						None, // just for default initialization
 					};
 
 					using enum class Code;
 
 
-
+					Result() : result_code(Code::None), data(std::nullopt) {};
 					Result(Code res_code) : result_code(res_code), data(std::nullopt) {};
 					Result(AST::NodeID&& value) : result_code(Code::Success), data(std::move(value)) {};
 					~Result() = default;
@@ -68,6 +73,8 @@ namespace panther{
 			EVO_NODISCARD auto parse_conditional() noexcept -> Result;
 			EVO_NODISCARD auto parse_while() noexcept -> Result;
 			EVO_NODISCARD auto parse_return() noexcept -> Result;
+			EVO_NODISCARD auto parse_struct() noexcept -> Result;
+			EVO_NODISCARD auto parse_try_catch() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
 			EVO_NODISCARD auto parse_intrinsic() noexcept -> Result;
@@ -135,6 +142,31 @@ namespace panther{
 			};
 
 
+			EVO_NODISCARD inline auto check_result_fail(const Result& result, const char* message) noexcept -> bool {
+				return this->check_result_fail(result, [&](){
+					this->expected_but_got(message);
+				});
+			};
+
+
+			EVO_NODISCARD inline auto check_result_fail(const Result& result, std::function<void()> wrong_type_event) noexcept -> bool {
+				switch(result.code()){
+					case Result::Success: return false;
+
+					case Result::WrongType: {
+						wrong_type_event();
+						return true;
+					} break;
+
+					case Result::Error: return false;
+
+					case Result::None: EVO_FATAL_BREAK("Should not be checking result of result that has no code");
+				};
+
+				EVO_FATAL_BREAK("Unknown result code");
+			};
+
+
 		private:
 			TokenizerReader& reader;
 
@@ -155,6 +187,8 @@ namespace panther{
 			std::vector<AST::Conditional> conditionals{};
 			std::vector<AST::WhileLoop> while_loops{};
 			std::vector<AST::Return> returns{};
+			std::vector<AST::Struct> structs{};
+			std::vector<AST::TryCatch> try_catches{};
 
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};

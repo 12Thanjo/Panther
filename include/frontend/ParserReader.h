@@ -55,6 +55,12 @@ namespace panther{
 			EVO_NODISCARD auto getReturn(AST::NodeID id) noexcept -> AST::Return&;
 			EVO_NODISCARD auto getReturn(AST::NodeID id) const noexcept -> const AST::Return&;
 
+			EVO_NODISCARD auto getStruct(AST::NodeID id) noexcept -> AST::Struct&;
+			EVO_NODISCARD auto getStruct(AST::NodeID id) const noexcept -> const AST::Struct&;
+
+			EVO_NODISCARD auto getTryCatch(AST::NodeID id) noexcept -> AST::TryCatch&;
+			EVO_NODISCARD auto getTryCatch(AST::NodeID id) const noexcept -> const AST::TryCatch&;
+
 
 
 			EVO_NODISCARD auto getPrefix(AST::NodeID id) noexcept -> AST::Prefix&;
@@ -91,7 +97,6 @@ namespace panther{
 			auto print_var_decl(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_multiple_assignment(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
-
 			auto print_func_def(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_func_params(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
@@ -100,6 +105,8 @@ namespace panther{
 			auto print_conditional(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_while_loop(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_return(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_struct(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_try_catch(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 
 			auto print_type(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_expr(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
