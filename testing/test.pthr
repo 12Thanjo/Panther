@@ -1,22 +1,22 @@
 
-struct Vec2 = {
-	var x: Int;
-	var y: Int;
-}
+// struct Vec2 = {
+// 	var x: Int;
+// 	var y: Int;
+// }
 
 
-func foo = () -> Int <Int> {
-	try{
+func operator{*=} = () -> Void {
+	// try{
 
-	}catch(a: Int, b: Bool){
+	// }catch(a: Int, b: Bool){
 
-	}catch(){
-		var foo: Int = 12;
-	}catch(c: String){
+	// }catch(){
+	// 	var foo: Int = 12;
+	// }catch(c: String){
 
-	}
+	// }
 	
-	throw 12;
+	// throw 12;
 }
 
 

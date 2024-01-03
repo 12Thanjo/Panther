@@ -172,11 +172,12 @@ namespace panther{
 			else if(ident_name == "static") { this->add_token(Token::Kind::KeywordStatic); }
 
 
-			else if(ident_name == "func")   { this->add_token(Token::Kind::KeywordFunc);   }
-			else if(ident_name == "struct") { this->add_token(Token::Kind::KeywordStruct); }
-			else if(ident_name == "enum")   { this->add_token(Token::Kind::KeywordEnum);   }
-			else if(ident_name == "union")  { this->add_token(Token::Kind::KeywordUnion);  }
-			else if(ident_name == "flags")  { this->add_token(Token::Kind::KeywordFlags);  }
+			else if(ident_name == "func")     { this->add_token(Token::Kind::KeywordFunc);     }
+			else if(ident_name == "operator") { this->add_token(Token::Kind::KeywordOperator); }
+			else if(ident_name == "struct")   { this->add_token(Token::Kind::KeywordStruct);   }
+			else if(ident_name == "enum")     { this->add_token(Token::Kind::KeywordEnum);     }
+			else if(ident_name == "union")    { this->add_token(Token::Kind::KeywordUnion);    }
+			else if(ident_name == "flags")    { this->add_token(Token::Kind::KeywordFlags);    }
 
 			else if(ident_name == "if")      { this->add_token(Token::Kind::KeywordIf);      }
 			else if(ident_name == "else")    { this->add_token(Token::Kind::KeywordElse);    }

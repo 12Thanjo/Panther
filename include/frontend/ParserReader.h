@@ -86,6 +86,9 @@ namespace panther{
 			EVO_NODISCARD auto getLiteral(AST::NodeID id) noexcept -> AST::Literal&;
 			EVO_NODISCARD auto getLiteral(AST::NodeID id) const noexcept -> const AST::Literal&;
 
+			EVO_NODISCARD auto getOperator(AST::NodeID id) noexcept -> AST::Operator&;
+			EVO_NODISCARD auto getOperator(AST::NodeID id) const noexcept -> const AST::Operator&;
+
 
 
 			auto print_to_console() const noexcept -> void;

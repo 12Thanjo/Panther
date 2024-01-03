@@ -60,6 +60,7 @@ namespace panther{
 			break; case Token::Kind::KeywordStatic: return "static";
 
 			break; case Token::Kind::KeywordFunc: return "func";
+			break; case Token::Kind::KeywordOperator: return "operator";
 			break; case Token::Kind::KeywordStruct: return "struct";
 			break; case Token::Kind::KeywordEnum: return "enum";
 			break; case Token::Kind::KeywordUnion: return "union";

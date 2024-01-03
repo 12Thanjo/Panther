@@ -337,6 +337,20 @@ namespace panther{
 	};
 
 
+	auto ParserReader::getOperator(AST::NodeID id) noexcept -> AST::Operator& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Operator, "Not an operator");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.operators[index];
+	};
+
+	auto ParserReader::getOperator(AST::NodeID id) const noexcept -> const AST::Operator& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Operator, "Not an operator");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.operators[index];
+	};
+
 
 	//////////////////////////////////////////////////////////////////////
 	// printing
@@ -541,8 +555,22 @@ namespace panther{
 
 		// ident
 		indenter.print();
-		this->printer.info("Identifier: ");
-		this->printer.debug(this->getIdentName(func_def.ident) + '\n');
+		this->printer.info("Name: ");
+		if(func_def.is_operator){
+			const AST::Operator& op = this->getOperator(func_def.name);
+			const Token::Kind op_kind = this->parser.reader.getKind(op.token);
+			this->printer.debug(std::format("operator{{{}}}\n", Token::print_kind(op_kind)));
+
+			if(op.type.has_value()){
+				indenter.push();
+					indenter.set_end();
+					this->print_type(*op.type, indenter);
+				indenter.pop();
+			}
+			
+		}else{
+			this->printer.debug(this->getIdentName(func_def.name) + '\n');
+		}
 
 		// static
 		indenter.set_arrow();
@@ -754,6 +782,13 @@ namespace panther{
 		if(params.params.empty() == false){
 			this->printer.info("Parameters:\n");
 			indenter.push();
+				if(params.this_param.has_value()){
+					indenter.print();
+					this->printer.info("this: ");
+					this->printer.debug(*params.this_param == AST::FuncParams::Param::Kind::Read ? "read" : "write");
+					this->printer.debug('\n');
+				}
+
 				for(int i = 0; i < params.params.size(); i+=1){
 					const AST::FuncParams::Param& param = params.params[i];
 

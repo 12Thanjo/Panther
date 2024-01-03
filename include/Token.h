@@ -65,6 +65,7 @@ namespace panther{
 			KeywordStatic,
 
 			KeywordFunc,
+			KeywordOperator,
 			KeywordStruct,
 			KeywordEnum,
 			KeywordUnion,

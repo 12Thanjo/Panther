@@ -36,6 +36,7 @@ namespace panther{
 			Attributes,
 			Literal,
 			Type,
+			Operator,
 
 			// no data
 			Uninit,
@@ -109,7 +110,8 @@ namespace panther{
 		struct FuncDef{
 			bool is_public;
 			bool is_static;
-			NodeID ident;
+			NodeID name;
+			bool is_operator;
 			NodeID func_params;
 
 			// struct Capture{
@@ -149,6 +151,7 @@ namespace panther{
 				std::optional<NodeID> default_value;
 			};
 
+			std::optional<Param::Kind> this_param; // should only be read, write, or nullopt
 			std::vector<Param> params;
 		};
 
@@ -271,6 +274,12 @@ namespace panther{
 			TokenID token;
 		};
 
+
+		// this is just for functions that are operator overloading
+		struct Operator{
+			TokenID token;
+			std::optional<NodeID> type; // if the operator is `as` or `cast`
+		};
 
 
 		struct Type{

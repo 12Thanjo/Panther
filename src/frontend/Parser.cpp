@@ -505,10 +505,87 @@ namespace panther{
 		}
 
 		// identifier
-		const Result ident_result = this->parse_ident();
-		if(ident_result.code() == Result::WrongType){
-			this->expected_but_got("identifer in function definition");
-			return Result::Error;
+		bool is_operator = false;
+		Result name_result = this->parse_ident();
+		if(name_result.code() == Result::WrongType){
+			if(this->reader.getKind(this->reader.peek()) == Token::KeywordOperator){
+				this->reader.skip(1);
+				is_operator = true;
+
+				if(this->reader.getKind(this->reader.next()) != Token::get("{")){
+					this->expected_but_got("\"{\" after operator keyword");
+					return Result::Error;
+				}
+
+
+				const TokenID operator_token = this->reader.peek();
+				const Token::Kind operator_kind = this->reader.getKind(operator_token);
+				bool is_valid_operator = false;
+				switch(operator_kind){
+					case Token::get("="):
+
+					case Token::get("+"):
+					case Token::get("-"):
+					case Token::get("*"):
+					case Token::get("/"):
+					case Token::get("%"):
+
+					case Token::get("+="):
+					case Token::get("-="):
+					case Token::get("*="):
+					case Token::get("/="):
+					case Token::get("%="):
+
+					case Token::get("<"):
+					case Token::get("<="):
+					case Token::get(">"):
+					case Token::get(">="):
+					case Token::get("=="):
+					case Token::get("!="):
+
+					case Token::get("&&"):
+					case Token::get("||"):
+
+					case Token::get("&"):
+					case Token::get("|"):
+					case Token::get("~"):
+
+					case Token::get("<<"):
+					case Token::get(">>"):
+
+					case Token::KeywordAs:
+					case Token::KeywordCast:
+						is_valid_operator = true;
+				};
+
+				if(is_valid_operator == false){
+					this->expected_but_got("valid operator in operator overload");
+					return Result::Error;
+				}else{
+					this->reader.skip(1);
+				}
+
+
+				auto type_convert = std::optional<AST::NodeID>{};
+				if(operator_kind == Token::KeywordAs || operator_kind == Token::KeywordCast){
+					const Result type_convert_result = this->parse_type();
+					if(this->check_result_fail(type_convert_result, "type to convert to")){ return Result::Error; }
+					type_convert = type_convert_result.value();
+				}
+
+
+				if(this->reader.getKind(this->reader.next()) != Token::get("}")){
+					this->expected_but_got("\"}\" after operator keyword", this->reader.peek(-1));
+					return Result::Error;
+				}
+
+
+				name_result = this->create_node(this->operators, AST::Kind::Operator, operator_token, type_convert);
+
+			}else{
+				this->expected_but_got("identifer in function definition");
+				return Result::Error;
+			}
 		}
 
 		// =
@@ -636,7 +713,8 @@ namespace panther{
 		return this->create_node(this->func_defs, AST::Kind::FuncDef,
 			is_public,
 			is_static,
-			ident_result.value(),
+			name_result.value(),
+			is_operator,
 			func_params_result.value(),
 			// std::move(captures_optional),
 			attributes_result.value(),
@@ -656,6 +734,29 @@ namespace panther{
 		}else{
 			this->reader.skip(1);
 		}
+
+
+		auto this_param = std::optional<AST::FuncParams::Param::Kind>{};
+		if(this->reader.getKind(this->reader.peek()) == Token::KeywordThis){
+			this->reader.skip(1);
+			
+			const TokenID kind_token = this->reader.next();
+			const Token::Kind kind_kind = this->reader.getKind(kind_token);
+			if(kind_kind == Token::KeywordRead){
+				this_param = AST::FuncParams::Param::Kind::Read;
+			}else if(kind_kind == Token::KeywordWrite){
+				this_param = AST::FuncParams::Param::Kind::Write;
+			}else{
+				this->expected_but_got("qualifer after \"this\" (either \"read\" or \"write\")");
+				return Result::Error;
+			}
+
+			if(this->reader.getKind(this->reader.peek()) == Token::get(",")){
+				this->reader.skip(1);
+			}
+		}
+
+
 
 		auto params = std::vector<AST::FuncParams::Param>{};
 
@@ -746,10 +847,8 @@ namespace panther{
 
 
 
-
-
 		// create and return
-		return this->create_node(this->func_params, AST::Kind::FuncParams, std::move(params));
+		return this->create_node(this->func_params, AST::Kind::FuncParams, this_param, std::move(params));
 	};
 
 

@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.0.18
+- Added parsing of the `this`  parameter
+- Added parsing of operator overloading
+
 ### v0.0.17
 - Added parsing of structs
 - Fixed use of literal 0 causing a divide by 0 error

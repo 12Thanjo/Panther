@@ -200,6 +200,7 @@ namespace panther{
 			std::vector<AST::Intrinsic> intrinsics{};
 			std::vector<AST::Attributes> attributes{};
 			std::vector<AST::Literal> literals{};
+			std::vector<AST::Operator> operators{};
 			std::vector<AST::Type> types{};
 
 			friend class ParserReader;
