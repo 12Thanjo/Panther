@@ -163,6 +163,21 @@ namespace panther{
 	};
 
 
+	auto ParserReader::getAlias(AST::NodeID id) noexcept -> AST::Alias& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Alias, "Not an alias");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.aliases[index];
+	};
+
+	auto ParserReader::getAlias(AST::NodeID id) const noexcept -> const AST::Alias& {
+		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Alias, "Not an alias");
+
+		const uint32_t index = this->parser.nodes[id.id].value_index;
+		return this->parser.aliases[index];
+	};
+
+
 	auto ParserReader::getReturn(AST::NodeID id) noexcept -> AST::Return& {
 		evo::debugAssert(this->getNodeKind(id) == AST::Kind::Return, "Not a return");
 
@@ -372,6 +387,7 @@ namespace panther{
 			break; case AST::Kind::FuncDef: this->print_func_def(id, indenter);
 			break; case AST::Kind::Conditional: this->print_conditional(id, indenter);
 			break; case AST::Kind::WhileLoop: this->print_while_loop(id, indenter);
+			break; case AST::Kind::Alias: this->print_alias(id, indenter);
 			break; case AST::Kind::Return: this->print_return(id, indenter);
 			break; case AST::Kind::Struct: this->print_struct(id, indenter);
 			break; case AST::Kind::TryCatch: this->print_try_catch(id, indenter);
@@ -955,6 +971,38 @@ namespace panther{
 	};
 
 
+	auto ParserReader::print_alias(AST::NodeID id, Indenter& indenter) const noexcept -> void {
+		const AST::Alias& alias = this->getAlias(id);
+
+		indenter.print();
+		if(alias.is_typedef){
+			this->printer.info("Typedef:\n");
+		}else{
+			this->printer.info("Alias:\n");
+		}
+
+
+		indenter.push();
+			indenter.print();
+			this->printer.info("Ident: ");
+			this->printer.debug(this->getIdentName(alias.name) + '\n');
+
+			indenter.set_arrow();
+			indenter.print();
+			this->printer.info("Public: ");
+			this->printer.debug(alias.is_public ? "yes\n" : "no\n");
+
+			indenter.set_end();
+			indenter.print();
+			this->printer.info("Type: \n");
+			indenter.push();
+				indenter.set_end();
+				this->print_type(alias.type, indenter);
+			indenter.pop();
+		indenter.pop();
+	};
+
+
 	auto ParserReader::print_return(AST::NodeID id, Indenter& indenter) const noexcept -> void {
 		const AST::Return& return_stmt = this->getReturn(id);
 
@@ -998,6 +1046,10 @@ namespace panther{
 			this->printer.info("Ident: ");
 			this->printer.debug(this->getIdentName(struct_def.name) + '\n');
 
+			indenter.set_arrow();
+			indenter.print();
+			this->printer.info("Public: ");
+			this->printer.debug(struct_def.is_public ? "yes\n" : "no\n");
 
 			indenter.set_end();
 			indenter.print();
@@ -1114,7 +1166,7 @@ namespace panther{
 					type_str = this->parser.reader.getStringValue(type.value.basic.token);
 
 				}else{
-					type_str =  Token::print_kind(kind);
+					type_str = Token::print_kind(kind);
 				}
 
 

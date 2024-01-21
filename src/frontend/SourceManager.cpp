@@ -60,6 +60,9 @@ namespace panther{
 	auto SourceManager::fatal(const std::string& message, SourceFileID id, uint32_t line, uint32_t collumn) noexcept -> void {
 		this->has_errored = true;
 
+		this->printer.fatal("Fatal Error: " + message + '\n');
+		this->printer.fatal("This is an error in the compiler" + '\n');
+
 		this->print_location(MessageType::Error, id, line, collumn);
 	};
 
@@ -148,8 +151,8 @@ namespace panther{
 			point_str += ' ';
 		}
 
-		for(int i = collumn_start; i < collumn_end + 1; i+=1){
-			point_str += '^';			
+		for(uint32_t i = collumn_start; i < collumn_end + 1; i+=1){
+			point_str += '^';
 		}
 
 

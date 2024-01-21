@@ -72,6 +72,7 @@ namespace panther{
 
 			EVO_NODISCARD auto parse_conditional() noexcept -> Result;
 			EVO_NODISCARD auto parse_while() noexcept -> Result;
+			EVO_NODISCARD auto parse_alias() noexcept -> Result;
 			EVO_NODISCARD auto parse_return() noexcept -> Result;
 			EVO_NODISCARD auto parse_struct() noexcept -> Result;
 			EVO_NODISCARD auto parse_try_catch() noexcept -> Result;
@@ -186,6 +187,7 @@ namespace panther{
 
 			std::vector<AST::Conditional> conditionals{};
 			std::vector<AST::WhileLoop> while_loops{};
+			std::vector<AST::Alias> aliases{};
 			std::vector<AST::Return> returns{};
 			std::vector<AST::Struct> structs{};
 			std::vector<AST::TryCatch> try_catches{};

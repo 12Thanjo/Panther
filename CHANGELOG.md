@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.0.19
+- Fixed all build warnings (in MSVC)
+- Added error messaging if function errors are empty (`<>`)
+- Added error message info for missing identifier in funciton return list
+- Fixed error message for missing semicolon at end of variable declaration pointing to the wrong location
+- Added the ability to make structs public
+- Added parsing of typedef and alias statements
+
 ### v0.0.18
 - Added parsing of the `this`  parameter
 - Added parsing of operator overloading

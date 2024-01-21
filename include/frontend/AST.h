@@ -21,6 +21,7 @@ namespace panther{
 
 			Conditional,
 			WhileLoop,
+			Alias,
 			Return,
 			Struct,
 			TryCatch,
@@ -189,6 +190,14 @@ namespace panther{
 		};
 
 
+		struct Alias{
+			bool is_public;
+			bool is_typedef;
+			NodeID name;
+			NodeID type;
+		};
+
+
 		struct Return{
 			bool is_throw;
 
@@ -204,6 +213,7 @@ namespace panther{
 		};
 
 		struct Struct{
+			bool is_public;
 			NodeID name;
 			NodeID block;
 		};

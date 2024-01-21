@@ -33,10 +33,16 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 
-	std::string const test_file_path = "./testing/test.pthr";
+	const std::string test_file_path = "./testing/test.pthr";
 
 	auto test_file = evo::fs::File{};
-	test_file.open(test_file_path, evo::fs::FileMode::Read);
+	{
+		const bool opened_successfully = test_file.open(test_file_path, evo::fs::FileMode::Read);
+		if(opened_successfully == false){
+			printer.error(std::format("Failed to open file: {}\n", test_file_path));
+			end_early(opened_successfully);
+		}
+	}
 
 	std::string test_file_data = test_file.read().value();
 

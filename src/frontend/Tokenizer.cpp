@@ -921,8 +921,10 @@ namespace panther{
 		const Tokenizer::TokenData& token = this->tokenizer.tokens[id.id];
 		
 		evo::debugAssert(
-			token.kind == Token::Kind::LiteralInt, 
-			std::format("cannot get integer value of Token Kind ({})", Token::print_kind(token.kind))
+			token.kind == Token::Kind::LiteralInt
+			|| token.kind == Token::Kind::TypeIntN
+			|| token.kind == Token::Kind::TypeUIntN
+			, std::format("cannot get integer value of Token Kind ({})", Token::print_kind(token.kind))
 		);
 
 		return token.value.integer;

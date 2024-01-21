@@ -5,19 +5,10 @@
 // }
 
 
-func operator{*=} = () -> Void {
-	// try{
+var list_of_things: std.Array(Int, 12) = uninit;
 
-	// }catch(a: Int, b: Bool){
 
-	// }catch(){
-	// 	var foo: Int = 12;
-	// }catch(c: String){
 
-	// }
-	
-	// throw 12;
-}
 
 
 

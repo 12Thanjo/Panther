@@ -97,8 +97,14 @@ namespace panther{
 		};
 
 		// TODO: do_while
-		// TODO: typedef_stmt
-		// TODO: alias_stmt
+
+		result = this->parse_alias();
+		switch(result.code()){
+			case Result::Success: return result;
+			case Result::WrongType: break;
+			case Result::Error: return Result::Error;
+		};
+
 
 		// return / throw
 		result = this->parse_return();
@@ -262,7 +268,7 @@ namespace panther{
 			
 			// ;
 			if(this->reader.getKind(this->reader.next()) != Token::get(";")){
-				this->expected_but_got("\";\" in variable declaration");
+				this->expected_but_got("\";\" in variable declaration", this->reader.peek(-1));
 				return Result::Error;
 			}
 
@@ -869,6 +875,8 @@ namespace panther{
 				const Result return_ident_result = this->parse_ident();
 				if(return_ident_result.code() == Result::WrongType){
 					this->expected_but_got("identifier in function return value");
+					// TODO: check if found was a type
+					this->error_info("When a function has multple error values, they all must be named");
 					return Result::Error;
 				}
 
@@ -965,6 +973,13 @@ namespace panther{
 
 			while(is_single_return == false){
 				if(this->reader.getKind(this->reader.peek()) == Token::get(">")){
+					if(errors.empty()){
+						this->error("Function errors list should not be empty.", this->reader.peek());
+						this->error_info("If you want an error return channel without any values, put \"<Void>\"");
+						this->error_info("If you don't want an error return channel, omit the \"<>\"");
+						return Result::Error;	
+					}
+
 					this->reader.skip(1);
 					break;
 				}
@@ -973,6 +988,8 @@ namespace panther{
 				const Result return_ident_result = this->parse_ident();
 				if(return_ident_result.code() == Result::WrongType){
 					this->expected_but_got("identifier in function errors value");
+					// TODO: check if found was a type
+					this->error_info("When a function has multple error values, they all must be named");
 					return Result::Error;
 				}
 
@@ -1148,6 +1165,63 @@ namespace panther{
 
 
 	// TODO: check EOF
+	auto Parser::parse_alias() noexcept -> Result {
+		const TokenID start_position = this->reader.peek();
+
+		bool is_public = false;
+
+		if(this->reader.getKind(this->reader.peek()) == Token::KeywordPublic){
+			is_public = true;
+			this->reader.skip(1);
+		}
+
+
+		bool is_typedef = false;
+		const char* stmt_type_name;
+
+		if(this->reader.getKind(this->reader.peek()) == Token::KeywordAlias){
+			stmt_type_name = "alias";
+
+		}else if(this->reader.getKind(this->reader.peek()) == Token::KeywordTypedef){
+			is_typedef = true;
+			stmt_type_name = "typedef";
+
+		}else{
+			this->reader.go_back(start_position);
+			return Result::WrongType;
+		}
+
+		this->reader.skip(1);
+
+
+
+		const Result name_result = this->parse_ident();
+		if(this->check_result_fail(name_result, std::format("indenifier for {}", stmt_type_name).c_str())){ return Result::Error; }
+
+
+		// =
+		if(this->reader.getKind(this->reader.next()) != Token::get("=")){
+			this->expected_but_got(std::format("\"=\" in {}", stmt_type_name).c_str(), this->reader.peek(-1));
+			return Result::Error;
+		}
+
+
+		const Result type_result = this->parse_type();
+		if(this->check_result_fail(type_result, std::format("type for {}", stmt_type_name).c_str())){ return Result::Error; }
+
+
+		// ;
+		if(this->reader.getKind(this->reader.next()) != Token::get(";")){
+			this->expected_but_got(std::format("\";\" at end of {}", stmt_type_name).c_str(), this->reader.peek(-1));
+			return Result::Error;
+		}
+
+
+		return this->create_node(this->aliases, AST::Kind::Alias, is_public, is_typedef, name_result.value(), type_result.value());
+	};
+
+
+	// TODO: check EOF
 	auto Parser::parse_return() noexcept -> Result {
 		const TokenID first_token = this->reader.peek();
 		const Token::Kind token_kind = this->reader.getKind(first_token);
@@ -1200,7 +1274,18 @@ namespace panther{
 
 	// TODO: check EOF
 	auto Parser::parse_struct() noexcept -> Result {
-		if(this->reader.getKind(this->reader.peek()) != Token::KeywordStruct){
+		bool is_public = false;
+
+		if(this->reader.getKind(this->reader.peek()) == Token::KeywordPub){
+			is_public = true;
+
+			if(this->reader.getKind(this->reader.peek(1)) != Token::KeywordStruct){
+				return Result::WrongType;
+			}
+
+			this->reader.skip(1);
+
+		}else if(this->reader.getKind(this->reader.peek()) != Token::KeywordStruct){
 			return Result::WrongType;
 		}
 
@@ -1221,7 +1306,7 @@ namespace panther{
 		if(this->check_result_fail(block_result, "identifier in struct definition")){ return Result::Error; }
 
 
-		return this->create_node(this->structs, AST::Kind::Struct, name_result.value(), block_result.value());
+		return this->create_node(this->structs, AST::Kind::Struct, is_public, name_result.value(), block_result.value());
 	};
 
 

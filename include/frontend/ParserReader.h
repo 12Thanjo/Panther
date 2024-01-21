@@ -52,6 +52,9 @@ namespace panther{
 			EVO_NODISCARD auto getWhileLoop(AST::NodeID id) noexcept -> AST::WhileLoop&;
 			EVO_NODISCARD auto getWhileLoop(AST::NodeID id) const noexcept -> const AST::WhileLoop&;
 
+			EVO_NODISCARD auto getAlias(AST::NodeID id) noexcept -> AST::Alias&;
+			EVO_NODISCARD auto getAlias(AST::NodeID id) const noexcept -> const AST::Alias&;
+
 			EVO_NODISCARD auto getReturn(AST::NodeID id) noexcept -> AST::Return&;
 			EVO_NODISCARD auto getReturn(AST::NodeID id) const noexcept -> const AST::Return&;
 
@@ -107,6 +110,7 @@ namespace panther{
 
 			auto print_conditional(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_while_loop(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
+			auto print_alias(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_return(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_struct(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
 			auto print_try_catch(AST::NodeID id, class Indenter& indenter) const noexcept -> void;
