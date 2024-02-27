@@ -1,0 +1,10 @@
+
+def test_2 = @import("testing/test_2.pthr");
+
+
+
+def foo: [Bool:12] = true;
+
+// pub def foo: Int = 12;
+// pub def bar: Int = baz;
+
