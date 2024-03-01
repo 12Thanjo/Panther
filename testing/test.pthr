@@ -1,10 +1,5 @@
 
-def test_2 = @import("testing/test_2.pthr");
+// asdf !
+var foo: Int = 12;
 
-
-
-def foo: [Bool:12] = true;
-
-// pub def foo: Int = 12;
-// pub def bar: Int = baz;
-
+true false Void var func
