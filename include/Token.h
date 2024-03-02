@@ -136,6 +136,66 @@ namespace panther{
 
 
 
+		EVO_NODISCARD static constexpr auto printKind(Kind kind) noexcept -> const char* {
+			switch(kind){
+				break; case Kind::None: return  "None";
+
+				break; case Kind::Ident: return "Ident";
+
+				///////////////////////////////////
+				// literals
+
+				break; case Kind::LiteralBool: return "LiteralBool";
+				break; case Kind::LiteralInt: return "LiteralInt";
+				break; case Kind::LiteralFloat: return "LiteralFloat";
+
+				///////////////////////////////////
+				// types
+
+				break; case Kind::TypeVoid: return "Void";
+
+				break; case Kind::TypeInt: return "Int";
+
+				///////////////////////////////////
+				// keywords
+
+				break; case Kind::KeywordVar: return "var";
+				break; case Kind::KeywordFunc: return "func";
+
+
+				///////////////////////////////////
+				// operators
+				
+				break; case Kind::Assign: return "=";
+
+				break; case Kind::LogicalEquals: return "==";
+
+
+				///////////////////////////////////
+				// punctuation
+
+				break; case Kind::OpenParen: return "(";
+				break; case Kind::CloseParen: return ")";
+				break; case Kind::OpenBracket: return "[";
+				break; case Kind::CloseBracket: return "]";
+				break; case Kind::OpenBrace: return "{";
+				break; case Kind::CloseBrace: return "}";
+
+				break; case Kind::Comma: return ",";
+				break; case Kind::Period: return ".";
+				break; case Kind::SemiColon: return ";";
+				break; case Kind::Colon: return ":";
+				
+			};
+
+
+			evo::unreachable();
+			
+			// Literally just here to appease constexpr
+			return "{{ERROR}}";
+		};
+
+
 	};
 
 

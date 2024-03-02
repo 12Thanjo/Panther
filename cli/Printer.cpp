@@ -4,6 +4,8 @@
 
 #include "SourceManager.h"
 
+#include <algorithm>
+
 namespace panther{
 	namespace cli{
 		
@@ -54,6 +56,11 @@ namespace panther{
 			if(this->use_colors){ evo::styleConsoleTrace(); };
 			evo::log(msg);
 			if(this->use_colors){ evo::styleConsoleReset(); };
+		};
+
+
+		auto Printer::print(evo::CStrProxy msg) const noexcept -> void {
+			evo::log(msg);
 		};
 
 
@@ -160,6 +167,56 @@ namespace panther{
 			for(const std::string& info : msg.infos){
 				this->info( std::format("\tNote: {}\n", info) );
 			}
+		};
+
+
+
+
+		auto Printer::print_tokens(const Source& source) const noexcept -> void {
+			this->info( std::format("Tokens: {}\n", source.getLocation()) );
+			this->trace( std::format("({} tokens)\n", source.tokens.size()) );
+
+			auto location_strings = std::vector<std::string>();
+
+			for(const Token& token : source.tokens){
+				location_strings.push_back( std::format("<{}:{}>", token.line, token.collumn) );
+			};
+
+			const size_t longest_location_string_length = std::ranges::max_element(
+				location_strings,
+				[](const std::string& lhs, const std::string& rhs) noexcept -> bool {
+					return lhs.size() < rhs.size();
+				}
+			)->size();
+
+			for(std::string& str : location_strings){
+				while(str.size() < longest_location_string_length){
+					str += ' ';
+				};
+
+				str += ' ';
+			}
+
+
+			for(size_t i = 0; i < source.tokens.size(); i+=1){
+				this->trace(location_strings[i]);
+
+				const Token& token = source.tokens[i];
+				this->info( std::format("[{}]", Token::printKind(token.kind)) );
+
+
+				switch(token.kind){
+					break; case Token::Ident: this->debug( std::format(" \"{}\"", token.value.string) );
+
+					break; case Token::LiteralBool: this->debug( std::format(" \"{}\"", token.value.boolean) );
+					break; case Token::LiteralInt: this->debug( std::format(" \"{}\"", token.value.integer) );
+					break; case Token::LiteralFloat: this->debug( std::format(" \"{}\"", token.value.floating_point) );
+				};
+
+
+				this->print("\n");
+			}
+
 		};
 
 

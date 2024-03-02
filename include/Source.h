@@ -27,6 +27,8 @@ namespace panther{
 			// returns if successful (no errors)
 			EVO_NODISCARD auto tokenize() noexcept -> bool;
 
+			// returns if successful (no errors)
+			EVO_NODISCARD auto parse() noexcept -> bool;
 
 
 

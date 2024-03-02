@@ -4,6 +4,8 @@
 #include <Evo.h>
 
 
+#include "Source.h"
+
 namespace panther{
 	struct Message;
 
@@ -24,13 +26,15 @@ namespace panther{
 				auto debug(evo::CStrProxy msg) const noexcept -> void;
 				auto trace(evo::CStrProxy msg) const noexcept -> void;
 
+				auto print(evo::CStrProxy msg) const noexcept -> void;
+
 
 				EVO_NODISCARD inline auto usesColors() const noexcept -> bool { return this->use_colors; };
 
 
 				auto print_message(const panther::Message& msg) const noexcept -> void;
 				
-
+				auto print_tokens(const Source& source) const noexcept -> void;
 
 			private:
 				bool use_colors;

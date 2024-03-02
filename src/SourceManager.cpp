@@ -60,5 +60,20 @@ namespace panther{
 	};
 
 
+	// TODO: multithreading
+	auto SourceManager::parse() noexcept -> evo::uint {
+		evo::uint total_fails = 0;
+
+		for(Source& source : this->sources){
+			if(source.parse() == false){
+				total_fails += 1;
+			}
+		}
+
+
+		return total_fails;
+	};
+
+
 	
 };

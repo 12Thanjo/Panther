@@ -1,7 +1,8 @@
 #include "Source.h"
 
 
-#include "./frontend/tokenizer.h"
+#include "./frontend/Tokenizer.h"
+#include "./frontend/Parser.h"
 #include "SourceManager.h"
 
 namespace panther{
@@ -11,6 +12,13 @@ namespace panther{
 		auto tokenizer = Tokenizer(*this);
 		return tokenizer.tokenize();
 	};
+
+
+	auto Source::parse() noexcept -> bool {
+		auto parser = Parser(*this);
+		return parser.parse();
+	};
+
 
 
 

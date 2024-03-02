@@ -77,6 +77,9 @@ namespace panther{
 			EVO_NODISCARD auto tokenize() noexcept -> evo::uint;
 
 
+			// returns if parsing all sources was successful
+			EVO_NODISCARD auto parse() noexcept -> evo::uint;
+
 
 		private:
 			std::vector<Source> sources{};

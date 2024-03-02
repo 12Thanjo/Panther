@@ -31,6 +31,11 @@ struct Config{
 	bool print_colors;
 	bool verbose;
 
+	enum class Output{
+		PrintTokens,
+		PrintAST,
+	} output;
+
 	std::filesystem::path relative_directory{};
 	bool relative_directory_set = false;
 };
@@ -39,7 +44,8 @@ struct Config{
 auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexcept -> int {
 	auto config = Config{
 		.print_colors = true,
-		.verbose = false,
+		.verbose      = true,
+		.output       = Config::Output::PrintTokens,
 	};
 
 	// print UTF-8 characters on windows
@@ -57,16 +63,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		std::cin.get();
 	};
 
-	auto fail_exit = [&](){
-		exit();
-		std::exit(1);
-	};
+
 
 
 
 
 	if(config.verbose){
 		printer.info("Panther Compiler\n");
+		printer.trace("----------------\n");
 	}
 
 
@@ -79,7 +83,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 			printer.error(std::format("\tcode: \"{}\"\n", ec.value()));
 			printer.error(std::format("\tmessage: \"{}\"\n", ec.message()));
 
-			fail_exit();
+			exit();
+			return 1;
 		}
 	}
 
@@ -94,7 +99,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	});
 
 
-	///////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
 	// get code
 
 	const std::string file_path = (config.relative_directory / "testing/test.pthr").make_preferred().string();
@@ -104,7 +109,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		const bool opened_successfully = file.open(file_path, evo::fs::FileMode::Read);
 		if(opened_successfully == false){
 			printer.error(std::format("Failed to open file: {}\n", file_path));
-			fail_exit();
+			exit();
+			return 1;
 		}
 	}
 
@@ -112,14 +118,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	file.close();
 
-	panther::Source::ID test_file = source_manager.addSource(file_path, std::move(file_data));
+	panther::Source::ID test_file_id = source_manager.addSource(file_path, std::move(file_data));
 
 
 	source_manager.lock();
 
 
 
-	///////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
 	// frontend
 
 	#if defined(PANTHER_BUILD_DEBUG)
@@ -135,23 +141,62 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	}
 	
 
+	///////////////////////////////////
+	// tokenize
+
 	const evo::uint tokenizing_successful = source_manager.tokenize();
 
 	if(tokenizing_successful > 0){
-		// panther::cli::print_messages(source_manager, printer);
-
 		printer.error( std::format("Failed to tokenize {} / {} files\n", tokenizing_successful, source_manager.numSources()) );
-		fail_exit();
+		exit();
+		return 1;
 	}
 
 
-	printer.success("Successfully Tokenized all files\n");
+	if(config.verbose){
+		printer.success("Successfully Tokenized all files\n");
+	}
+
+
+	if(config.output == Config::Output::PrintTokens){
+		printer.trace("------------------------------\n");
+		printer.print_tokens(source_manager.getSource(test_file_id));
+
+		exit();
+		return 0;
+	}
+
 
 	
-
-
-
 	///////////////////////////////////
+	// parse
+
+	const evo::uint parsing_successful = source_manager.parse();
+
+	if(parsing_successful > 0){
+		printer.error( std::format("Failed to parse {} / {} files\n", parsing_successful, source_manager.numSources()) );
+
+		exit();
+		return 1;
+	}
+
+
+	if(config.verbose){
+		printer.success("Successfully Parsed all files\n");
+	}
+
+
+	if(config.output == Config::Output::PrintAST){
+		if(config.verbose){ printer.trace("------------------------------\n"); }
+		printer.warning("The PrintAST output target is not supported yet\n");
+
+		exit();
+		return 0;
+	}
+
+
+
+	//////////////////////////////////////////////////////////////////////
 	// done
 
 	exit();
