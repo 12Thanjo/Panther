@@ -73,12 +73,12 @@ namespace panther{
 
 
 
-			// returns if tokenizing all sources was successful
+			// returns number of sources taht failed tokenizing
 			EVO_NODISCARD auto tokenize() noexcept -> evo::uint;
 
-
-			// returns if parsing all sources was successful
+			// returns number of sources taht failed parsing
 			EVO_NODISCARD auto parse() noexcept -> evo::uint;
+			
 
 
 		private:

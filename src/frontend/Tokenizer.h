@@ -32,6 +32,9 @@ namespace panther{
 		private:
 			Source& source;
 			CharStream char_stream;
+
+			uint32_t line_start;
+			uint32_t collumn_start;
 	};
 
 

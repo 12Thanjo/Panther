@@ -42,11 +42,14 @@ struct Config{
 
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexcept -> int {
+
 	auto config = Config{
 		.print_colors = true,
 		.verbose      = true,
-		.output       = Config::Output::PrintTokens,
+		.output       = Config::Output::PrintAST,
 	};
+
+
 
 	// print UTF-8 characters on windows
 	#if defined(EVO_PLATFORM_WINDOWS)
@@ -188,7 +191,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	if(config.output == Config::Output::PrintAST){
 		if(config.verbose){ printer.trace("------------------------------\n"); }
-		printer.warning("The PrintAST output target is not supported yet\n");
+		printer.print_ast(source_manager.getSource(test_file_id));
 
 		exit();
 		return 0;

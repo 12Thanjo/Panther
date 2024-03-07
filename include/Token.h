@@ -7,6 +7,12 @@ namespace panther{
 
 
 	struct Token{
+		struct ID{ // typesafe identifier
+			uint32_t id;
+			explicit ID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+
 
 		///////////////////////////////////
 		// kind 
@@ -71,8 +77,10 @@ namespace panther{
 
 		Kind kind;
 
-		uint32_t line;
-		uint32_t collumn;
+		uint32_t line_start;
+		uint32_t line_end;
+		uint32_t collumn_start;
+		uint32_t collumn_end;
 
 		union {
 			evo::byte none = 0;
@@ -84,29 +92,29 @@ namespace panther{
 		} value;
 
 
-		Token(Kind _kind, uint32_t _line, uint32_t _collumn) noexcept
-			: kind(_kind), line(_line), collumn(_collumn) {};
+		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn) noexcept
+			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {};
 
-		Token(Kind _kind, uint32_t _line, uint32_t _collumn, std::string_view value) noexcept
-			: kind(_kind), line(_line), collumn(_collumn) {
+		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, std::string_view value) noexcept
+			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
 			this->value.string = value;
 		};
 
 
-		Token(Kind _kind, uint32_t _line, uint32_t _collumn, bool value) noexcept
-			: kind(_kind), line(_line), collumn(_collumn) {
+		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, bool value) noexcept
+			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
 			this->value.boolean = value;
 		};
 
 
-		Token(Kind _kind, uint32_t _line, uint32_t _collumn, uint64_t value) noexcept
-			: kind(_kind), line(_line), collumn(_collumn) {
+		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, uint64_t value) noexcept
+			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
 			this->value.integer = value;
 		};
 
 
-		Token(Kind _kind, uint32_t _line, uint32_t _collumn, float64_t value) noexcept
-			: kind(_kind), line(_line), collumn(_collumn) {
+		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, float64_t value) noexcept
+			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
 			this->value.floating_point = value;
 		};
 
@@ -129,12 +137,27 @@ namespace panther{
 
 			// length 1
 			if(is_token("=")){ return Token::Assign; }
+			if(is_token("(")){ return Token::OpenParen; }
+			if(is_token(")")){ return Token::CloseParen; }
+			if(is_token("[")){ return Token::OpenBracket; }
+			if(is_token("]")){ return Token::CloseBracket; }
+			if(is_token("{")){ return Token::OpenBrace; }
+			if(is_token("}")){ return Token::CloseBrace; }
+
+			if(is_token(",")){ return Token::Comma; }
+			if(is_token(".")){ return Token::Period; }
+			if(is_token(";")){ return Token::SemiColon; }
+			if(is_token(":")){ return Token::Colon; }
 
 
 			EVO_FATAL_BREAK(std::format("Unknown token kind ({}) => {}", token_str, __FUNCTION__));
 		};
 
 
+
+		#if defined(EVO_COMPILER_MSVC)
+			#pragma warning(disable: 4702)
+		#endif
 
 		EVO_NODISCARD static constexpr auto printKind(Kind kind) noexcept -> const char* {
 			switch(kind){
@@ -190,10 +213,15 @@ namespace panther{
 
 
 			evo::unreachable();
-			
+
+
 			// Literally just here to appease constexpr
 			return "{{ERROR}}";
 		};
+
+		#if defined(EVO_COMPILER_MSVC)
+			#pragma warning(default: 4702)
+		#endif
 
 
 	};

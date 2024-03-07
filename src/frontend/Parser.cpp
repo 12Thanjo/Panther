@@ -5,13 +5,177 @@ namespace panther{
 
 
 	auto Parser::parse() noexcept -> bool {
-		return true;
+		while(this->eof() == false){
+			const Result stmt_res = this->parse_stmt();
+
+			switch(stmt_res.code()){
+				case Result::Success: {
+					this->source.global_stmts.push_back(stmt_res.value());
+					continue;
+				} break;
+
+				case Result::WrongType: {
+					this->source.error("Failed to parse global statement", this->peek());
+					return false;
+				} break;
+
+				case Result::Error: return false;
+			};
+		};
+
+		return this->source.hasErrored() == false;
 	};
 
 
 
-	auto Parser::parse_stmt() noexcept -> Result<AST::NodeID> {
-		return ResultCode::WrongType;
+	auto Parser::parse_stmt() noexcept -> Result {
+		Result result;
+
+		result = this->parse_var_decl();
+		if(result.code() == Result::Success || result.code() == Result::Error){
+			return result;
+		}
+
+		return Result::WrongType;
+	};
+
+
+
+	auto Parser::parse_var_decl() noexcept -> Result {
+		const Token& first_token = this->get(this->peek());
+
+		// keyword var
+		if(first_token.kind == Token::KeywordVar){
+			this->skip(1);
+		}else{
+			return Result::WrongType;
+		}
+
+
+		// ident
+		const Result ident = this->parse_ident();
+		if(ident.code() == Result::Error){ return Result::Error; }
+		else if(ident.code() == Result::WrongType){
+			this->expected_but_got("identifier in variable declaration");
+			return Result::Error;
+		}
+
+
+		// :
+		if(this->expect_token(Token::get(":"), "in variable declaration") == false){ return Result::Error; }
+
+
+
+		// type
+		const Result type = this->parse_type();
+		if(type.code() == Result::Error){ return Result::Error; }
+		else if(type.code() == Result::WrongType){
+			this->expected_but_got("type in variable declaration");
+			return Result::Error;
+		}
+
+		// =
+		if(this->expect_token(Token::get("="), "in variable declaration") == false){ return Result::Error; }
+
+
+		// expr
+		const Result expr = this->parse_expr();
+		if(expr.code() == Result::Error){ return Result::Error; }
+		else if(expr.code() == Result::WrongType){
+			this->expected_but_got("expr in variable declaration");
+			return Result::Error;
+		}
+
+		// ;
+		if(this->expect_token(Token::get(";"), "at end of variable declaration") == false){ return Result::Error; }
+
+
+		return this->create_node(
+			this->source.var_decls, AST::Kind::VarDecl,
+			ident.value(), type.value(), expr.value()
+		);
+	};
+
+
+
+
+	auto Parser::parse_expr() noexcept -> Result {
+		return this->parse_literal();
+	};
+
+
+
+	auto Parser::parse_type() noexcept -> Result {
+
+		switch(this->get(this->peek()).kind){
+			case Token::TypeVoid:
+			case Token::TypeInt:
+			case Token::Ident: 
+				break;
+
+			default:
+				return Result::WrongType;
+		};
+
+
+		const Token::ID base_type = this->next();
+
+
+
+		return this->create_node(
+			this->source.types, AST::Kind::Type,
+			base_type
+		);
+	};
+
+
+
+
+
+
+	auto Parser::parse_literal() noexcept -> Result {
+		switch(this->get(this->peek()).kind){
+			case Token::LiteralBool:
+			case Token::LiteralInt:
+			case Token::LiteralFloat:
+				break;
+
+			default:
+				return Result::WrongType;
+		};
+
+		return this->create_token_node(AST::Kind::Literal, this->next());
+	};
+
+
+
+	auto Parser::parse_ident() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::Ident){
+			return Result::WrongType;
+		}
+
+		return this->create_token_node(AST::Kind::Ident, this->next());
+	};
+
+
+
+
+	//////////////////////////////////////////////////////////////////////
+	// messaging
+
+	auto Parser::expect_token(Token::Kind kind, evo::CStrProxy location) noexcept -> bool {
+		if(this->get(this->next()).kind != kind){
+			this->expected_but_got(std::format("\"{}\" {}", Token::printKind(kind), location), this->peek(-1));
+			return false;
+		}
+
+		return true;
+	};
+
+
+	auto Parser::expected_but_got(evo::CStrProxy msg, Token::ID token_id) noexcept -> void {
+		const Token& token = this->get(token_id);
+		this->source.error(std::format("Expected {} - got [{}] instead.", msg.data(), Token::printKind(token.kind)), token_id);
 	};
 
 

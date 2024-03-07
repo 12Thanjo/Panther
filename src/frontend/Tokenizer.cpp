@@ -11,6 +11,9 @@ namespace panther{
 
 	auto Tokenizer::tokenize() noexcept -> bool {
 		while(this->char_stream.eof() == false && this->source.hasErrored() == false){
+			this->line_start = this->char_stream.get_line();
+			this->collumn_start = this->char_stream.get_collumn();
+
 			if(this->tokenize_whitespace()){ continue; }
 			if(this->tokenize_comment()){ continue; }
 			if(this->tokenize_identifier()){ continue; }
@@ -523,9 +526,6 @@ namespace panther{
 			this->create_token(Token::Kind::LiteralInt, output_number);
 		}
 
-
-		
-
 		return true;
 	};
 
@@ -536,13 +536,17 @@ namespace panther{
 
 
 	auto Tokenizer::create_token(Token::Kind kind) noexcept -> void {
-		this->source.tokens.emplace_back(kind, this->char_stream.get_line(), this->char_stream.get_collumn());
+		this->source.tokens.emplace_back(
+			kind, this->line_start, this->char_stream.get_line(), this->collumn_start, this->char_stream.get_collumn() - 1
+		);
 	};
 
 
 	template<typename T>
 	auto Tokenizer::create_token(Token::Kind kind, T value) noexcept -> void {
-		this->source.tokens.emplace_back(kind, this->char_stream.get_line(), this->char_stream.get_collumn(), value);
+		this->source.tokens.emplace_back(
+			kind, this->line_start, this->char_stream.get_line(), this->collumn_start, this->char_stream.get_collumn() - 1, value
+		);
 	};
 
 

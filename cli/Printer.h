@@ -36,6 +36,42 @@ namespace panther{
 				
 				auto print_tokens(const Source& source) const noexcept -> void;
 
+				auto print_ast(const Source& source) noexcept -> void;
+
+
+			private:
+				///////////////////////////////////
+				// ast
+
+				auto print_stmt(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_var_decl(const Source& source, const AST::Node& node_id) noexcept -> void;
+
+				auto print_type(const Source& source, const AST::Node& node_id) noexcept -> void;
+
+				auto print_expr(const Source& source, const AST::Node& node_id) noexcept -> void;
+
+				auto print_literal(const Source& source, const AST::Node& node_id) noexcept -> void;
+
+
+				///////////////////////////////////
+				// indenter
+				auto indenter_push() noexcept -> void;
+				auto indenter_pop() noexcept -> void;
+
+				auto indenter_set_arrow() noexcept -> void;
+				auto indenter_set_end() noexcept -> void;	
+
+				auto indenter_print() noexcept -> void;
+
+				enum class IndenterType{
+					Line,
+					Arrow,
+					EndArrow,
+					None,
+				};
+
+				std::vector<IndenterType> indents{};
+
 			private:
 				bool use_colors;
 		};

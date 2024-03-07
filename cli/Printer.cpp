@@ -174,12 +174,18 @@ namespace panther{
 
 		auto Printer::print_tokens(const Source& source) const noexcept -> void {
 			this->info( std::format("Tokens: {}\n", source.getLocation()) );
-			this->trace( std::format("({} tokens)\n", source.tokens.size()) );
+			if(source.tokens.size() == 0){
+				this->trace("(NONE)\n");
+			}else if(source.tokens.size() == 1){
+				this->trace("(1 token)\n");
+			}else{
+				this->trace( std::format("({} tokens)\n", source.tokens.size()) );
+			}
 
 			auto location_strings = std::vector<std::string>();
 
 			for(const Token& token : source.tokens){
-				location_strings.push_back( std::format("<{}:{}>", token.line, token.collumn) );
+				location_strings.push_back( std::format("<{}:{}>", token.line_start, token.collumn_start) );
 			};
 
 			const size_t longest_location_string_length = std::ranges::max_element(
@@ -217,6 +223,153 @@ namespace panther{
 				this->print("\n");
 			}
 
+		};
+
+
+
+		//////////////////////////////////////////////////////////////////////
+		// print AST
+
+
+		auto Printer::print_ast(const Source& source) noexcept -> void {
+			this->info( std::format("AST: {}\n", source.getLocation()) );
+			if(source.global_stmts.size() == 0){
+				this->trace("(NONE)\n");
+			}else if(source.global_stmts.size() == 1){
+				this->trace("(1 global statement)\n");
+			}else{
+				this->trace( std::format("({} global statements)\n", source.global_stmts.size()) );
+			}
+
+
+			for(AST::Node::ID node_id : source.global_stmts){
+				this->print_stmt(source, source.nodes[node_id.id]);
+			}
+
+
+			this->indents.clear();
+		};
+
+
+
+
+		auto Printer::print_stmt(const Source& source, const AST::Node& node) noexcept -> void {
+			switch(node.kind){
+				break; case AST::Kind::VarDecl: this->print_var_decl(source, node);
+			};
+		};
+
+
+		auto Printer::print_var_decl(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::VarDecl& var_decl = source.getVarDecl(node);
+
+			this->indenter_print();
+			this->info("VarDecl:\n");
+			this->indenter_push();
+
+			this->indenter_print();
+			this->info("Ident: ");
+			this->debug( std::format("{}\n", source.getToken(source.getNode(var_decl.ident).token).value.string) );
+
+
+			this->indenter_set_arrow();
+			this->indenter_print();
+			this->info("Type:\n");
+			this->indenter_push();
+			this->indenter_set_end();
+				this->print_type(source, source.getNode(var_decl.type));
+			this->indenter_pop();
+
+			this->indenter_set_end();
+			this->indenter_print();
+			this->info("Expr:\n");
+			this->indenter_push();
+			this->indenter_set_end();
+				this->print_expr(source, source.getNode(var_decl.expr));
+			this->indenter_pop();
+
+
+
+			this->indenter_pop();
+		};
+
+
+
+		auto Printer::print_type(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::Type& type = source.getType(node);
+
+			this->indenter_print();
+			this->debug( std::format("{}\n", Token::printKind(source.getToken(type.token).kind)) );
+		};
+
+
+		auto Printer::print_expr(const Source& source, const AST::Node& node) noexcept -> void {
+			switch(node.kind){
+				break; case AST::Kind::Literal: this->print_literal(source, node);
+
+				break; default: EVO_FATAL_BREAK("Node is not an expr");
+			};
+		};
+
+
+
+		auto Printer::print_literal(const Source& source, const AST::Node& node) noexcept -> void {
+			evo::debugAssert(node.kind == AST::Kind::Literal, "Node is not a literal");
+
+			const Token& token = source.getToken(node.token);
+
+			this->indenter_print();
+
+			switch(token.kind){
+				break; case Token::LiteralInt: this->debug(std::to_string(token.value.integer)); this->trace(" [LiteralInt]");
+				break; case Token::LiteralFloat: this->debug(std::to_string(token.value.floating_point)); this->trace(" [LiteralFloat]");
+				break; case Token::LiteralBool: this->debug(evo::boolStr(token.value.boolean)); this->trace(" [LiteralBool]");
+			};
+
+			this->print('\n');
+		};
+
+
+		//////////////////////////////////////////////////////////////////////
+		// indenter
+
+		auto Printer::indenter_push() noexcept -> void {
+			this->indents.emplace_back(IndenterType::Arrow);
+		};
+
+		auto Printer::indenter_pop() noexcept -> void {
+			this->indents.pop_back();
+		};
+
+		auto Printer::indenter_set_arrow() noexcept -> void {
+			this->indents.back() = IndenterType::Arrow;
+		};
+
+		auto Printer::indenter_set_end() noexcept -> void {
+			this->indents.back() = IndenterType::EndArrow;		
+		};
+
+
+		auto Printer::indenter_print() noexcept -> void {
+			auto print_string = std::string{};
+
+			for(const IndenterType& indent : this->indents){
+				switch(indent){
+					break; case IndenterType::Line:     print_string += "|   ";
+					break; case IndenterType::Arrow:    print_string += "|-> ";
+					break; case IndenterType::EndArrow: print_string += "\\-> ";
+					break; case IndenterType::None:     print_string += "    ";
+				};
+			}
+
+
+			this->trace(print_string);
+
+
+			if(this->indents.empty() == false){
+				     if(this->indents.back() == IndenterType::Arrow){    this->indents.back() = IndenterType::Line; }
+				else if(this->indents.back() == IndenterType::EndArrow){ this->indents.back() = IndenterType::None; }
+			}
 		};
 
 

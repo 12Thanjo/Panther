@@ -3,7 +3,8 @@
 
 #include <Evo.h>
 
-#include "Token.h"
+#include "./Token.h"
+#include "./AST.h"
 
 
 namespace panther{
@@ -31,6 +32,15 @@ namespace panther{
 			EVO_NODISCARD auto parse() noexcept -> bool;
 
 
+			///////////////////////////////////
+			// gettting
+
+			EVO_NODISCARD auto getNode(AST::Node::ID node_id) const noexcept -> const AST::Node&;
+			EVO_NODISCARD auto getToken(Token::ID token_id) const noexcept -> const Token&;
+
+			EVO_NODISCARD auto getVarDecl(const AST::Node& node) const noexcept -> const AST::VarDecl&;
+			EVO_NODISCARD auto getType(const AST::Node& node) const noexcept -> const AST::Type&;
+
 
 			///////////////////////////////////
 			// messaging / errors
@@ -40,6 +50,7 @@ namespace panther{
 
 
 			auto error(const std::string& msg, uint32_t line, uint32_t collumn) noexcept -> void;
+			auto error(const std::string& msg, Token::ID token_id) noexcept -> void;
 			auto error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<std::string>&& infos) noexcept -> void;
 			auto error(const std::string& msg, uint32_t line, uint32_t collumn_start, uint32_t collumn_end) noexcept -> void;
 			auto error(
@@ -53,6 +64,11 @@ namespace panther{
 
 		public:
 			std::vector<Token> tokens{};
+
+			std::vector<AST::Node> nodes{};
+			std::vector<AST::Node::ID> global_stmts{};
+			std::vector<AST::VarDecl> var_decls{};
+			std::vector<AST::Type> types{};
 
 
 		private:

@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.3.0
+- Added parsing
+	- variable declarations
+	- basic types
+	- literals
+- Added printing of the AST
+
 ### v0.2.0
 - Added foundation for parsing
 - Added printing of tokens
