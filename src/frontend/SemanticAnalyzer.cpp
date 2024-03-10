@@ -3,7 +3,7 @@
 #include "SourceManager.h"
 
 namespace panther{
-
+	
 
 	auto SemanticAnalyzer::semantic_analysis() noexcept -> bool {
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
@@ -40,10 +40,20 @@ namespace panther{
 		const Token& ident = this->source.getToken(ident_tok_id);
 
 
-		if(this->objects.contains(ident.value.string)){
+		SourceManager& src_manager = this->source.getSourceManager();
+
+
+
+		if(this->global_vars.contains(ident.value.string)){
+			const object::Var& already_defined_var = src_manager.getGlobalVar( this->global_vars.at(ident.value.string) );
+			const Token& already_defined_var_token = this->source.getToken(already_defined_var.ident);
+
 			this->source.error(
 				std::format("Identifier \"{}\" already defined", ident.value.string),
-				ident
+				ident,
+				std::vector<Message::Info>{
+					{"First defined here:", Location(already_defined_var_token.line_start, already_defined_var_token.collumn_start, already_defined_var_token.collumn_end)}
+				}
 			);
 			return false;
 		}
@@ -80,17 +90,15 @@ namespace panther{
 
 		
 
-		SourceManager& src_manager = this->source.getSourceManager();
-
 		const object::Type::ID var_type = src_manager.getType(
 			object::Type{
 				.base_type = src_manager.getBaseTypeID(type_token.kind),
 			}
 		);
 
-		src_manager.createGlobalVar(this->source.getID(), ident_tok_id, var_type);
+		const SourceManager::GlobalVarID global_var_id = src_manager.createGlobalVar(this->source.getID(), ident_tok_id, var_type);
 
-		this->objects.insert(ident.value.string);
+		this->global_vars.emplace(ident.value.string, global_var_id);
 
 
 		return true;

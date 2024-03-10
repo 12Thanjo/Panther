@@ -6,8 +6,9 @@
 
 #include "Source.h"
 #include "AST.h"
+#include "SourceManager.h"
 
-#include <unordered_set>
+#include <unordered_map>
 
 namespace panther{
 
@@ -24,7 +25,7 @@ namespace panther{
 		private:
 			EVO_NODISCARD auto analyize_global_var(const AST::VarDecl& var_decl) noexcept -> bool;
 
-			std::unordered_set<std::string_view> objects{};
+			std::unordered_map<std::string_view, SourceManager::GlobalVarID> global_vars{};
 
 	
 		private:

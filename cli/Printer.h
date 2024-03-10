@@ -40,6 +40,9 @@ namespace panther{
 
 
 			private:
+				auto print_location(const Source& source, Location location, Message::Type type) const noexcept -> void;
+
+
 				///////////////////////////////////
 				// ast
 

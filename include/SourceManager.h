@@ -6,29 +6,11 @@
 
 #include "Source.h"
 #include "objects.h"
+#include "Message.h"
 
 #include <functional>
 
 namespace panther{
-
-	struct Message{
-		enum class Type{
-			Fatal,
-			Error,
-			Warning,
-		};
-
-
-		Type type;
-		const Source& source;
-		const std::string message;
-
-		uint32_t line;
-		uint32_t collumn_start;
-		uint32_t collumn_end;
-
-		std::vector<std::string> infos{};
-	};
 
 
 	class SourceManager{
@@ -100,11 +82,27 @@ namespace panther{
 			EVO_NODISCARD auto getType(const object::Type& type) noexcept -> object::Type::ID;
 
 
+
+
+			struct GlobalVarID{ // typesafe identifier
+				uint32_t id;
+				explicit GlobalVarID(uint32_t _id) noexcept : id(_id) {};
+			};
+
+
 			template<typename... Args>
-			EVO_NODISCARD inline auto createGlobalVar(Args... args) noexcept -> void {
+			EVO_NODISCARD inline auto createGlobalVar(Args... args) noexcept -> GlobalVarID {
 				evo::debugAssert(this->isLocked(), "Can only add global variables when locked");
 
 				this->global_vars.emplace_back(args...);
+
+				return GlobalVarID( uint32_t(this->global_vars.size() - 1) );
+			};
+
+
+			EVO_NODISCARD inline auto getGlobalVar(GlobalVarID id) const noexcept -> const object::Var& {
+				evo::debugAssert(this->isLocked(), "Can only get global variables when locked");
+				return this->global_vars[size_t(id.id)];
 			};
 
 

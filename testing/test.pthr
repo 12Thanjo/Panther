@@ -1,6 +1,4 @@
 
-// asdf !
 var foo: Int = 12;
-var foo: Int = 12;
+var foo: Bool = false;
 
-// true false Void var func

@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.4.1
+- Added messaging for location of variable already defined (when trying to use the sane identifier)
+
 ### v0.4.0
 - Added Semantic Analysis of variables
 

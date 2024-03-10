@@ -69,8 +69,8 @@ namespace panther{
 				if(this->char_stream.ammount_left() < 2){
 					this->source.error(
 						"Unterminated multi-line comment",
-						comment_beginning_line, comment_beginning_collumn, comment_beginning_collumn + 1,
-						std::vector<std::string>{"Expected a \"*/\" before the end of the file"}
+						Location{comment_beginning_line, comment_beginning_collumn, comment_beginning_collumn + 1},
+						std::vector<Message::Info>{{"Expected a \"*/\" before the end of the file"}}
 					);
 					return true;
 				}
@@ -244,7 +244,7 @@ namespace panther{
 				this->source.error(
 					"Leading zeros in literal numbers are not supported",
 					this->char_stream.get_line(), this->char_stream.get_collumn(),
-					std::vector<std::string>{"the literal integer prefix for base-8 is \"0o\""}
+					std::vector<Message::Info>{{"the literal integer prefix for base-8 is \"0o\""}}
 				);
 
 				return true;

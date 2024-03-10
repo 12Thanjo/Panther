@@ -5,6 +5,7 @@
 
 #include "./Token.h"
 #include "./AST.h"
+#include "Message.h"
 
 
 namespace panther{
@@ -20,10 +21,10 @@ namespace panther{
 		public:
 			// TODO: other permutations of refs
 			Source(const std::string& src_location, std::string&& src_data, class SourceManager& src_manager, ID src_id)
-				: location(src_location), data(std::move(src_data)), source_manager(src_manager), id(src_id) {};
+				: src_location(src_location), data(std::move(src_data)), source_manager(src_manager), id(src_id) {};
 
 
-			EVO_NODISCARD inline auto getLocation() const noexcept -> const std::string& { return this->location; };
+			EVO_NODISCARD inline auto getLocation() const noexcept -> const std::string& { return this->src_location; };
 			EVO_NODISCARD inline auto getData() const noexcept -> const std::string& { return this->data; };
 			EVO_NODISCARD inline auto getSourceManager() noexcept -> SourceManager& { return this->source_manager; };
 			EVO_NODISCARD inline auto getID() const noexcept -> ID { return this->id; };
@@ -65,11 +66,12 @@ namespace panther{
 
 			auto error(const std::string& msg, uint32_t line, uint32_t collumn) noexcept -> void;
 			auto error(const std::string& msg, Token::ID token_id) noexcept -> void;
-			auto error(const std::string& msg, const Token& token_id) noexcept -> void;
-			auto error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<std::string>&& infos) noexcept -> void;
-			auto error(const std::string& msg, uint32_t line, uint32_t collumn_start, uint32_t collumn_end) noexcept -> void;
+			auto error(const std::string& msg, const Token& token) noexcept -> void;
+			auto error(const std::string& msg, const Token& token, std::vector<Message::Info>&& infos) noexcept -> void;
+			auto error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void;
+			auto error(const std::string& msg, Location location) noexcept -> void;
 			auto error(
-				const std::string& msg, uint32_t line, uint32_t collumn_start, uint32_t collumn_end, std::vector<std::string>&& infos
+				const std::string& msg, Location location, std::vector<Message::Info>&& infos
 			) noexcept -> void;
 
 
@@ -87,7 +89,7 @@ namespace panther{
 
 
 		private:
-			std::string location; 
+			std::string src_location; 
 			std::string data;
 			ID id;
 			class SourceManager& source_manager;

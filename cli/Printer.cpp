@@ -65,7 +65,6 @@ namespace panther{
 
 
 
-		static auto print_src_location(const Printer& printer, const panther::Message& msg) noexcept -> void;
 
 
 
@@ -79,93 +78,25 @@ namespace panther{
 				break; case panther::Message::Type::Warning: this->warning( std::format("Warning: {}\n", msg.message) );
 			};
 
-			this->trace( std::format("\t{}:{}:{}\n", msg.source.getLocation(), msg.line, msg.collumn_start) );
+			this->trace( std::format("\t{}:{}:{}\n", msg.source.getLocation(), msg.location.line, msg.location.collumn_start) );
 
 
 
 			///////////////////////////////////
 			// print location
 
-			// find line in the source code
-			size_t cursor = 0;
-			size_t current_line = 1;
-			while(current_line < msg.line){
-				evo::debugAssert(cursor < msg.source.getData().size(), "out of bounds looking for line in source code for error");
-
-				if(msg.source.getData()[cursor] == '\n'){
-					current_line += 1;
-
-				}else if(msg.source.getData()[cursor] == '\r'){
-					current_line += 1;
-
-					if(msg.source.getData()[cursor + 1] == '\n'){
-						cursor += 1;
-					}
-				}
-
-				cursor += 1;
-			};
-
-			// get actual line and remove leading whitespace
-
-			auto line_str = std::string{};
-			size_t point_collumn = msg.collumn_start;
-			bool remove_whitespace = true;
-
-			while(msg.source.getData()[cursor] != '\n' && msg.source.getData()[cursor] != '\r' && cursor < msg.source.getData().size()){
-				if(remove_whitespace && (msg.source.getData()[cursor] == '\t' || msg.source.getData()[cursor] == ' ')){
-					// remove leading whitespace
-					point_collumn -= 1;
-
-				}else{
-					line_str += msg.source.getData()[cursor];
-					remove_whitespace = false;
-				}
-
-				cursor += 1;
-			};
-
-
-			// print line
-			const std::string line_number_str = std::to_string(msg.line);
-
-			this->trace( std::format("\t{} | {}\n", line_number_str, line_str) );
-
-
-			// print out pointer
-			auto pointer_str = std::string("\t");
-			for(size_t i = 0; i < line_number_str.size() + 1; i+=1){
-				pointer_str.push_back(' ');
-			}
-
-			pointer_str += '|';
-
-			for(size_t i = 0; i < point_collumn; i+=1){
-				pointer_str += ' ';
-			}
-
-			this->trace(pointer_str);
-
-			pointer_str.clear();
-
-			for(uint32_t i = msg.collumn_start; i < msg.collumn_end + 1; i+=1){
-				pointer_str += '^';
-			}
-
-			pointer_str += '\n';
-
-			switch(msg.type){
-				break; case panther::Message::Type::Fatal:   this->fatal(pointer_str);
-				break; case panther::Message::Type::Error:   this->error(pointer_str);
-				break; case panther::Message::Type::Warning: this->warning(pointer_str);
-			};
+			this->print_location(msg.source, msg.location, msg.type);
 
 
 			///////////////////////////////////
 			// print infos
 
-			for(const std::string& info : msg.infos){
-				this->info( std::format("\tNote: {}\n", info) );
+			for(const Message::Info& info : msg.infos){
+				this->info( std::format("\tNote: {}\n", info.string) );
+
+				if(info.location.has_value()){
+					this->print_location(msg.source, *info.location, Message::Type::Info);
+				}
 			}
 		};
 
@@ -223,6 +154,88 @@ namespace panther{
 				this->print("\n");
 			}
 
+		};
+
+
+
+
+
+
+		auto Printer::print_location(const Source& source, Location location, Message::Type type) const noexcept -> void {
+			// find line in the source code
+			size_t cursor = 0;
+			size_t current_line = 1;
+			while(current_line < location.line){
+				evo::debugAssert(cursor < source.getData().size(), "out of bounds looking for line in source code for error");
+
+				if(source.getData()[cursor] == '\n'){
+					current_line += 1;
+
+				}else if(source.getData()[cursor] == '\r'){
+					current_line += 1;
+
+					if(source.getData()[cursor + 1] == '\n'){
+						cursor += 1;
+					}
+				}
+
+				cursor += 1;
+			};
+
+			// get actual line and remove leading whitespace
+
+			auto line_str = std::string{};
+			size_t point_collumn = location.collumn_start;
+			bool remove_whitespace = true;
+
+			while(source.getData()[cursor] != '\n' && source.getData()[cursor] != '\r' && cursor < source.getData().size()){
+				if(remove_whitespace && (source.getData()[cursor] == '\t' || source.getData()[cursor] == ' ')){
+					// remove leading whitespace
+					point_collumn -= 1;
+
+				}else{
+					line_str += source.getData()[cursor];
+					remove_whitespace = false;
+				}
+
+				cursor += 1;
+			};
+
+
+			// print line
+			const std::string line_number_str = std::to_string(location.line);
+
+			this->trace( std::format("\t{} | {}\n", line_number_str, line_str) );
+
+
+			// print out pointer
+			auto pointer_str = std::string("\t");
+			for(size_t i = 0; i < line_number_str.size() + 1; i+=1){
+				pointer_str.push_back(' ');
+			}
+
+			pointer_str += '|';
+
+			for(size_t i = 0; i < point_collumn; i+=1){
+				pointer_str += ' ';
+			}
+
+			this->trace(pointer_str);
+
+			pointer_str.clear();
+
+			for(uint32_t i = location.collumn_start; i < location.collumn_end + 1; i+=1){
+				pointer_str += '^';
+			}
+
+			pointer_str += '\n';
+
+			switch(type){
+				break; case panther::Message::Type::Fatal:   this->fatal(pointer_str);
+				break; case panther::Message::Type::Error:   this->error(pointer_str);
+				break; case panther::Message::Type::Warning: this->warning(pointer_str);
+				break; case panther::Message::Type::Info:    this->info(pointer_str);
+			};
 		};
 
 
