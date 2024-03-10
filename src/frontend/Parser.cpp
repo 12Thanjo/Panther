@@ -110,7 +110,8 @@ namespace panther{
 		switch(this->get(this->peek()).kind){
 			case Token::TypeVoid:
 			case Token::TypeInt:
-			case Token::Ident: 
+			case Token::TypeBool:
+			// case Token::Ident: 
 				break;
 
 			default:

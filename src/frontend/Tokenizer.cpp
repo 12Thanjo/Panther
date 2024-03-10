@@ -128,7 +128,7 @@ namespace panther{
 
 			else if(ident_name == "Void") { this->create_token(Token::Kind::TypeVoid); }
 
-			// else if(ident_name == "Bool") { this->create_token(Token::Kind::TypeBool); }
+			else if(ident_name == "Bool") { this->create_token(Token::Kind::TypeBool); }
 			else if(ident_name == "Int") { this->create_token(Token::Kind::TypeInt); }
 
 

@@ -1,5 +1,6 @@
 
 // asdf !
 var foo: Int = 12;
+var foo: Int = 12;
 
 // true false Void var func

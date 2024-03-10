@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.4.0
+- Added Semantic Analysis of variables
+
 ### v0.3.0
 - Added parsing
 	- variable declarations

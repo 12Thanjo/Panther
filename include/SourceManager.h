@@ -5,6 +5,7 @@
 
 
 #include "Source.h"
+#include "objects.h"
 
 #include <functional>
 
@@ -78,12 +79,43 @@ namespace panther{
 
 			// returns number of sources taht failed parsing
 			EVO_NODISCARD auto parse() noexcept -> evo::uint;
-			
+
+			auto initBuiltinTypes() noexcept -> void;
+
+			// returns number of sources taht failed parsing
+			EVO_NODISCARD auto semanticAnalysis() noexcept -> evo::uint;
+
+
+
+			///////////////////////////////////
+			// objects
+
+			EVO_NODISCARD auto getBaseType(Token::Kind tok_kind) noexcept -> object::BaseType&;
+			EVO_NODISCARD auto getBaseTypeID(Token::Kind tok_kind) const noexcept -> object::BaseType::ID;
+
+
+			// gets type with matching ID
+			// if type doesn't already exist, create a new one
+			// TODO: &&
+			EVO_NODISCARD auto getType(const object::Type& type) noexcept -> object::Type::ID;
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createGlobalVar(Args... args) noexcept -> void {
+				evo::debugAssert(this->isLocked(), "Can only add global variables when locked");
+
+				this->global_vars.emplace_back(args...);
+			};
 
 
 		private:
 			std::vector<Source> sources{};
 			bool is_locked = false;
+
+			std::vector<object::BaseType> base_types{};
+			std::vector<object::Type> types{};
+			std::vector<object::Var> global_vars{};
+
 
 			MessageCallback message_callback;
 

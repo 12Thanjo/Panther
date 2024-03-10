@@ -3,6 +3,7 @@
 
 #include "./frontend/Tokenizer.h"
 #include "./frontend/Parser.h"
+#include "./frontend/SemanticAnalyzer.h"
 #include "SourceManager.h"
 
 namespace panther{
@@ -20,6 +21,12 @@ namespace panther{
 	};
 
 
+	auto Source::semantic_analysis() noexcept -> bool {
+		auto semantic_analizer = SemanticAnalyzer(*this);
+		return semantic_analizer.semantic_analysis();
+	};
+
+
 
 	//////////////////////////////////////////////////////////////////////
 	// getting
@@ -33,14 +40,36 @@ namespace panther{
 	};
 
 
+
+	auto Source::getVarDecl(AST::Node::ID node_id) const noexcept -> const AST::VarDecl& {
+		return this->getVarDecl(this->getNode(node_id));
+	};
+
 	auto Source::getVarDecl(const AST::Node& node) const noexcept -> const AST::VarDecl& {
 		evo::debugAssert(node.kind == AST::Kind::VarDecl, "Node is not a VarDecl");
 		return this->var_decls[node.index];
 	};
 
+
+
+	auto Source::getType(AST::Node::ID node_id) const noexcept -> const AST::Type& {
+		return this->getType(this->getNode(node_id));
+	};
+
 	auto Source::getType(const AST::Node& node) const noexcept -> const AST::Type& {
 		evo::debugAssert(node.kind == AST::Kind::Type, "Node is not a Type");
 		return this->types[node.index];
+	};
+
+
+
+	auto Source::getLiteral(AST::Node::ID node_id) const noexcept -> const Token& {
+		return this->getLiteral(this->getNode(node_id));
+	};
+
+	auto Source::getLiteral(const AST::Node& node) const noexcept -> const Token& {
+		evo::debugAssert(node.kind == AST::Kind::Literal, "Node is not a Literal");
+		return this->getToken(node.token);
 	};
 
 
@@ -88,7 +117,11 @@ namespace panther{
 	};
 
 	auto Source::error(const std::string& msg, Token::ID token_id) noexcept -> void {
-		const Token& token = this->tokens[token_id.id];
+		const Token& token = this->getToken(token_id);
+		this->error(msg, token.line_start, token.collumn_start, token.collumn_end, std::vector<std::string>{});
+	};
+
+	auto Source::error(const std::string& msg, const Token& token) noexcept -> void {
 		this->error(msg, token.line_start, token.collumn_start, token.collumn_end, std::vector<std::string>{});
 	};
 

@@ -22,6 +22,7 @@ namespace panther{
 
 			Ident,
 
+
 			///////////////////////////////////
 			// literals
 
@@ -31,12 +32,15 @@ namespace panther{
 			// LiteralChar,
 			// LiteralString,
 
+
 			///////////////////////////////////
 			// types
 
 			TypeVoid,
 
 			TypeInt,
+			TypeBool,
+
 
 			///////////////////////////////////
 			// keywords
@@ -178,6 +182,7 @@ namespace panther{
 				break; case Kind::TypeVoid: return "Void";
 
 				break; case Kind::TypeInt: return "Int";
+				break; case Kind::TypeBool: return "Bool";
 
 				///////////////////////////////////
 				// keywords

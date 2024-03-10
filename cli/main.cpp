@@ -34,6 +34,7 @@ struct Config{
 	enum class Output{
 		PrintTokens,
 		PrintAST,
+		SemanticAnalysis,
 	} output;
 
 	std::filesystem::path relative_directory{};
@@ -46,7 +47,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	auto config = Config{
 		.print_colors = true,
 		.verbose      = true,
-		.output       = Config::Output::PrintAST,
+		.output       = Config::Output::SemanticAnalysis,
 	};
 
 
@@ -150,7 +151,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	const evo::uint tokenizing_successful = source_manager.tokenize();
 
 	if(tokenizing_successful > 0){
-		printer.error( std::format("Failed to tokenize {} / {} files\n", tokenizing_successful, source_manager.numSources()) );
+		printer.error( std::format("Tokenizing failed for {} / {} files\n", tokenizing_successful, source_manager.numSources()) );
 		exit();
 		return 1;
 	}
@@ -177,7 +178,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	const evo::uint parsing_successful = source_manager.parse();
 
 	if(parsing_successful > 0){
-		printer.error( std::format("Failed to parse {} / {} files\n", parsing_successful, source_manager.numSources()) );
+		printer.error( std::format("Parsing failed for {} / {} files\n", parsing_successful, source_manager.numSources()) );
 
 		exit();
 		return 1;
@@ -192,6 +193,35 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	if(config.output == Config::Output::PrintAST){
 		if(config.verbose){ printer.trace("------------------------------\n"); }
 		printer.print_ast(source_manager.getSource(test_file_id));
+
+		exit();
+		return 0;
+	}
+
+
+	///////////////////////////////////
+	// semantic analysis
+
+	source_manager.initBuiltinTypes();
+
+
+	const evo::uint semantic_analysis_successful = source_manager.semanticAnalysis();
+
+	if(semantic_analysis_successful > 0){
+		printer.error( std::format("Semantic Analysis failed for {} / {} files\n", semantic_analysis_successful, source_manager.numSources()) );
+
+		exit();
+		return 1;
+	}
+
+
+	if(config.verbose){
+		printer.success("Semantic Analysis succeeded for all files\n");
+	}
+
+
+	if(config.output == Config::Output::SemanticAnalysis){
+		// Do nothing...
 
 		exit();
 		return 0;
