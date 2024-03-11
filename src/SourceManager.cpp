@@ -152,7 +152,7 @@ namespace panther{
 
 
 
-	auto SourceManager::getType(const object::Type& type) noexcept -> object::Type::ID {
+	auto SourceManager::getTypeID(const object::Type& type) noexcept -> object::Type::ID {
 		// find existing type
 		for(size_t i = 0; i < this->types.size(); i+=1){
 			const object::Type& type_ref = this->types[i];
@@ -166,6 +166,27 @@ namespace panther{
 		// create new type
 		this->types.emplace_back(type);
 		return object::Type::ID( uint32_t(this->types.size() - 1) );
+	};
+
+
+
+	auto SourceManager::printType(object::Type::ID id) const noexcept -> std::string {
+		const object::Type& type = this->getType(id);
+		const object::BaseType& base_type = this->base_types[type.base_type.id];
+
+
+		std::string base_type_str = [&]() noexcept {
+			if(base_type.is_builtin){
+				return Token::printKind(base_type.builtin);
+
+			}else{
+				// TODO:
+				EVO_FATAL_BREAK("Printing of non-builtin types are not supported yet");
+			}
+		}();
+		
+
+		return base_type_str;
 	};
 
 

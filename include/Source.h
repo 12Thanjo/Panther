@@ -64,6 +64,9 @@ namespace panther{
 			EVO_NODISCARD auto getLiteral(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getLiteral(const AST::Node& node) const noexcept -> const Token&;
 
+			EVO_NODISCARD auto getIdent(AST::Node::ID node_id) const noexcept -> const Token&;
+			EVO_NODISCARD auto getIdent(const AST::Node& node) const noexcept -> const Token&;
+
 
 
 
@@ -107,6 +110,8 @@ namespace panther{
 			auto error(const std::string& msg, Token::ID token_id) noexcept -> void;
 			auto error(const std::string& msg, const Token& token) noexcept -> void;
 			auto error(const std::string& msg, const Token& token, std::vector<Message::Info>&& infos) noexcept -> void;
+			auto error(const std::string& msg, AST::Node::ID node_id) noexcept -> void;
+			auto error(const std::string& msg, const AST::Node& node) noexcept -> void;
 			auto error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void;
 			auto error(const std::string& msg, Location location) noexcept -> void;
 			auto error(
@@ -136,6 +141,9 @@ namespace panther{
 			} objects;
 
 
+		private:
+			EVO_NODISCARD auto get_node_location(AST::Node::ID node_id) const noexcept -> Location;
+			EVO_NODISCARD auto get_node_location(const AST::Node& node) const noexcept -> Location;
 
 
 		private:

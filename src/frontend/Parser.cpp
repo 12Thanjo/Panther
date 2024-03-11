@@ -131,7 +131,14 @@ namespace panther{
 
 
 	auto Parser::parse_expr() noexcept -> Result {
-		return this->parse_literal();
+		Result result = this->parse_literal();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+		result = this->parse_ident();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+
+		return Result::WrongType;
 	};
 
 

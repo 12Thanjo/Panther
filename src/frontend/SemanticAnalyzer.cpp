@@ -47,52 +47,50 @@ namespace panther{
 		}
 
 
-		// check typing
+		///////////////////////////////////
+		// type checking
+
 		const AST::Type& type = this->source.getType(var_decl.type);
 		const Token& type_token = this->source.getToken(type.token);
 
-		const Token& literal_value = this->source.getLiteral(var_decl.expr);
 
-
-		if(type_token.kind == Token::TypeVoid){
-			this->source.error("Variable cannot be of type Void", type.token);
-			return false;
-
-		}else if(type_token.kind == Token::TypeInt){
-			if(literal_value.kind != Token::LiteralInt){
-				this->source.error(
-					std::format("Variable of type Int cannot be set to value of type [{}]", Token::printKind(literal_value.kind)),
-					literal_value
-				);
-
-				return false;
-			}
-
-
-		}else if(type_token.kind == Token::TypeBool){
-			if(literal_value.kind != Token::LiteralBool){
-				this->source.error(
-					std::format("Variable of type Bool cannot be set to value of type [{}]", Token::printKind(literal_value.kind)),
-					literal_value
-				);
-
-				return false;
-			}
-
-		}
-
-
-		// create object
-		
 		SourceManager& src_manager = this->source.getSourceManager();
 
-		const object::Type::ID var_type = src_manager.getType(
+		const object::Type::ID var_type_id = src_manager.getTypeID(
 			object::Type{
 				.base_type = src_manager.getBaseTypeID(type_token.kind),
 			}
 		);
 
-		const object::Var::ID var_id = this->source.createVar(ident_tok_id, var_type);
+		
+		if(type_token.kind == Token::TypeVoid){
+			this->source.error("Variable cannot be of type Void", type.token);
+			return false;
+
+		}else{
+
+			const std::optional<object::Type::ID> expr_type_id = this->get_type_of_expr(this->source.getNode(var_decl.expr));
+
+			if(expr_type_id.has_value() == false){ return false; }
+
+
+			if(var_type_id != *expr_type_id){
+				this->source.error(
+					std::format(
+						"Variable of type ({}) cannot be set to the value of an expression of type ({})", 
+						src_manager.printType(var_type_id), src_manager.printType(*expr_type_id)
+					),
+					var_decl.expr
+				);
+
+				return false;
+			}
+		}
+
+
+		///////////////////////////////////
+		// create object	
+		const object::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id);
 
 		this->add_var_to_scope(ident.value.string, var_id);
 
@@ -161,7 +159,56 @@ namespace panther{
 
 
 
+	auto SemanticAnalyzer::get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<object::Type::ID> {
+		SourceManager& src_manager = this->source.getSourceManager();
 
+
+		switch(node.kind){
+			case AST::Kind::Literal: {
+				const Token& literal_value = this->source.getLiteral(node);
+
+				const Token::Kind base_type = [&]() noexcept {
+					switch(literal_value.kind){
+						break; case Token::LiteralInt: return Token::TypeInt;
+						break; case Token::LiteralBool: return Token::TypeBool;
+					};
+
+					EVO_FATAL_BREAK("Unkonwn literal type");
+				}();
+
+
+
+				return src_manager.getTypeID(
+					object::Type{
+						.base_type = src_manager.getBaseTypeID(base_type),
+					}
+				);
+			} break;
+
+
+			case AST::Kind::Ident: {
+				const Token& ident = this->source.getIdent(node);
+				std::string_view ident_str = ident.value.string;
+
+				for(const Scope& scope : this->scopes){
+					if(scope.vars.contains(ident_str)){
+						const object::Var& var = this->source.getVar( scope.vars.at(ident_str) );
+						return var.type;
+
+					}else if(scope.funcs.contains(ident_str)){
+						this->source.error("At this time, functions cannot used be expressions", node);
+						return std::nullopt;
+					}
+				}
+
+
+				this->source.error(std::format("Identifier \"{}\" is undefined", ident_str), node);
+				return std::nullopt;
+			} break;
+		};
+
+		EVO_FATAL_BREAK("Unknwon expr type");
+	};
 
 
 
@@ -184,6 +231,7 @@ namespace panther{
 	auto SemanticAnalyzer::add_func_to_scope(std::string_view str, object::Func::ID id) noexcept -> void {
 		this->scopes.back().funcs.emplace(str, id);
 	};
+
 
 
 	auto SemanticAnalyzer::has_in_scope(std::string_view ident) const noexcept -> bool {

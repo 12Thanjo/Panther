@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.6.0
+- Added identifier expressions
+
 ### v0.5.0
 - Added parsing and semantic analysis of functions
 

@@ -79,8 +79,14 @@ namespace panther{
 			// gets type with matching ID
 			// if type doesn't already exist, create a new one
 			// TODO: &&
-			EVO_NODISCARD auto getType(const object::Type& type) noexcept -> object::Type::ID;
+			EVO_NODISCARD auto getTypeID(const object::Type& type) noexcept -> object::Type::ID;
 
+			EVO_NODISCARD inline auto getType(object::Type::ID id) const noexcept -> const object::Type& {
+				return this->types[id.id];
+			};
+
+
+			EVO_NODISCARD auto printType(object::Type::ID id) const noexcept -> std::string;
 
 
 

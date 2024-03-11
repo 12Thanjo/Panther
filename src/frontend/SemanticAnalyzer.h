@@ -28,6 +28,10 @@ namespace panther{
 			EVO_NODISCARD auto analyze_func(const AST::Func& func) noexcept -> bool;
 			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
 
+			// also analyzes the expr
+			// returns nullopt if error occurs
+			EVO_NODISCARD auto get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<object::Type::ID>;
+
 
 			struct Scope{
 				std::unordered_map<std::string_view, object::Var::ID> vars{};
@@ -42,6 +46,7 @@ namespace panther{
 
 			auto add_var_to_scope(std::string_view str, object::Var::ID id) noexcept -> void;
 			auto add_func_to_scope(std::string_view str, object::Func::ID id) noexcept -> void;
+
 
 
 			auto has_in_scope(std::string_view ident) const noexcept -> bool;

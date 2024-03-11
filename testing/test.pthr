@@ -1,11 +1,6 @@
 
 var foo: Int = 12;
-var bar: Bool = false;
+var bar: Bool = foo;
 
-
-
-func test = () -> Void {
-	var asdf: Int = 12;
-}
 
 

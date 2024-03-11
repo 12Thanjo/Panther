@@ -85,6 +85,14 @@ namespace panther{
 		return this->getToken(node.token);
 	};
 
+	auto Source::getIdent(AST::Node::ID node_id) const noexcept -> const Token& {
+		return this->getIdent(this->getNode(node_id));
+	};
+	auto Source::getIdent(const AST::Node& node) const noexcept -> const Token& {
+		evo::debugAssert(node.kind == AST::Kind::Ident, "Node is not a Ident");
+		return this->getToken(node.token);
+	};
+
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -146,6 +154,14 @@ namespace panther{
 		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
 	};
 
+	auto Source::error(const std::string& msg, AST::Node::ID node_id) noexcept -> void {
+		this->error(msg, this->get_node_location(node_id), std::vector<Message::Info>{});
+	};
+
+	auto Source::error(const std::string& msg, const AST::Node& node) noexcept -> void {
+		this->error(msg, this->get_node_location(node), std::vector<Message::Info>{});
+	};
+
 	auto Source::error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void {
 		this->error(msg, Location{line, collumn, collumn}, std::move(infos));
 	};
@@ -171,6 +187,55 @@ namespace panther{
 
 		this->source_manager.emitMessage(message);
 	};
+
+
+
+	auto Source::get_node_location(AST::Node::ID node_id) const noexcept -> Location {
+		return this->get_node_location(this->getNode(node_id));
+	};
+
+
+
+
+	auto Source::get_node_location(const AST::Node& node) const noexcept -> Location {
+		switch(node.kind){
+			case AST::Kind::VarDecl: {
+				const AST::VarDecl& var_decl = this->getVarDecl(node);
+				return this->get_node_location(var_decl.ident);
+			} break;
+
+			case AST::Kind::Func: {
+				const AST::Func& func = this->getFunc(node);
+				return this->get_node_location(func.ident);
+			} break;
+
+			
+			case AST::Kind::Type: {
+				const AST::Type& type = this->getType(node);
+				const Token& token = this->getToken(type.token);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
+			} break;
+
+			case AST::Kind::Block: {
+				EVO_FATAL_BREAK("Cannot get location of Block");
+			} break;
+
+
+			case AST::Kind::Ident: {
+				const Token& token = this->getIdent(node);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
+			} break;
+
+			case AST::Kind::Literal: {
+				const Token& token = this->getLiteral(node);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
+			} break;
+
+		};
+
+		EVO_FATAL_BREAK("Unknwon node type");
+	};
+
 
 	
 };

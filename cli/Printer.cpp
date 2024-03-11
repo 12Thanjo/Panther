@@ -350,7 +350,8 @@ namespace panther{
 			const AST::Type& type = source.getType(node);
 
 			this->indenter_print();
-			this->debug( std::format("{}\n", Token::printKind(source.getToken(type.token).kind)) );
+			this->debug( std::format("{} ", Token::printKind(source.getToken(type.token).kind)) );
+			this->trace("[BUILTIN]\n");
 		};
 
 		auto Printer::print_block(const Source& source, const AST::Node& node) noexcept -> void {
@@ -381,6 +382,10 @@ namespace panther{
 		auto Printer::print_expr(const Source& source, const AST::Node& node) noexcept -> void {
 			switch(node.kind){
 				break; case AST::Kind::Literal: this->print_literal(source, node);
+				break; case AST::Kind::Ident: {
+					this->indenter_print();
+					this->debug( std::format("{}\n", source.getToken(node.token).value.string) );
+				} break;
 
 				break; default: EVO_FATAL_BREAK("Node is not an expr");
 			};
