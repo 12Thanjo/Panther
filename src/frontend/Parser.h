@@ -58,11 +58,12 @@ namespace panther{
 
 
 			EVO_NODISCARD auto parse_stmt() noexcept -> Result;
-
 			EVO_NODISCARD auto parse_var_decl() noexcept -> Result;
-			EVO_NODISCARD auto parse_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_func() noexcept -> Result;
 
+			EVO_NODISCARD auto parse_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
+			EVO_NODISCARD auto parse_block() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_literal() noexcept -> Result;
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
@@ -93,12 +94,16 @@ namespace panther{
 			///////////////////////////////////
 			// messaging
 
-			auto expected_but_got(evo::CStrProxy msg, Token::ID token_id) noexcept -> void;
-			auto expected_but_got(evo::CStrProxy msg) noexcept -> void {
+			auto expect_token(Token::Kind kind, evo::CStrProxy location) noexcept -> bool; // returns if got punctuation
+
+			auto expected_but_got(evo::CStrProxy msg, Token::ID token_id) const noexcept -> void;
+			auto expected_but_got(evo::CStrProxy msg) const noexcept -> void {
 				this->expected_but_got(msg, this->peek());
 			};
 
-			auto expect_token(Token::Kind kind, evo::CStrProxy location) noexcept -> bool; // returns if got punctuation
+
+			EVO_NODISCARD auto check_result_fail(const Result& result, evo::CStrProxy msg) const noexcept -> bool;
+			
 
 
 
@@ -128,7 +133,7 @@ namespace panther{
 
 			EVO_NODISCARD inline auto skip(uint32_t skip_ammount) noexcept -> void {
 				evo::debugAssert(skip_ammount > 0, "skip ammount should be more than 0");
-				evo::debugAssert(size_t(this->cursor + skip_ammount) < this->source.tokens.size(), "cannot skip past end of tokens");
+				evo::debugAssert(size_t(this->cursor + skip_ammount) <= this->source.tokens.size(), "cannot skip past end of tokens");
 
 				this->cursor += ptrdiff_t(skip_ammount);
 			};

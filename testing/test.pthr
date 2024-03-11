@@ -1,4 +1,11 @@
 
 var foo: Int = 12;
-var foo: Bool = false;
+var bar: Bool = false;
+
+
+
+func test = () -> Void {
+	var asdf: Int = 12;
+}
+
 

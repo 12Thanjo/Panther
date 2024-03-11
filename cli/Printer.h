@@ -48,8 +48,10 @@ namespace panther{
 
 				auto print_stmt(const Source& source, const AST::Node& node_id) noexcept -> void;
 				auto print_var_decl(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_func(const Source& source, const AST::Node& node_id) noexcept -> void;
 
 				auto print_type(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_block(const Source& source, const AST::Node& node_id) noexcept -> void;
 
 				auto print_expr(const Source& source, const AST::Node& node_id) noexcept -> void;
 

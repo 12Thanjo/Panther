@@ -84,35 +84,12 @@ namespace panther{
 
 
 
-			struct GlobalVarID{ // typesafe identifier
-				uint32_t id;
-				explicit GlobalVarID(uint32_t _id) noexcept : id(_id) {};
-			};
-
-
-			template<typename... Args>
-			EVO_NODISCARD inline auto createGlobalVar(Args... args) noexcept -> GlobalVarID {
-				evo::debugAssert(this->isLocked(), "Can only add global variables when locked");
-
-				this->global_vars.emplace_back(args...);
-
-				return GlobalVarID( uint32_t(this->global_vars.size() - 1) );
-			};
-
-
-			EVO_NODISCARD inline auto getGlobalVar(GlobalVarID id) const noexcept -> const object::Var& {
-				evo::debugAssert(this->isLocked(), "Can only get global variables when locked");
-				return this->global_vars[size_t(id.id)];
-			};
-
-
 		private:
 			std::vector<Source> sources{};
 			bool is_locked = false;
 
 			std::vector<object::BaseType> base_types{};
 			std::vector<object::Type> types{};
-			std::vector<object::Var> global_vars{};
 
 
 			MessageCallback message_callback;

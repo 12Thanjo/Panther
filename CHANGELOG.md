@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.5.0
+- Added parsing and semantic analysis of functions
+
 ### v0.4.1
 - Added messaging for location of variable already defined (when trying to use the sane identifier)
 

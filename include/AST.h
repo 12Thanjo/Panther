@@ -8,7 +8,10 @@ namespace panther{
 
 		enum class Kind{
 			VarDecl,
+			Func,
+			
 			Type,
+			Block,
 
 			// tokens
 			Ident,
@@ -42,11 +45,21 @@ namespace panther{
 		};
 
 
+		struct Func{
+			Node::ID ident;
+			Node::ID return_type;
+			Node::ID block;
+		};
+
+
 		struct Type{
 			Token::ID token;
 		};
-		
 
+		struct Block{
+			std::vector<Node::ID> nodes;
+		};
+	
 
 	};
 };

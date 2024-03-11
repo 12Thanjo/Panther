@@ -6,6 +6,7 @@
 #include "./Token.h"
 #include "./AST.h"
 #include "Message.h"
+#include "objects.h"
 
 
 namespace panther{
@@ -20,14 +21,14 @@ namespace panther{
 
 		public:
 			// TODO: other permutations of refs
-			Source(const std::string& src_location, std::string&& src_data, class SourceManager& src_manager, ID src_id)
-				: src_location(src_location), data(std::move(src_data)), source_manager(src_manager), id(src_id) {};
+			Source(const std::string& src_location, std::string&& src_data, class SourceManager& src_manager, ID id)
+				: src_location(src_location), data(std::move(src_data)), source_manager(src_manager), src_id(id) {};
 
 
 			EVO_NODISCARD inline auto getLocation() const noexcept -> const std::string& { return this->src_location; };
 			EVO_NODISCARD inline auto getData() const noexcept -> const std::string& { return this->data; };
 			EVO_NODISCARD inline auto getSourceManager() noexcept -> SourceManager& { return this->source_manager; };
-			EVO_NODISCARD inline auto getID() const noexcept -> ID { return this->id; };
+			EVO_NODISCARD inline auto getID() const noexcept -> ID { return this->src_id; };
 
 			// returns true if successful (no errors)
 			EVO_NODISCARD auto tokenize() noexcept -> bool;
@@ -49,12 +50,50 @@ namespace panther{
 			EVO_NODISCARD auto getVarDecl(AST::Node::ID node_id) const noexcept -> const AST::VarDecl&;
 			EVO_NODISCARD auto getVarDecl(const AST::Node& node) const noexcept -> const AST::VarDecl&;
 
+			EVO_NODISCARD auto getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func&;
+			EVO_NODISCARD auto getFunc(const AST::Node& node) const noexcept -> const AST::Func&;
+
+
 			EVO_NODISCARD auto getType(AST::Node::ID node_id) const noexcept -> const AST::Type&;
 			EVO_NODISCARD auto getType(const AST::Node& node) const noexcept -> const AST::Type&;
+
+			EVO_NODISCARD auto getBlock(AST::Node::ID node_id) const noexcept -> const AST::Block&;
+			EVO_NODISCARD auto getBlock(const AST::Node& node) const noexcept -> const AST::Block&;
 
 
 			EVO_NODISCARD auto getLiteral(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getLiteral(const AST::Node& node) const noexcept -> const Token&;
+
+
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createVar(Args... args) noexcept -> object::Var::ID {
+				this->objects.vars.emplace_back(args...);
+
+				return object::Var::ID( uint32_t(this->objects.vars.size() - 1) );
+			};
+
+
+			EVO_NODISCARD inline auto getVar(object::Var::ID id) const noexcept -> const object::Var& {
+				return this->objects.vars[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createFunc(Args... args) noexcept -> object::Func::ID {
+				this->objects.funcs.emplace_back(args...);
+
+				return object::Func::ID( uint32_t(this->objects.funcs.size() - 1) );
+			};
+
+
+			EVO_NODISCARD inline auto getFunc(object::Func::ID id) const noexcept -> const object::Func& {
+				return this->objects.funcs[size_t(id.id)];
+			};
+
 
 
 			///////////////////////////////////
@@ -85,13 +124,24 @@ namespace panther{
 			std::vector<AST::Node::ID> global_stmts{};
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
+			std::vector<AST::Func> funcs{};
 			std::vector<AST::Type> types{};
+			std::vector<AST::Block> blocks{};
+
+
+
+			struct /* objects */ {
+				std::vector<object::Var> vars{};
+				std::vector<object::Func> funcs{};
+			} objects;
+
+
 
 
 		private:
 			std::string src_location; 
 			std::string data;
-			ID id;
+			ID src_id;
 			class SourceManager& source_manager;
 
 			bool has_errored = false;

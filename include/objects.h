@@ -4,9 +4,11 @@
 #include <Evo.h>
 
 #include "Token.h"
-#include "Source.h"
+
 
 namespace panther{
+	class Source;
+
 	namespace object{
 		
 
@@ -48,13 +50,28 @@ namespace panther{
 
 
 		struct Var{
-			Source::ID source_id;
+			struct ID{ // typesafe identifier
+				uint32_t id;
+				explicit ID(uint32_t _id) noexcept : id(_id) {};
+			};
+
 
 			Token::ID ident;
 			Type::ID type;
 		};
 
 
+
+		struct Func{
+			struct ID{ // typesafe identifier
+				uint32_t id;
+				explicit ID(uint32_t _id) noexcept : id(_id) {};
+			};
+
+
+			Token::ID ident;
+			// Type::ID return_type;
+		};
 
 
 	};

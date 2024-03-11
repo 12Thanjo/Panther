@@ -15,7 +15,7 @@ namespace panther{
 				} break;
 
 				case Result::WrongType: {
-					this->source.error("Failed to parse global statement", this->peek());
+					this->source.error("Unknown beginning to statement or unknown statement type", this->peek());
 					return false;
 				} break;
 
@@ -32,6 +32,11 @@ namespace panther{
 		Result result;
 
 		result = this->parse_var_decl();
+		if(result.code() == Result::Success || result.code() == Result::Error){
+			return result;
+		}
+
+		result = this->parse_func();
 		if(result.code() == Result::Success || result.code() == Result::Error){
 			return result;
 		}
@@ -54,37 +59,21 @@ namespace panther{
 
 		// ident
 		const Result ident = this->parse_ident();
-		if(ident.code() == Result::Error){ return Result::Error; }
-		else if(ident.code() == Result::WrongType){
-			this->expected_but_got("identifier in variable declaration");
-			return Result::Error;
-		}
-
+		if(this->check_result_fail(ident, "identifier in variable declaration")){ return Result::Error; }
 
 		// :
 		if(this->expect_token(Token::get(":"), "in variable declaration") == false){ return Result::Error; }
 
-
-
 		// type
 		const Result type = this->parse_type();
-		if(type.code() == Result::Error){ return Result::Error; }
-		else if(type.code() == Result::WrongType){
-			this->expected_but_got("type in variable declaration");
-			return Result::Error;
-		}
+		if(this->check_result_fail(type, "type in variable declaration")){ return Result::Error; }
 
 		// =
 		if(this->expect_token(Token::get("="), "in variable declaration") == false){ return Result::Error; }
 
-
 		// expr
 		const Result expr = this->parse_expr();
-		if(expr.code() == Result::Error){ return Result::Error; }
-		else if(expr.code() == Result::WrongType){
-			this->expected_but_got("expr in variable declaration");
-			return Result::Error;
-		}
+		if(this->check_result_fail(expr, "expr in variable declaration")){ return Result::Error; }
 
 		// ;
 		if(this->expect_token(Token::get(";"), "at end of variable declaration") == false){ return Result::Error; }
@@ -95,6 +84,48 @@ namespace panther{
 			ident.value(), type.value(), expr.value()
 		);
 	};
+
+
+
+	auto Parser::parse_func() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordFunc){
+			return Result::WrongType;
+		}
+
+		this->skip(1);
+
+
+		// ident
+		const Result ident = this->parse_ident();
+		if(this->check_result_fail(ident, "identifier in function declaration")){ return Result::Error; }
+
+		// =
+		if(this->expect_token(Token::get("="), "in function declaration") == false){ return Result::Error; }
+
+		// (
+		if(this->expect_token(Token::get("("), "in function declaration") == false){ return Result::Error; }
+
+		// )
+		if(this->expect_token(Token::get(")"), "in function declaration") == false){ return Result::Error; }
+
+		// ->
+		if(this->expect_token(Token::get("->"), "in function declaration") == false){ return Result::Error; }
+
+		// return type
+		const Result return_type = this->parse_type();
+		if(this->check_result_fail(return_type, "return type in function declaration")){ return Result::Error; }
+
+		
+		const Result block = this->parse_block();
+		if(this->check_result_fail(block, "statement block in function declaration")){ return Result::Error; }
+
+
+		return this->create_node(
+			this->source.funcs, AST::Kind::Func,
+			ident.value(), return_type.value(), block.value()
+		);
+	};
+
 
 
 
@@ -126,6 +157,39 @@ namespace panther{
 		return this->create_node(
 			this->source.types, AST::Kind::Type,
 			base_type
+		);
+	};
+
+
+
+	auto Parser::parse_block() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::get("{")){
+			return Result::WrongType;
+		}
+
+		this->skip(1);
+
+		auto statements = std::vector<AST::Node::ID>();
+
+
+
+		while(true){
+			if(this->get(this->peek()).kind == Token::get("}")){
+				this->skip(1);
+				break;
+			}
+
+			const Result stmt = this->parse_stmt();
+			if(this->check_result_fail(stmt, "statement in statement block")){ return Result::Error; }
+
+			statements.push_back(stmt.value());
+		};
+
+
+
+		return this->create_node(
+			this->source.blocks, AST::Kind::Block,
+			std::move(statements)
 		);
 	};
 
@@ -174,9 +238,22 @@ namespace panther{
 	};
 
 
-	auto Parser::expected_but_got(evo::CStrProxy msg, Token::ID token_id) noexcept -> void {
+	auto Parser::expected_but_got(evo::CStrProxy msg, Token::ID token_id) const noexcept -> void {
 		const Token& token = this->get(token_id);
 		this->source.error(std::format("Expected {} - got [{}] instead.", msg.data(), Token::printKind(token.kind)), token_id);
+	};
+
+
+
+
+	auto Parser::check_result_fail(const Result& result, evo::CStrProxy msg) const noexcept -> bool {
+		if(result.code() == Result::Error){ return true; }
+		else if(result.code() == Result::WrongType){
+			this->expected_but_got(msg);
+			return true;
+		}
+
+		return false;
 	};
 
 

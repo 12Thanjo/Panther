@@ -204,6 +204,7 @@ namespace panther{
 
 		// length 2
 		if(is_op("==")){ set_op("=="); return true; }
+		if(is_op("->")){ set_op("->"); return true; }
 
 		// length 1
 		if(is_op("=")){ set_op("="); return true; }

@@ -52,9 +52,11 @@ namespace panther{
 			///////////////////////////////////
 			// operators
 			
-			Assign,
+			Equal, // =
 
-			LogicalEquals,
+			DoubleEqual, // ==
+
+			RightArrow, // ->
 
 
 			///////////////////////////////////
@@ -138,10 +140,11 @@ namespace panther{
 			// operators
 
 			// length 2
-			if(is_token("==")){ return Token::LogicalEquals; }
+			if(is_token("==")){ return Token::DoubleEqual; }
+			if(is_token("->")){ return Token::RightArrow; }
 
 			// length 1
-			if(is_token("=")){ return Token::Assign; }
+			if(is_token("=")){ return Token::Equal; }
 			if(is_token("(")){ return Token::OpenParen; }
 			if(is_token(")")){ return Token::CloseParen; }
 			if(is_token("[")){ return Token::OpenBracket; }
@@ -195,9 +198,11 @@ namespace panther{
 				///////////////////////////////////
 				// operators
 				
-				break; case Kind::Assign: return "=";
+				break; case Kind::Equal: return "=";
 
-				break; case Kind::LogicalEquals: return "==";
+				break; case Kind::DoubleEqual: return "==";
+
+				break; case Kind::RightArrow: return "->";
 
 
 				///////////////////////////////////

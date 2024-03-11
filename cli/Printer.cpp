@@ -269,6 +269,9 @@ namespace panther{
 		auto Printer::print_stmt(const Source& source, const AST::Node& node) noexcept -> void {
 			switch(node.kind){
 				break; case AST::Kind::VarDecl: this->print_var_decl(source, node);
+				break; case AST::Kind::Func: this->print_func(source, node);
+
+				break; default: EVO_FATAL_BREAK("Unknown stmt type");
 			};
 		};
 
@@ -307,6 +310,41 @@ namespace panther{
 		};
 
 
+		auto Printer::print_func(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::Func& func = source.getFunc(node);
+
+			this->indenter_print();
+			this->info("Func:\n");
+			this->indenter_push();
+
+			this->indenter_print();
+			this->info("Ident: ");
+			this->debug( std::format("{}\n", source.getToken(source.getNode(func.ident).token).value.string) );
+
+
+			this->indenter_set_arrow();
+			this->indenter_print();
+			this->info("Return Type:\n");
+			this->indenter_push();
+			this->indenter_set_end();
+				this->print_type(source, source.getNode(func.return_type));
+			this->indenter_pop();
+
+
+			this->indenter_set_end();
+			this->indenter_print();
+			this->info("Block:\n");
+			this->indenter_push();
+			this->indenter_set_end();
+				this->print_block(source, source.getNode(func.block));
+			this->indenter_pop();
+
+
+
+			this->indenter_pop();
+		};
+
+
 
 		auto Printer::print_type(const Source& source, const AST::Node& node) noexcept -> void {
 			const AST::Type& type = source.getType(node);
@@ -314,6 +352,30 @@ namespace panther{
 			this->indenter_print();
 			this->debug( std::format("{}\n", Token::printKind(source.getToken(type.token).kind)) );
 		};
+
+		auto Printer::print_block(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::Block& block = source.getBlock(node);
+
+			if(block.nodes.empty()){
+				this->indenter_set_end();
+				this->indenter_print();
+				this->debug("[EMPTY]\n");
+				return;
+			}
+
+			for(int i = 0; i < block.nodes.size(); i+=1){
+				AST::Node::ID stmt = block.nodes[i];
+
+				if(i < block.nodes.size() - 1){
+					this->indenter_set_arrow();
+				}else{
+					this->indenter_set_end();
+				}
+
+				this->print_stmt(source, source.getNode(stmt));
+			}
+		};
+
 
 
 		auto Printer::print_expr(const Source& source, const AST::Node& node) noexcept -> void {

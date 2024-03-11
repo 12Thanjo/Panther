@@ -34,7 +34,6 @@ namespace panther{
 	auto Source::getNode(AST::Node::ID node_id) const noexcept -> const AST::Node& {
 		return this->nodes[node_id.id];
 	};
-
 	auto Source::getToken(Token::ID token_id) const noexcept -> const Token& {
 		return this->tokens[token_id.id];
 	};
@@ -44,10 +43,18 @@ namespace panther{
 	auto Source::getVarDecl(AST::Node::ID node_id) const noexcept -> const AST::VarDecl& {
 		return this->getVarDecl(this->getNode(node_id));
 	};
-
 	auto Source::getVarDecl(const AST::Node& node) const noexcept -> const AST::VarDecl& {
 		evo::debugAssert(node.kind == AST::Kind::VarDecl, "Node is not a VarDecl");
 		return this->var_decls[node.index];
+	};
+
+
+	auto Source::getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func& {
+		return this->getFunc(this->getNode(node_id));
+	};
+	auto Source::getFunc(const AST::Node& node) const noexcept -> const AST::Func& {
+		evo::debugAssert(node.kind == AST::Kind::Func, "Node is not a Func");
+		return this->funcs[node.index];
 	};
 
 
@@ -55,18 +62,24 @@ namespace panther{
 	auto Source::getType(AST::Node::ID node_id) const noexcept -> const AST::Type& {
 		return this->getType(this->getNode(node_id));
 	};
-
 	auto Source::getType(const AST::Node& node) const noexcept -> const AST::Type& {
 		evo::debugAssert(node.kind == AST::Kind::Type, "Node is not a Type");
 		return this->types[node.index];
 	};
 
 
+	auto Source::getBlock(AST::Node::ID node_id) const noexcept -> const AST::Block& {
+		return this->getBlock(this->getNode(node_id));
+	};
+	auto Source::getBlock(const AST::Node& node) const noexcept -> const AST::Block& {
+		evo::debugAssert(node.kind == AST::Kind::Block, "Node is not a Block");
+		return this->blocks[node.index];
+	};
+
 
 	auto Source::getLiteral(AST::Node::ID node_id) const noexcept -> const Token& {
 		return this->getLiteral(this->getNode(node_id));
 	};
-
 	auto Source::getLiteral(const AST::Node& node) const noexcept -> const Token& {
 		evo::debugAssert(node.kind == AST::Kind::Literal, "Node is not a Literal");
 		return this->getToken(node.token);
