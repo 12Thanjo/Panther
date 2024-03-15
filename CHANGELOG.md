@@ -1,5 +1,10 @@
 # Changelog
 
+# v0.9.0
+- Added return statements
+- Added `#extern` function attribute
+- Added tokenizing of intrinsics
+
 ### v0.8.0
 - Made global variables have private linkage
 - Semantic Ananlysis now catches setting global variables to variables with value uninit

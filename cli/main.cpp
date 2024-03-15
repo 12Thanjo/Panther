@@ -64,7 +64,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		.name		  = "testing",
 		.print_colors = true,
 		.verbose      = true,
-		.target       = Config::Target::PrintLLVMIR,
+		.target       = Config::Target::Run,
 	};
 
 
@@ -346,11 +346,13 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		return 0;
 
 	}else if(config.target == Config::Target::Run){
-		if(config.verbose){ printer.trace("------------------------------\nRunning:\n\n"); }
+		if(config.verbose){ printer.trace("------------------------------\nRunning:\n"); }
 
-		objects_to_ir.run("main");
+		uint64_t return_code = objects_to_ir.run<uint64_t>("main");
 
-		if(config.verbose){ printer.trace("------------------------------\nCompleted Running\n"); }
+		// if(config.verbose){ printer.trace("------------------------------\n"); }
+
+		printer.info(std::format("Return Code: {}\n", return_code));
 
 		objects_to_ir.shutdown();
 

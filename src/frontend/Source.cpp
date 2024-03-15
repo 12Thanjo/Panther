@@ -58,6 +58,15 @@ namespace panther{
 	};
 
 
+	auto Source::getReturn(AST::Node::ID node_id) const noexcept -> const AST::Return& {
+		return this->getReturn(this->getNode(node_id));
+	};
+	auto Source::getReturn(const AST::Node& node) const noexcept -> const AST::Return& {
+		evo::debugAssert(node.kind == AST::Kind::Return, "Node is not a Return");
+		return this->returns[node.index];
+	};
+
+
 
 	auto Source::getType(AST::Node::ID node_id) const noexcept -> const AST::Type& {
 		return this->getType(this->getNode(node_id));

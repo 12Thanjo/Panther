@@ -144,6 +144,8 @@ namespace panther{
 
 				switch(token.kind){
 					break; case Token::Ident: this->debug( std::format(" \"{}\"", token.value.string) );
+					break; case Token::Intrinsic: this->debug( std::format(" \"@{}\"", token.value.string) );
+					break; case Token::Attribute: this->debug( std::format(" \"#{}\"", token.value.string) );
 
 					break; case Token::LiteralBool: this->debug( std::format(" \"{}\"", token.value.boolean) );
 					break; case Token::LiteralInt: this->debug( std::format(" \"{}\"", token.value.integer) );
@@ -270,6 +272,7 @@ namespace panther{
 			switch(node.kind){
 				break; case AST::Kind::VarDecl: this->print_var_decl(source, node);
 				break; case AST::Kind::Func: this->print_func(source, node);
+				break; case AST::Kind::Return: this->print_return(source, node);
 
 				break; default: EVO_FATAL_BREAK("Unknown stmt type");
 			};
@@ -322,6 +325,30 @@ namespace panther{
 			this->debug( std::format("{}\n", source.getToken(source.getNode(func.ident).token).value.string) );
 
 
+			this->indenter_print();
+			if(func.attributes.empty()){
+				this->info("Attributes: ");
+				this->debug("[None]\n");
+			}else{
+				this->info("Attributes:\n");
+
+				this->indenter_push();
+				for(size_t i = 0; i < func.attributes.size(); i+=1){
+					if(i < func.attributes.size() - 1){
+						this->indenter_set_arrow();
+					}else{
+						this->indenter_set_end();
+					}
+
+					this->indenter_print();
+
+					this->debug( std::format("#{}\n", source.getToken(func.attributes[i]).value.string) );
+				}
+				this->indenter_pop();
+			}
+
+
+
 			this->indenter_set_arrow();
 			this->indenter_print();
 			this->info("Return Type:\n");
@@ -343,6 +370,28 @@ namespace panther{
 
 			this->indenter_pop();
 		};
+
+
+		auto Printer::print_return(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::Return& return_stmt = source.getReturn(node);
+
+			this->indenter_print();
+
+			if(return_stmt.value.has_value()){
+				this->info("Return:\n");
+				this->indenter_push();
+				this->indenter_set_end();
+					this->print_expr(source, source.getNode(*return_stmt.value));
+				this->indenter_pop();
+
+			}else{
+				this->info("Return: ");
+				this->debug("[NONE]\n");
+			}
+
+		};
+
+
 
 
 

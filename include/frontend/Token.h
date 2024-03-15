@@ -21,7 +21,8 @@ namespace panther{
 			None, // for use as an optional
 
 			Ident,
-
+			Attribute,
+			Intrinsic,
 
 			///////////////////////////////////
 			// literals
@@ -47,6 +48,8 @@ namespace panther{
 
 			KeywordVar,
 			KeywordFunc,
+
+			KeywordReturn,
 
 			KeywordUninit,
 
@@ -174,6 +177,8 @@ namespace panther{
 				break; case Kind::None: evo::unreachable(); return "{{ERROR}}";
 
 				break; case Kind::Ident: return "Ident";
+				break; case Kind::Intrinsic: return "Intrinsic";
+				break; case Kind::Attribute: return "Attribute";
 
 
 				///////////////////////////////////
@@ -198,6 +203,8 @@ namespace panther{
 
 				break; case Kind::KeywordVar: return "var";
 				break; case Kind::KeywordFunc: return "func";
+
+				break; case Kind::KeywordReturn: return "return";
 
 				break; case Kind::KeywordUninit: return "uninit";
 

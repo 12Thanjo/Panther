@@ -89,6 +89,18 @@ namespace panther{
 				llvm::AllocaInst* alloca;
 			} llvm;
 			bool is_alloca = false;
+
+			EVO_NODISCARD inline auto isGlobal() const noexcept -> bool { return !this->is_alloca; };
+		};
+
+
+		struct Return{
+			struct ID{ // typesafe identifier
+				uint32_t id;
+				explicit ID(uint32_t _id) noexcept : id(_id) {};
+			};
+
+			std::optional<Expr> value;
 		};
 
 
@@ -97,13 +109,16 @@ namespace panther{
 		struct Stmt{
 			enum class Kind{
 				Var,
+				Return,
 			} kind;
 
 			union {
 				Var::ID var;
+				Return::ID ret;
 			};
 
 			Stmt(Var::ID id) : kind(Kind::Var), var(id) {};
+			Stmt(Return::ID id) : kind(Kind::Return), ret(id) {};
 		};
 
 
@@ -115,10 +130,14 @@ namespace panther{
 
 
 			Token::ID ident;
-			// Type::ID return_type;
+			std::optional<Type::ID> return_type; // nullopt means Void
+
+			bool is_export;
 
 			llvm::Function* llvm_func = nullptr;
 			std::vector<Stmt> stmts{};
+
+			bool returns = false;
 		};
 
 

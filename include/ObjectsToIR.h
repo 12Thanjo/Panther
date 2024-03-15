@@ -97,8 +97,20 @@ namespace panther{
 			EVO_NODISCARD inline auto isInitialized() const noexcept -> bool { return this->builder != nullptr; };
 
 
+			template<typename ReturnType>
+			EVO_NODISCARD inline auto run(std::string_view func_name) noexcept -> ReturnType {
+				auto execution_engine = llvmint::ExecutionEngine();
+				execution_engine.createEngine(*this->module);
 
-			auto run(std::string_view func_name) noexcept -> void {
+				const ReturnType output = execution_engine.runFunction<ReturnType>(func_name);
+
+				execution_engine.shutdownEngine();
+
+				return output;
+			};
+
+			template<>
+			inline auto run<void>(std::string_view func_name) noexcept -> void {
 				auto execution_engine = llvmint::ExecutionEngine();
 				execution_engine.createEngine(*this->module);
 
@@ -138,7 +150,15 @@ namespace panther{
 			inline auto lower_func(Source& source, object::Func& func) noexcept -> void {
 				const std::string mangled_name = ObjectsToIR::mangle_name(source, func);
 
-				llvm::FunctionType* prototype = this->builder->getFuncProto(this->builder->getTypeVoid(), {}, false);
+				llvm::Type* return_type = this->builder->getTypeVoid();
+				if(func.return_type.has_value()){
+					const SourceManager& source_manager = source.getSourceManager();
+					const object::Type& return_type_obj = source_manager.getType(*func.return_type);
+					return_type = this->get_type(source_manager, return_type_obj);
+				}
+
+
+				llvm::FunctionType* prototype = this->builder->getFuncProto(return_type, {}, false);
 				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, llvmint::LinkageTypes::ExternalLinkage);
 
 				func.llvm_func = llvm_func;
@@ -151,11 +171,15 @@ namespace panther{
 				for(const object::Stmt& stmt : func.stmts){
 					switch(stmt.kind){
 						break; case object::Stmt::Kind::Var: this->lower_var(source, source.getVar(stmt.var));
+						break; case object::Stmt::Kind::Return: this->lower_return(source, source.getReturn(stmt.ret));
 						break; default: EVO_FATAL_BREAK("Unknown object::Stmt::Kind");
 					};
 				}
 
-				this->builder->createRet();
+
+				if(func.returns == false){
+					this->builder->createRet();
+				}
 			};
 
 
@@ -174,7 +198,6 @@ namespace panther{
 				var.is_alloca = true;
 
 
-
 				if(var.value.kind == object::Expr::Kind::ASTNode){
 					const AST::Node& var_value_node = source.getNode(var.value.ast_node);
 					if(var_value_node.kind != AST::Kind::Uninit){
@@ -185,6 +208,16 @@ namespace panther{
 					this->builder->createStore(alloca_val, this->get_value(source, var.value), false);
 				}
 
+			};
+
+
+			inline auto lower_return(Source& source, object::Return& ret) noexcept -> void {
+				if(ret.value.has_value()){
+					this->builder->createRet(this->get_value(source, *ret.value));
+
+				}else{
+					this->builder->createRet();
+				}
 			};
 
 
@@ -245,9 +278,11 @@ namespace panther{
 				}else if(value.kind == object::Expr::Kind::Var){
 					const object::Var& var = source.getVar(value.var);
 					if(var.is_alloca){
-						return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca));
 					}else{
-						return var.llvm.value;
+						const SourceManager& source_manager = source.getSourceManager();
+						llvm::Type* var_type = this->get_type(source_manager, source_manager.getType(var.type));
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.value, var_type));
 					}
 				}
 
@@ -260,13 +295,19 @@ namespace panther{
 
 			EVO_NODISCARD inline static auto mangle_name(const Source& source, const object::Func& func) noexcept -> std::string {
 				const std::string ident = std::string(source.getToken(func.ident).value.string);
-				
-				return std::format("P.{}.{}", source.getID().id, ident);
+
+				if(func.is_export){
+					return ident;
+				}else{
+					return std::format("P.{}.{}", source.getID().id, ident);
+				}
 			};
 
 
 			// should only be used for globals
 			EVO_NODISCARD inline static auto mangle_name(const Source& source, const object::Var& var) noexcept -> std::string {
+				evo::debugAssert(var.isGlobal(), "Variable name mangling should only be used on globals");
+
 				const std::string ident = std::string(source.getToken(var.ident).value.string);
 				
 				return std::format("P.{}.{}", source.getID().id, ident);

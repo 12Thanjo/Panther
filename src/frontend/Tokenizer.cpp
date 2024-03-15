@@ -98,24 +98,49 @@ namespace panther{
 
 
 	auto Tokenizer::tokenize_identifier() noexcept -> bool {
+		auto kind = Token::Kind::None;
+
 		char peeked_char = this->char_stream.peek();
 		if(evo::isLetter(peeked_char) || peeked_char == '_'){
-			const char* string_start_ptr = this->char_stream.get_raw_ptr();
+			kind = Token::Kind::Ident;
 
-			std::string_view::size_type token_length = 0;
-
-			do{
+		}else if(this->char_stream.ammount_left() >= 2 && (evo::isLetter(this->char_stream.peek(1)) || this->char_stream.peek(1) == '_')){
+			if(this->char_stream.peek() == '@'){
+				kind = Token::Kind::Intrinsic;
 				this->char_stream.skip(1);
-				token_length += 1;
 
-				if(this->char_stream.eof()){ break; }
+			}else if(this->char_stream.peek() == '#'){
+				kind = Token::Kind::Attribute;
+				this->char_stream.skip(1);
+			}
+		}
 
-				peeked_char = this->char_stream.peek();
-			}while( (evo::isAlphaNumeric(peeked_char) || peeked_char == '_'));
+		if(kind == Token::Kind::None){
+			return false;
+		}
 
-			auto ident_name = std::string_view(string_start_ptr, token_length);
 
 
+		const char* string_start_ptr = this->char_stream.get_raw_ptr();
+
+		std::string_view::size_type token_length = 0;
+
+		do{
+			this->char_stream.skip(1);
+			token_length += 1;
+
+			if(this->char_stream.eof()){ break; }
+
+			peeked_char = this->char_stream.peek();
+		}while( (evo::isAlphaNumeric(peeked_char) || peeked_char == '_'));
+
+		auto ident_name = std::string_view(string_start_ptr, token_length);
+
+
+
+
+		if(kind == Token::Kind::Ident){
+			
 			///////////////////////////////////
 			// literals
 
@@ -138,19 +163,22 @@ namespace panther{
 			else if(ident_name == "var") { this->create_token(Token::Kind::KeywordVar); }
 			else if(ident_name == "func") { this->create_token(Token::Kind::KeywordFunc); }
 
+			else if(ident_name == "return") { this->create_token(Token::Kind::KeywordReturn); }
+
 			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
 
 
 			///////////////////////////////////
 			// else
 
-			else{this->create_token(Token::Ident, ident_name); }
-			
+			else{ this->create_token(Token::Ident, ident_name); }
 
-			return true;
+		}else{
+			this->create_token(kind, ident_name);
 		}
+		
 
-		return false;
+		return true;
 	};
 
 

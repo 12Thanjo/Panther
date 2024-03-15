@@ -32,14 +32,13 @@ namespace panther{
 		Result result;
 
 		result = this->parse_var_decl();
-		if(result.code() == Result::Success || result.code() == Result::Error){
-			return result;
-		}
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
 		result = this->parse_func();
-		if(result.code() == Result::Success || result.code() == Result::Error){
-			return result;
-		}
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+		result = this->parse_return();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
 		return Result::WrongType;
 	};
@@ -108,6 +107,13 @@ namespace panther{
 		// )
 		if(this->expect_token(Token::get(")"), "in function declaration") == false){ return Result::Error; }
 
+		// attributes
+		auto attributes = std::vector<Token::ID>();
+		while(this->get(this->peek()).kind == Token::Attribute){
+			attributes.emplace_back(this->next());
+		};
+
+
 		// ->
 		if(this->expect_token(Token::get("->"), "in function declaration") == false){ return Result::Error; }
 
@@ -122,7 +128,40 @@ namespace panther{
 
 		return this->create_node(
 			this->source.funcs, AST::Kind::Func,
-			ident.value(), return_type.value(), block.value()
+			ident.value(), return_type.value(), block.value(), std::move(attributes)
+		);
+	};
+
+
+
+	auto Parser::parse_return() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordReturn){
+			return Result::WrongType;
+		}
+
+		const Token::ID keyword = this->next();
+
+		std::optional<AST::Node::ID> value = std::nullopt;
+
+
+		if(this->get(this->peek()).kind == Token::get(";")){
+			this->skip(1);
+		}else{
+			const Result value_result = this->parse_expr();
+			// TODO: better messaging
+			if(this->check_result_fail(value_result, "expression in return statement")){ return Result::Error; }
+
+			value = value_result.value();
+			
+			// ;
+			if(this->expect_token(Token::get(";"), "at end of return statement") == false){ return Result::Error; }
+		}
+
+
+
+		return this->create_node(
+			this->source.returns, AST::Kind::Return,
+			keyword, value
 		);
 	};
 

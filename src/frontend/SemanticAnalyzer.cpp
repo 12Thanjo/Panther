@@ -24,12 +24,19 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_stmt(const AST::Node& node) noexcept -> bool {
+		if(this->current_func != nullptr && this->current_func->returns){
+			// TODO: better messaging
+			this->source.error("Code after return statement", node);
+			return false;
+		}
+
 		switch(node.kind){
 			break; case AST::Kind::VarDecl: return this->analyze_var(this->source.getVarDecl(node));
 			break; case AST::Kind::Func: return this->analyze_func(this->source.getFunc(node));
+			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node));
 		};
 
-		EVO_FATAL_BREAK("This AST Kind is not handled");
+		EVO_FATAL_BREAK("This AST Kind is not handled (semantic analysis of stmt)");
 	};
 
 
@@ -105,7 +112,7 @@ namespace panther{
 			const Token& value_ident = this->source.getIdent(value_node);
 			std::string_view value_ident_str = value_ident.value.string;
 
-
+			// find the var
 			for(const Scope& scope : this->scopes){
 				if(scope.vars.contains(value_ident_str)){
 					const object::Var::ID value_var_id = scope.vars.at(value_ident_str);
@@ -171,21 +178,43 @@ namespace panther{
 			return false;
 		}
 
+		// check attributes
+		bool is_export = false;
+		for(Token::ID attribute : func.attributes){
+			const Token& token = this->source.getToken(attribute);
+			std::string_view token_str = token.value.string;
+
+			if(token_str == "export"){
+				is_export = true;
+
+			}else{
+				this->source.error(std::format("Uknown attribute \"#{}\"", token_str), token);
+				return false;
+			}
+		}
+
 
 		// check typing
 		const AST::Type& return_type = this->source.getType(func.return_type);
 		const Token& return_type_token = this->source.getToken(return_type.token);
 
+		// get return type
+		std::optional<object::Type::ID> return_type_id = std::nullopt;
 		if(return_type_token.kind != Token::TypeVoid){
-			this->source.error("Function return types can only be Void at the moment", return_type_token);
-			return false;
+			SourceManager& src_manager = this->source.getSourceManager();
+
+			return_type_id = src_manager.getTypeID(
+				object::Type{
+					.base_type = src_manager.getBaseTypeID(return_type_token.kind),
+				}
+			);
 		}
 
 
 
 
 		// create object
-		const object::Func::ID func_id = this->source.createFunc(ident_tok_id);
+		const object::Func::ID func_id = this->source.createFunc(ident_tok_id, return_type_id, is_export);
 
 		this->add_func_to_scope(ident.value.string, func_id);
 
@@ -197,9 +226,79 @@ namespace panther{
 			return false;
 		}
 
+		if(return_type_id.has_value() && this->current_func->returns == false){
+			this->source.error("Function with return type does not return", ident);
+			return false;
+		}
+
+		this->current_func = nullptr;
 
 		return true;
 	};
+
+
+
+	auto SemanticAnalyzer::analyze_return(const AST::Return& return_stmt) noexcept -> bool {
+		if(this->current_func == nullptr){
+			this->source.error("Return statements can only be inside functions", return_stmt.keyword);
+			return false;
+		}
+
+
+		std::optional<object::Expr> return_value = std::nullopt;
+
+		if(return_stmt.value.has_value()){
+			// return expr;
+
+			if(this->current_func->return_type.has_value() == false){
+				this->source.error("Return statement has value when function's return type is \"Void\"", return_stmt.keyword);
+				return false;	
+			}
+
+			const AST::Node& expr_node = this->source.getNode(*return_stmt.value);
+
+			const std::optional<object::Type::ID> expr_type_id = this->get_type_of_expr(expr_node);
+			if(expr_type_id.has_value() == false){ return false; }
+
+			if(*expr_type_id != *this->current_func->return_type){
+				SourceManager& src_manager = this->source.getSourceManager();
+
+				this->source.error(
+					"Return value type and function return type do not match", 
+					expr_node,
+
+					std::vector<Message::Info>{
+						{std::string("Function return is type: ") + src_manager.printType(*this->current_func->return_type)},
+						{std::string("Return value is of type: ") + src_manager.printType(*expr_type_id)}
+					}
+				);
+
+				return false;
+			}
+
+			return_value = this->get_expr_value(*return_stmt.value);
+
+
+		}else{
+			// return;
+			
+			if(this->current_func->return_type.has_value()){
+				this->source.error("Return statement has no value when function's return type is not \"Void\"", return_stmt.keyword);
+				return false;
+			}
+		}
+
+
+
+		const object::Return::ID ret_id = this->source.createReturn(return_value);
+
+		this->current_func->returns = true;
+
+		this->current_func->stmts.emplace_back(ret_id);
+
+		return true;
+	};
+
 
 
 
@@ -275,6 +374,35 @@ namespace panther{
 		};
 
 		EVO_FATAL_BREAK("Unknwon expr type");
+	};
+
+
+
+
+	auto SemanticAnalyzer::get_expr_value(AST::Node::ID node_id) const noexcept -> object::Expr {
+		evo::debugAssert(this->is_global_scope() == false, "SemanticAnalyzer::get_expr_value() is not for use in global variables");
+
+
+		const AST::Node& value_node = this->source.getNode(node_id);
+
+		// get ident value / pointer
+		if(value_node.kind == AST::Kind::Ident){
+			const Token& value_ident = this->source.getIdent(value_node);
+			std::string_view value_ident_str = value_ident.value.string;
+
+			// find the var
+			for(const Scope& scope : this->scopes){
+				if(scope.vars.contains(value_ident_str)){
+					return scope.vars.at(value_ident_str);
+				}
+			}
+
+			EVO_FATAL_BREAK("Didn't find value_ident");
+
+		}else{
+			return node_id;
+		}
+
 	};
 
 

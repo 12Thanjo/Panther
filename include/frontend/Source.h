@@ -54,6 +54,9 @@ namespace panther{
 			EVO_NODISCARD auto getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func&;
 			EVO_NODISCARD auto getFunc(const AST::Node& node) const noexcept -> const AST::Func&;
 
+			EVO_NODISCARD auto getReturn(AST::Node::ID node_id) const noexcept -> const AST::Return&;
+			EVO_NODISCARD auto getReturn(const AST::Node& node) const noexcept -> const AST::Return&;
+
 
 			EVO_NODISCARD auto getType(AST::Node::ID node_id) const noexcept -> const AST::Type&;
 			EVO_NODISCARD auto getType(const AST::Node& node) const noexcept -> const AST::Type&;
@@ -86,7 +89,6 @@ namespace panther{
 			EVO_NODISCARD inline auto getVar(object::Var::ID id) const noexcept -> const object::Var& {
 				return this->objects.vars[size_t(id.id)];
 			};
-
 			EVO_NODISCARD inline auto getVar(object::Var::ID id) noexcept -> object::Var& {
 				return this->objects.vars[size_t(id.id)];
 			};
@@ -103,6 +105,26 @@ namespace panther{
 
 			EVO_NODISCARD inline auto getFunc(object::Func::ID id) const noexcept -> const object::Func& {
 				return this->objects.funcs[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getFunc(object::Func::ID id) noexcept -> object::Func& {
+				return this->objects.funcs[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createReturn(Args... args) noexcept -> object::Return::ID {
+				this->objects.returns.emplace_back(args...);
+
+				return object::Return::ID( uint32_t(this->objects.returns.size() - 1) );
+			};
+
+
+			EVO_NODISCARD inline auto getReturn(object::Return::ID id) const noexcept -> const object::Return& {
+				return this->objects.returns[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getReturn(object::Return::ID id) noexcept -> object::Return& {
+				return this->objects.returns[size_t(id.id)];
 			};
 
 
@@ -140,6 +162,7 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
+			std::vector<AST::Return> returns{};
 			std::vector<AST::Type> types{};
 			std::vector<AST::Block> blocks{};
 
@@ -148,6 +171,7 @@ namespace panther{
 			struct /* objects */ {
 				std::vector<object::Var> vars{};
 				std::vector<object::Func> funcs{};
+				std::vector<object::Return> returns{};
 
 				std::vector<object::Var::ID> global_vars{};
 			} objects;

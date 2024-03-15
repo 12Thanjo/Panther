@@ -26,11 +26,15 @@ namespace panther{
 			EVO_NODISCARD auto analyze_stmt(const AST::Node& node) noexcept -> bool;
 			EVO_NODISCARD auto analyze_var(const AST::VarDecl& var_decl) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func(const AST::Func& func) noexcept -> bool;
+			EVO_NODISCARD auto analyze_return(const AST::Return& return_stmt) noexcept -> bool;
 			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
 
 			// also analyzes the expr
 			// returns nullopt if error occurs
 			EVO_NODISCARD auto get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<object::Type::ID>;
+
+			// Not for use in global variables
+			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> object::Expr;
 
 
 			struct Scope{
