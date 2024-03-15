@@ -137,6 +137,9 @@ namespace panther{
 		result = this->parse_ident();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
+		result = this->parse_uninit();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
 
 		return Result::WrongType;
 	};
@@ -227,6 +230,15 @@ namespace panther{
 		}
 
 		return this->create_token_node(AST::Kind::Ident, this->next());
+	};
+
+
+	auto Parser::parse_uninit() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordUninit){
+			return Result::WrongType;
+		}
+
+		return this->create_token_node(AST::Kind::Uninit, this->next());	
 	};
 
 

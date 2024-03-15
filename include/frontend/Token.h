@@ -48,6 +48,8 @@ namespace panther{
 			KeywordVar,
 			KeywordFunc,
 
+			KeywordUninit,
+
 
 			///////////////////////////////////
 			// operators
@@ -169,9 +171,10 @@ namespace panther{
 
 		EVO_NODISCARD static constexpr auto printKind(Kind kind) noexcept -> const char* {
 			switch(kind){
-				break; case Kind::None: return  "None";
+				break; case Kind::None: evo::unreachable(); return "{{ERROR}}";
 
 				break; case Kind::Ident: return "Ident";
+
 
 				///////////////////////////////////
 				// literals
@@ -179,6 +182,7 @@ namespace panther{
 				break; case Kind::LiteralBool: return "LiteralBool";
 				break; case Kind::LiteralInt: return "LiteralInt";
 				break; case Kind::LiteralFloat: return "LiteralFloat";
+
 
 				///////////////////////////////////
 				// types
@@ -188,11 +192,14 @@ namespace panther{
 				break; case Kind::TypeInt: return "Int";
 				break; case Kind::TypeBool: return "Bool";
 
+
 				///////////////////////////////////
 				// keywords
 
 				break; case Kind::KeywordVar: return "var";
 				break; case Kind::KeywordFunc: return "func";
+
+				break; case Kind::KeywordUninit: return "uninit";
 
 
 				///////////////////////////////////

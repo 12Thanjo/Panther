@@ -25,7 +25,8 @@ project "CLI"
 
 	links{
 		"Evo",
-		"Panther",
+		"Panther_Frontend",
+		"Panther_Middleend",
 	}
 
 

@@ -138,6 +138,8 @@ namespace panther{
 			else if(ident_name == "var") { this->create_token(Token::Kind::KeywordVar); }
 			else if(ident_name == "func") { this->create_token(Token::Kind::KeywordFunc); }
 
+			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
+
 
 			///////////////////////////////////
 			// else

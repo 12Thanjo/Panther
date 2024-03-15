@@ -41,6 +41,8 @@ These are the goals I have that are for after a 1.0.0 release:
 ## Downloading:
 `git clone https://github.com/12Thanjo/Panther.git --recursive`
 
+## Building:
+Instructions on how to build (work on progress) can be found [here](documentation/building.md).
 
 ## Updates:
 List of changes for each version can be found [here](CHANGELOG.md).

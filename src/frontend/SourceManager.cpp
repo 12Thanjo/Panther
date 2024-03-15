@@ -1,4 +1,5 @@
-#include "SourceManager.h"
+#include "frontend/SourceManager.h"
+
 
 
 namespace panther{
@@ -42,6 +43,19 @@ namespace panther{
 		evo::debugAssert(this->isLocked(), "Can only get sources when locked");
 
 		return this->sources[id.id];
+	};
+
+
+	auto SourceManager::getSources() noexcept -> std::vector<Source>& {
+		evo::debugAssert(this->isLocked(), "Can only get sources when locked");
+
+		return this->sources;
+	};
+
+	auto SourceManager::getSources() const noexcept -> const std::vector<Source>& {
+		evo::debugAssert(this->isLocked(), "Can only get sources when locked");
+
+		return this->sources;
 	};
 
 
@@ -120,7 +134,6 @@ namespace panther{
 
 		return total_fails;
 	};
-
 
 
 

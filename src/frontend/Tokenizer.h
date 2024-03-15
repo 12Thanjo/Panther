@@ -4,7 +4,7 @@
 #include <Evo.h>
 
 #include "./CharStream.h"
-#include "Source.h"
+#include "frontend/Source.h"
 
 namespace panther{
 

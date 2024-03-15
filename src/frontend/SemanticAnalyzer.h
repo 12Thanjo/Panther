@@ -4,9 +4,9 @@
 #include <Evo.h>
 
 
-#include "Source.h"
-#include "AST.h"
-#include "SourceManager.h"
+#include "frontend/Source.h"
+#include "frontend/AST.h"
+#include "frontend/SourceManager.h"
 
 #include <unordered_map>
 
@@ -36,9 +36,11 @@ namespace panther{
 			struct Scope{
 				std::unordered_map<std::string_view, object::Var::ID> vars{};
 				std::unordered_map<std::string_view, object::Func::ID> funcs{};
+
 			};
 
 			std::vector<Scope> scopes{};
+			object::Func* current_func = nullptr;
 
 
 			auto enter_scope() noexcept -> void;
@@ -46,6 +48,8 @@ namespace panther{
 
 			auto add_var_to_scope(std::string_view str, object::Var::ID id) noexcept -> void;
 			auto add_func_to_scope(std::string_view str, object::Func::ID id) noexcept -> void;
+
+			EVO_NODISCARD inline auto is_global_scope() const noexcept -> bool { return this->scopes.size() == 1; };
 
 
 

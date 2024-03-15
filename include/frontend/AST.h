@@ -16,6 +16,7 @@ namespace panther{
 			// tokens
 			Ident,
 			Literal,
+			Uninit,
 		};
 
 

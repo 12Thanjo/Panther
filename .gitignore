@@ -1,6 +1,7 @@
 # directories
 .vs/
 build/
+libs/LLVM
 
 # sublime
 *.sublime-project
@@ -11,7 +12,6 @@ build/
 *.vcxproj.user
 *.vcxproj.filters
 *.sln
-
 
 # misc
 *.ini

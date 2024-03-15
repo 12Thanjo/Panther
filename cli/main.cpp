@@ -1,6 +1,8 @@
 
 #include "./Printer.h"
-#include "SourceManager.h"
+#include "frontend/SourceManager.h"
+#include "middleend/Context.h"
+#include "ObjectsToIR.h"
 
 
 #include <Evo.h>
@@ -28,14 +30,20 @@
 
 
 struct Config{
+	std::string name;
 	bool print_colors;
 	bool verbose;
 
-	enum class Output{
+	enum class Target{
 		PrintTokens,
 		PrintAST,
 		SemanticAnalysis,
-	} output;
+		PrintLLVMIR,
+		LLVMIR,
+		Object,
+		Run,
+	} target;
+	std::filesystem::path output_path{};
 
 	std::filesystem::path relative_directory{};
 	bool relative_directory_set = false;
@@ -44,39 +52,36 @@ struct Config{
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexcept -> int {
 
-	auto config = Config{
-		.print_colors = true,
-		.verbose      = true,
-		.output       = Config::Output::SemanticAnalysis,
-	};
-
-
 
 	// print UTF-8 characters on windows
 	#if defined(EVO_PLATFORM_WINDOWS)
-		SetConsoleOutputCP(CP_UTF8);
+		::SetConsoleOutputCP(CP_UTF8);
 	#endif
+
+
+
+	auto config = Config{
+		.name		  = "testing",
+		.print_colors = true,
+		.verbose      = true,
+		.target       = Config::Target::Run,
+	};
+
 
 
 	auto printer = panther::cli::Printer(config.print_colors);
 
+	auto llvm_context = panther::llvmint::Context();
 
 
 	auto exit = [&](){
+		if(llvm_context.isInitialized()){
+			llvm_context.shutdown();
+		}
+
 		printer.trace("Press Enter to close...\n");
 		std::cin.get();
 	};
-
-
-
-
-
-
-	if(config.verbose){
-		printer.info("Panther Compiler\n");
-		printer.trace("----------------\n");
-	}
-
 
 
 	if(config.relative_directory_set == false){
@@ -92,6 +97,20 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		}
 	}
 
+	config.output_path = config.relative_directory / "testing/output.o";
+
+
+
+
+
+
+	if(config.verbose){
+		printer.info("Panther Compiler\n");
+		printer.trace("----------------\n");
+	}
+
+
+
 
 	if(config.verbose){
 		printer.debug( std::format("Relative Directory: {}\n", config.relative_directory.string()) );
@@ -101,6 +120,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	auto source_manager = panther::SourceManager([&](const panther::Message& message){
 		printer.print_message(message);
 	});
+
+
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -162,7 +183,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	}
 
 
-	if(config.output == Config::Output::PrintTokens){
+	if(config.target == Config::Target::PrintTokens){
 		printer.trace("------------------------------\n");
 		printer.print_tokens(source_manager.getSource(test_file_id));
 
@@ -190,7 +211,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	}
 
 
-	if(config.output == Config::Output::PrintAST){
+	if(config.target == Config::Target::PrintAST){
 		if(config.verbose){ printer.trace("------------------------------\n"); }
 		printer.print_ast(source_manager.getSource(test_file_id));
 
@@ -220,7 +241,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	}
 
 
-	if(config.output == Config::Output::SemanticAnalysis){
+	if(config.target == Config::Target::SemanticAnalysis){
 		// Do nothing...
 
 		exit();
@@ -230,7 +251,121 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	//////////////////////////////////////////////////////////////////////
+	// lowering to IR
+
+	llvm_context.init();
+
+
+	auto objects_to_ir = panther::ObjectsToIR();
+	objects_to_ir.init(config.name, llvm_context);
+
+	objects_to_ir.lower(source_manager);
+
+
+	if(config.verbose){
+		printer.success("Lowered to LLVM IR\n");
+	}
+
+
+
+	if(config.target == Config::Target::PrintLLVMIR){
+		if(config.verbose){ printer.trace("------------------------------\n"); }
+		printer.info(objects_to_ir.printLLVMIR());
+
+		objects_to_ir.shutdown();
+
+		exit();
+		return 0;
+
+	}else if(config.target == Config::Target::LLVMIR){
+		const std::string output = objects_to_ir.printLLVMIR();
+		objects_to_ir.shutdown();
+
+
+		const std::string path_str = config.output_path.string();
+
+		auto output_file = evo::fs::File();
+		if(output_file.open(path_str, evo::fs::FileMode::Write) == false){
+			printer.error( std::format("Failed to open file: \"{}\"\n", path_str) );
+			exit();
+			return 1;
+		}
+
+		if(output_file.write(output) == false){
+			printer.error( std::format("Failed to write to file: \"{}\"\n", path_str) );
+			exit();
+			return 1;
+		}
+
+		output_file.close();
+
+
+
+
+		if(config.verbose){
+			printer.success( std::format("Successfully wrote output to: \"{}\"\n", path_str) );
+		}
+
+		exit();
+		return 0;
+
+	}else if(config.target == Config::Target::Object){
+		const std::optional< std::vector<evo::byte> > output = objects_to_ir.compileToObjectFile();
+		if(output.has_value() == false){
+			printer.fatal("Target machine cannot output object file");
+			exit();
+			return 1;
+		}
+
+		objects_to_ir.shutdown();
+
+		const std::string path_str = config.output_path.string();
+
+		auto output_file = evo::fs::BinaryFile();
+		if(output_file.open(path_str, evo::fs::FileMode::Write) == false){
+			printer.error( std::format("Failed to open file: \"{}\"\n", path_str) );
+			exit();
+			return 1;
+		}
+
+		if(output_file.write(*output) == false){
+			printer.error( std::format("Failed to write to file: \"{}\"\n", path_str) );
+			exit();
+			return 1;
+		}
+
+		output_file.close();
+
+
+
+		if(config.verbose){
+			printer.success( std::format("Successfully wrote output to: \"{}\"\n", path_str) );
+		}
+
+		exit();
+		return 0;
+
+	}else if(config.target == Config::Target::Run){
+		if(config.verbose){ printer.trace("------------------------------\nRunning:\n\n"); }
+
+		objects_to_ir.run("main");
+
+		if(config.verbose){ printer.trace("------------------------------\nCompleted Running\n"); }
+
+		objects_to_ir.shutdown();
+
+
+		exit();
+		return 0;		
+	}
+
+
+
+	//////////////////////////////////////////////////////////////////////
 	// done
+
+	objects_to_ir.shutdown();
+	
 
 	exit();
 

@@ -4,8 +4,8 @@
 #include <Evo.h>
 
 
-#include "Source.h"
-#include "AST.h"
+#include "frontend/Source.h"
+#include "frontend/AST.h"
 
 namespace panther{
 
@@ -67,6 +67,7 @@ namespace panther{
 
 			EVO_NODISCARD auto parse_literal() noexcept -> Result;
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
+			EVO_NODISCARD auto parse_uninit() noexcept -> Result;
 
 
 		private:

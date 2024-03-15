@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.7.0
+- Added build instruction for LLVM
+- Improved Semantic Analysis
+- Added uninit expression
+- Added output to LLVMIR
+- Added output to object file
+
 ### v0.6.0
 - Added identifier expressions
 

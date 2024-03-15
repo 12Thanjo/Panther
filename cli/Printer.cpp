@@ -2,7 +2,7 @@
 
 
 
-#include "SourceManager.h"
+#include "frontend/SourceManager.h"
 
 #include <algorithm>
 
@@ -385,6 +385,11 @@ namespace panther{
 				break; case AST::Kind::Ident: {
 					this->indenter_print();
 					this->debug( std::format("{}\n", source.getToken(node.token).value.string) );
+				} break;
+
+				break; case AST::Kind::Uninit: {
+					this->indenter_print();
+					this->debug("[uninit]\n");
 				} break;
 
 				break; default: EVO_FATAL_BREAK("Node is not an expr");

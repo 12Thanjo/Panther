@@ -54,6 +54,9 @@ namespace panther{
 			// EVO_NODISCARD auto getSource(Source::ID id)       noexcept ->       Source&;
 			EVO_NODISCARD auto getSource(Source::ID id) const noexcept -> const Source&;
 
+			EVO_NODISCARD auto getSources() noexcept -> std::vector<Source>&;
+			EVO_NODISCARD auto getSources() const noexcept -> const std::vector<Source>&;
+
 
 
 			// returns number of sources taht failed tokenizing
@@ -69,8 +72,14 @@ namespace panther{
 
 
 
+
+
 			///////////////////////////////////
 			// objects
+
+			EVO_NODISCARD inline auto getBaseType(object::BaseType::ID id) const noexcept -> const object::BaseType& {
+				return this->base_types[id.id];
+			};
 
 			EVO_NODISCARD auto getBaseType(Token::Kind tok_kind) noexcept -> object::BaseType&;
 			EVO_NODISCARD auto getBaseTypeID(Token::Kind tok_kind) const noexcept -> object::BaseType::ID;

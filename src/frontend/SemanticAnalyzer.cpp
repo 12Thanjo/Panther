@@ -1,6 +1,6 @@
 #include "SemanticAnalyzer.h"
 
-#include "SourceManager.h"
+#include "frontend/SourceManager.h"
 
 namespace panther{
 	
@@ -68,31 +68,69 @@ namespace panther{
 			return false;
 
 		}else{
+			const AST::Node& expr_node = this->source.getNode(var_decl.expr);
 
-			const std::optional<object::Type::ID> expr_type_id = this->get_type_of_expr(this->source.getNode(var_decl.expr));
+			if(expr_node.kind != AST::Kind::Uninit){
+				const std::optional<object::Type::ID> expr_type_id = this->get_type_of_expr(expr_node);
 
-			if(expr_type_id.has_value() == false){ return false; }
+				if(expr_type_id.has_value() == false){ return false; }
 
+				if(var_type_id != *expr_type_id){
+					this->source.error(
+						"Variable cannot be assigned a value of a different type", 
+						var_decl.expr,
 
-			if(var_type_id != *expr_type_id){
-				this->source.error(
-					std::format(
-						"Variable of type ({}) cannot be set to the value of an expression of type ({})", 
-						src_manager.printType(var_type_id), src_manager.printType(*expr_type_id)
-					),
-					var_decl.expr
-				);
+						std::vector<Message::Info>{
+							{std::string("Variable is of type:   ") + src_manager.printType(var_type_id)},
+							{std::string("Expression is of type: ") + src_manager.printType(*expr_type_id)}
+						}
+					);
 
-				return false;
+					return false;
+				}
 			}
+
 		}
 
 
 		///////////////////////////////////
-		// create object	
-		const object::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id);
+		// create object
+
+		object::Expr var_value = var_decl.expr;
+
+
+		if(this->is_global_scope()){
+			const AST::Node& node = this->source.getNode(var_decl.expr);
+
+			if(node.kind == AST::Kind::Ident){
+				const Token& value_ident = this->source.getIdent(node);
+				std::string_view value_ident_str = value_ident.value.string;
+
+				for(const Scope& scope : this->scopes){
+					if(scope.vars.contains(value_ident_str)){
+						const object::Var& var = this->source.getVar( scope.vars.at(value_ident_str) );
+
+						// if(var.value.kind == object::Expr::Kind::ASTNode){
+							
+						// }
+
+						var_value = var.value;
+						break;
+					}
+				}
+			}
+		}
+
+
+		const object::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id, var_value);
 
 		this->add_var_to_scope(ident.value.string, var_id);
+
+		if(this->is_global_scope()){
+			this->source.objects.global_vars.emplace_back(var_id);
+		}else{
+			this->current_func->stmts.emplace_back(var_id);
+		}
 
 
 		return true;
@@ -103,10 +141,17 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_func(const AST::Func& func) noexcept -> bool {
-		// check ident is unused
 		const Token::ID ident_tok_id = this->source.getNode(func.ident).token;
 		const Token& ident = this->source.getToken(ident_tok_id);
 
+		// check function is in global scope
+		if(this->is_global_scope() == false){
+			this->source.error("Functions can only be defined at global scope", ident);
+			return false;
+		}
+
+
+		// check ident is unused
 		if(this->has_in_scope(ident.value.string)){
 			this->already_defined(ident);
 			return false;
@@ -130,9 +175,11 @@ namespace panther{
 
 		this->add_func_to_scope(ident.value.string, func_id);
 
+		this->current_func = &this->source.objects.funcs[func_id.id];
 
 		// analyze block
-		if(this->analyze_block(this->source.getBlock(func.block)) == false){
+		const AST::Block& block = this->source.getBlock(func.block);
+		if(this->analyze_block(block) == false){
 			return false;
 		}
 
@@ -174,7 +221,7 @@ namespace panther{
 					};
 
 					EVO_FATAL_BREAK("Unkonwn literal type");
-				}();
+				}(); 
 
 
 
@@ -204,6 +251,12 @@ namespace panther{
 
 				this->source.error(std::format("Identifier \"{}\" is undefined", ident_str), node);
 				return std::nullopt;
+			} break;
+
+
+
+			case AST::Kind::Uninit: {
+				EVO_FATAL_BREAK("[uinit] exprs should not be analyzed with this function");
 			} break;
 		};
 

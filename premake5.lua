@@ -69,7 +69,7 @@ workspace "Panther"
 
 
 	filter "configurations:Optimize"
-		runtime "Release"
+		runtime "Debug" -- TODO: figure out how to have LLVM build with release runtime
 		symbols "On"
 		optimize "On"
 
@@ -84,7 +84,7 @@ workspace "Panther"
 
 
 	filter "configurations:Release"
-		runtime "Release"
+		runtime "Debug" -- TODO: figure out how to have LLVM build with release runtime
 		symbols "Off"
 		optimize "Full"
 
@@ -100,7 +100,7 @@ workspace "Panther"
 
 
 	filter "configurations:ReleaseDist"
-		runtime "Release"
+		runtime "Debug" -- TODO: figure out how to have LLVM build with release runtime
 		symbols "Off"
 		optimize "Full"
 

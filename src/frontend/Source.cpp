@@ -1,10 +1,10 @@
-#include "Source.h"
+#include "frontend/Source.h"
 
 
-#include "./frontend/Tokenizer.h"
-#include "./frontend/Parser.h"
-#include "./frontend/SemanticAnalyzer.h"
-#include "SourceManager.h"
+#include "./Tokenizer.h"
+#include "./Parser.h"
+#include "./SemanticAnalyzer.h"
+#include "frontend/SourceManager.h"
 
 namespace panther{
 
@@ -94,6 +94,15 @@ namespace panther{
 	};
 
 
+	auto Source::getUninit(AST::Node::ID node_id) const noexcept -> const Token& {
+		return this->getUninit(this->getNode(node_id));
+	};
+	auto Source::getUninit(const AST::Node& node) const noexcept -> const Token& {
+		evo::debugAssert(node.kind == AST::Kind::Uninit, "Node is not a Uninit");
+		return this->getToken(node.token);
+	};
+
+
 
 	//////////////////////////////////////////////////////////////////////
 	// messaging
@@ -136,41 +145,26 @@ namespace panther{
 
 
 
-
-	auto Source::error(const std::string& msg, uint32_t line, uint32_t collumn) noexcept -> void {
-		this->error(msg, Location{line, collumn, collumn}, std::vector<Message::Info>{});
+	auto Source::error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->error(msg, Location{line, collumn, collumn}, std::move(infos));
 	};
 
-	auto Source::error(const std::string& msg, Token::ID token_id) noexcept -> void {
+	auto Source::error(const std::string& msg, Token::ID token_id, std::vector<Message::Info>&& infos) noexcept -> void {
 		const Token& token = this->getToken(token_id);
-		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::vector<Message::Info>{});
-	};
-
-	auto Source::error(const std::string& msg, const Token& token) noexcept -> void {
-		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::vector<Message::Info>{});
+		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
 	};
 
 	auto Source::error(const std::string& msg, const Token& token, std::vector<Message::Info>&& infos) noexcept -> void {
 		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
 	};
 
-	auto Source::error(const std::string& msg, AST::Node::ID node_id) noexcept -> void {
-		this->error(msg, this->get_node_location(node_id), std::vector<Message::Info>{});
+	auto Source::error(const std::string& msg, AST::Node::ID node_id, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->error(msg, this->get_node_location(node_id), std::move(infos));
 	};
 
-	auto Source::error(const std::string& msg, const AST::Node& node) noexcept -> void {
-		this->error(msg, this->get_node_location(node), std::vector<Message::Info>{});
+	auto Source::error(const std::string& msg, const AST::Node& node, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->error(msg, this->get_node_location(node), std::move(infos));
 	};
-
-	auto Source::error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void {
-		this->error(msg, Location{line, collumn, collumn}, std::move(infos));
-	};
-
-
-	auto Source::error(const std::string& msg, Location location) noexcept -> void {
-		this->error(msg, location, std::vector<Message::Info>{});
-	};
-
 
 	auto Source::error(
 		const std::string& msg, Location location, std::vector<Message::Info>&& infos
@@ -231,9 +225,14 @@ namespace panther{
 				return Location{token.line_start, token.collumn_start, token.collumn_end};
 			} break;
 
+			case AST::Kind::Uninit: {
+				const Token& token = this->getUninit(node);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
+			} break;
+
 		};
 
-		EVO_FATAL_BREAK("Unknwon node type");
+		EVO_FATAL_BREAK("Unknown node type (cannot get node location)");
 	};
 
 

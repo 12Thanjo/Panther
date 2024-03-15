@@ -1,6 +1,15 @@
 
 var foo: Int = 12;
-var bar: Bool = foo;
+var bar: Int = foo;
+
+
+var bool_var: Bool = uninit;
 
 
 
+func main = () -> Void {
+	var int_var_in_func: Int = 12;
+	// var bool_var_in_func: Bool = uninit;
+
+	// var other_var: Int = int_var_in_func;
+}
