@@ -4,12 +4,14 @@ var bar: Int = foo;
 
 
 var bool_var: Bool = uninit;
+var bool_var_2: Bool = bool_var;
 
 
 
 func main = () -> Void {
 	var int_var_in_func: Int = 12;
-	// var bool_var_in_func: Bool = uninit;
+	var bool_var_in_func: Bool = uninit;
 
-	// var other_var: Int = int_var_in_func;
+	var other_var: Int = int_var_in_func;
+	var other_var_from_global: Int = bar;
 }

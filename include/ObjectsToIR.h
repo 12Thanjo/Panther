@@ -111,7 +111,7 @@ namespace panther{
 
 		private:
 			inline auto lower_global_var(const Source& source, object::Var& var) noexcept -> void {
-				const std::string ident = std::string(source.getToken(var.ident).value.string);
+				const std::string mangled_name = ObjectsToIR::mangle_name(source, var);
 
 				const SourceManager& source_manager = source.getSourceManager();
 				const object::Type& type = source_manager.getType(var.type);
@@ -128,7 +128,7 @@ namespace panther{
 					EVO_DEBUG_ASSERT("Invalid kind of global var value");
 				}
 
-				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, false, ident.c_str());
+				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, false, mangled_name.c_str());
 
 				var.llvm.value = llvmint::ptrcast<llvm::Value>(global_val);
 			};
@@ -136,10 +136,10 @@ namespace panther{
 
 
 			inline auto lower_func(Source& source, object::Func& func) noexcept -> void {
-				const std::string ident = std::string(source.getToken(func.ident).value.string);
+				const std::string mangled_name = ObjectsToIR::mangle_name(source, func);
 
 				llvm::FunctionType* prototype = this->builder->getFuncProto(this->builder->getTypeVoid(), {}, false);
-				llvm::Function* llvm_func = this->module->createFunction(ident, prototype, llvmint::LinkageTypes::ExternalLinkage);
+				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, llvmint::LinkageTypes::ExternalLinkage);
 
 				func.llvm_func = llvm_func;
 
@@ -253,6 +253,23 @@ namespace panther{
 
 
 				EVO_FATAL_BREAK("Invalid value kind");
+			};
+
+
+
+
+			EVO_NODISCARD inline static auto mangle_name(const Source& source, const object::Func& func) noexcept -> std::string {
+				const std::string ident = std::string(source.getToken(func.ident).value.string);
+				
+				return std::format("P.{}.{}", source.getID().id, ident);
+			};
+
+
+			// should only be used for globals
+			EVO_NODISCARD inline static auto mangle_name(const Source& source, const object::Var& var) noexcept -> std::string {
+				const std::string ident = std::string(source.getToken(var.ident).value.string);
+				
+				return std::format("P.{}.{}", source.getID().id, ident);
 			};
 
 

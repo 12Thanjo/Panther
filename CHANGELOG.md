@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.8.0
+- Made global variables have private linkage
+- Semantic Ananlysis now catches setting global variables to variables with value uninit
+- Fixed setting variables to identifiers
+
 ### v0.7.0
 - Added build instruction for LLVM
 - Improved Semantic Analysis

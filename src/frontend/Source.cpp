@@ -184,6 +184,49 @@ namespace panther{
 
 
 
+
+	auto Source::warning(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->warning(msg, Location{line, collumn, collumn}, std::move(infos));
+	};
+
+	auto Source::warning(const std::string& msg, Token::ID token_id, std::vector<Message::Info>&& infos) noexcept -> void {
+		const Token& token = this->getToken(token_id);
+		this->warning(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
+	};
+
+	auto Source::warning(const std::string& msg, const Token& token, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->warning(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
+	};
+
+	auto Source::warning(const std::string& msg, AST::Node::ID node_id, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->warning(msg, this->get_node_location(node_id), std::move(infos));
+	};
+
+	auto Source::warning(const std::string& msg, const AST::Node& node, std::vector<Message::Info>&& infos) noexcept -> void {
+		this->warning(msg, this->get_node_location(node), std::move(infos));
+	};
+
+
+	auto Source::warning(
+		const std::string& msg, Location location, std::vector<Message::Info>&& infos
+	) noexcept -> void {
+		this->has_errored = true;
+
+		auto message = Message{
+			.type     = Message::Type::Warning,
+			.source   = *this,
+			.message  = msg,
+			.location = location,
+			.infos	  = std::move(infos),
+		};
+
+		this->source_manager.emitMessage(message);
+	};
+
+
+
+
+
 	auto Source::get_node_location(AST::Node::ID node_id) const noexcept -> Location {
 		return this->get_node_location(this->getNode(node_id));
 	};

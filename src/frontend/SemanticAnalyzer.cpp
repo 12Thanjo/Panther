@@ -98,25 +98,39 @@ namespace panther{
 
 		object::Expr var_value = var_decl.expr;
 
+		const AST::Node& value_node = this->source.getNode(var_decl.expr);
 
-		if(this->is_global_scope()){
-			const AST::Node& node = this->source.getNode(var_decl.expr);
+		// get ident value / pointer
+		if(value_node.kind == AST::Kind::Ident){
+			const Token& value_ident = this->source.getIdent(value_node);
+			std::string_view value_ident_str = value_ident.value.string;
 
-			if(node.kind == AST::Kind::Ident){
-				const Token& value_ident = this->source.getIdent(node);
-				std::string_view value_ident_str = value_ident.value.string;
 
-				for(const Scope& scope : this->scopes){
-					if(scope.vars.contains(value_ident_str)){
-						const object::Var& var = this->source.getVar( scope.vars.at(value_ident_str) );
+			for(const Scope& scope : this->scopes){
+				if(scope.vars.contains(value_ident_str)){
+					const object::Var::ID value_var_id = scope.vars.at(value_ident_str);
 
-						// if(var.value.kind == object::Expr::Kind::ASTNode){
-							
-						// }
+					if(this->is_global_scope()){
+						const object::Var& value_var = this->source.getVar(value_var_id);
 
-						var_value = var.value;
-						break;
+						// check if value var is uninit
+						if(value_var.value.kind == object::Expr::Kind::ASTNode && this->source.getNode(value_var.value.ast_node).kind == AST::Kind::Uninit){
+							const Token& value_var_token = this->source.getToken(value_var.ident);
+							const Location value_var_location = Location(value_var_token.line_start, value_var_token.collumn_start, value_var_token.collumn_end);
+
+							this->source.warning(
+								"declaring global variable with value of another global variable that's has the value of \"uninit\"", value_ident,
+								std::vector<Message::Info>{ {std::format("global variable \"{}\" defined here", value_ident_str), value_var_location}, }
+							);
+						}
+
+						var_value = value_var.value;
+
+					}else{
+						var_value = value_var_id;
 					}
+					
+					break;
 				}
 			}
 		}

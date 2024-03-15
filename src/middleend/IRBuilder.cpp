@@ -116,7 +116,7 @@ namespace panther{
 		) noexcept -> llvm::GlobalVariable* {
 			// this gets freed automatically in the destructor of the module
 			llvm::GlobalVariable* global = new llvm::GlobalVariable(
-				module.getModule(), type, is_constant, llvm::GlobalValue::ExternalLinkage, value, name.data()
+				module.getModule(), type, is_constant, llvm::GlobalValue::PrivateLinkage, value, name.data()
 			);
 
 			global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);

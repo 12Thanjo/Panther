@@ -122,6 +122,12 @@ namespace panther{
 			auto error(const std::string& msg, Location location,               std::vector<Message::Info>&& infos = {}) noexcept -> void;
 
 
+			auto warning(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos = {}) noexcept -> void;
+			auto warning(const std::string& msg, Token::ID token_id,              std::vector<Message::Info>&& infos = {}) noexcept -> void;
+			auto warning(const std::string& msg, const Token& token,              std::vector<Message::Info>&& infos = {}) noexcept -> void;
+			auto warning(const std::string& msg, AST::Node::ID node_id,           std::vector<Message::Info>&& infos = {}) noexcept -> void;
+			auto warning(const std::string& msg, const AST::Node& node,           std::vector<Message::Info>&& infos = {}) noexcept -> void;
+			auto warning(const std::string& msg, Location location,               std::vector<Message::Info>&& infos = {}) noexcept -> void;
 
 
 
@@ -153,7 +159,7 @@ namespace panther{
 
 
 		private:
-			std::string src_location; 
+			std::string src_location;
 			std::string data;
 			ID src_id;
 			class SourceManager& source_manager;
