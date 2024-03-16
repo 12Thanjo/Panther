@@ -1,6 +1,9 @@
 # Changelog
 
-# v0.9.0
+### v0.10.0
+- Added assigning new values to variables
+
+### v0.9.0
 - Added return statements
 - Added `#extern` function attribute
 - Added tokenizing of intrinsics

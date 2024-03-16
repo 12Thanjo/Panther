@@ -40,6 +40,12 @@ namespace panther{
 		result = this->parse_return();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
+		result = this->parse_assignment();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+		result = this->parse_func_call();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
 		return Result::WrongType;
 	};
 
@@ -163,6 +169,59 @@ namespace panther{
 			this->source.returns, AST::Kind::Return,
 			keyword, value
 		);
+	};
+
+
+
+	auto Parser::parse_assignment() noexcept -> Result {
+		const Token::ID start = this->peek();
+
+		// ident
+		const Result ident = this->parse_ident();
+		if(ident.code() == Result::Error){
+			return Result::Error;
+
+		}else if(ident.code() == Result::WrongType){
+			return Result::WrongType;
+		}
+
+
+		// op
+		const Token::ID op = this->next();
+
+		switch(this->get(op).kind){
+			case Token::get("="): break;
+
+			default:
+				this->go_back(start);
+				return Result::WrongType;
+		};
+
+
+		// expr
+		const Result expr = this->parse_expr();
+		if(this->check_result_fail(expr, "Expression value in assignment")){ return Result::Error; }
+
+
+		// ;
+		if(this->expect_token(Token::get(";"), "at end of assignment") == false){ return Result::Error; }
+
+
+
+
+
+		return this->create_node(
+			this->source.infixes, AST::Kind::Infix,
+			ident.value(), op, expr.value()
+		);
+	};
+
+
+
+
+	auto Parser::parse_func_call() noexcept -> Result {
+
+		return Result::WrongType;
 	};
 
 

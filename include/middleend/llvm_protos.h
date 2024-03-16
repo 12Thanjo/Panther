@@ -73,18 +73,20 @@ namespace panther{
 		EVO_NODISCARD auto _ptrcast_to_value(llvm::ConstantInt* from) noexcept -> llvm::Value*;
 		EVO_NODISCARD auto _ptrcast_to_value(llvm::AllocaInst* from) noexcept -> llvm::Value*;
 
+		EVO_NODISCARD auto _ptrcast_to_value(llvm::IntegerType* from) noexcept -> llvm::Type*;
+		EVO_NODISCARD auto _ptrcast_to_value(llvm::PointerType* from) noexcept -> llvm::Type*;
 
 
 
 		template<> inline auto ptrcast(llvm::ConstantInt* from) noexcept -> llvm::Constant* { return _ptrcast_to_constant(from); };
-
-
 
 		template<> inline auto ptrcast(llvm::LoadInst* from) noexcept -> llvm::Value* { return _ptrcast_to_value(from); };
 		template<> inline auto ptrcast(llvm::GlobalVariable* from) noexcept -> llvm::Value* { return _ptrcast_to_value(from); };
 		template<> inline auto ptrcast(llvm::ConstantInt* from) noexcept -> llvm::Value* { return _ptrcast_to_value(from); };
 		template<> inline auto ptrcast(llvm::AllocaInst* from) noexcept -> llvm::Value* { return _ptrcast_to_value(from); };
 
+		template<> inline auto ptrcast(llvm::IntegerType* from) noexcept -> llvm::Type* { return _ptrcast_to_value(from); };
+		template<> inline auto ptrcast(llvm::PointerType* from) noexcept -> llvm::Type* { return _ptrcast_to_value(from); };
 
 
 	};

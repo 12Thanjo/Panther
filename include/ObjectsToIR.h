@@ -158,8 +158,10 @@ namespace panther{
 				}
 
 
+
 				llvm::FunctionType* prototype = this->builder->getFuncProto(return_type, {}, false);
-				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, llvmint::LinkageTypes::ExternalLinkage);
+				auto linkage = func.is_export ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::InternalLinkage;
+				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, linkage);
 
 				func.llvm_func = llvm_func;
 
@@ -172,6 +174,7 @@ namespace panther{
 					switch(stmt.kind){
 						break; case object::Stmt::Kind::Var: this->lower_var(source, source.getVar(stmt.var));
 						break; case object::Stmt::Kind::Return: this->lower_return(source, source.getReturn(stmt.ret));
+						break; case object::Stmt::Kind::Assignment: this->lower_assignment(source, source.getAssignment(stmt.assignment));
 						break; default: EVO_FATAL_BREAK("Unknown object::Stmt::Kind");
 					};
 				}
@@ -222,6 +225,23 @@ namespace panther{
 
 
 
+			inline auto lower_assignment(Source& source, object::Assignment& assignment) noexcept -> void {
+				evo::debugAssert(source.getToken(assignment.op).kind == Token::get("="), "Only normal assignment (=) is supported for lowering at the moment");
+
+				llvm::Value* value = this->get_value(source, assignment.value);
+
+				const object::Var& var = source.getVar(assignment.var);
+
+				if(var.is_alloca){
+					this->builder->createStore(var.llvm.alloca, value, false);
+				}else{
+					this->builder->createStore(var.llvm.value, value, false);
+				}
+
+			};
+
+
+
 
 
 			EVO_NODISCARD inline auto get_type(const SourceManager& source_manager, const object::Type& type) noexcept -> llvm::Type* {
@@ -230,10 +250,10 @@ namespace panther{
 
 				if(base_type.builtin == Token::TypeInt){
 					// TODO: make sure is register sized
-					return this->builder->getTypeI64();
+					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
 
 				}else if(base_type.builtin == Token::TypeBool){
-					return this->builder->getTypeBool();
+					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
 				}
 
 				EVO_FATAL_BREAK("Unknown type");

@@ -64,6 +64,9 @@ namespace panther{
 			EVO_NODISCARD auto getBlock(AST::Node::ID node_id) const noexcept -> const AST::Block&;
 			EVO_NODISCARD auto getBlock(const AST::Node& node) const noexcept -> const AST::Block&;
 
+			EVO_NODISCARD auto getInfix(AST::Node::ID node_id) const noexcept -> const AST::Infix&;
+			EVO_NODISCARD auto getInfix(const AST::Node& node) const noexcept -> const AST::Infix&;
+
 
 			EVO_NODISCARD auto getLiteral(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getLiteral(const AST::Node& node) const noexcept -> const Token&;
@@ -73,6 +76,7 @@ namespace panther{
 
 			EVO_NODISCARD auto getUninit(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getUninit(const AST::Node& node) const noexcept -> const Token&;
+
 
 
 
@@ -129,6 +133,23 @@ namespace panther{
 
 
 
+			template<typename... Args>
+			EVO_NODISCARD inline auto createAssignment(Args... args) noexcept -> object::Assignment::ID {
+				this->objects.assignments.emplace_back(args...);
+
+				return object::Assignment::ID( uint32_t(this->objects.assignments.size() - 1) );
+			};
+
+
+			EVO_NODISCARD inline auto getAssignment(object::Assignment::ID id) const noexcept -> const object::Assignment& {
+				return this->objects.assignments[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getAssignment(object::Assignment::ID id) noexcept -> object::Assignment& {
+				return this->objects.assignments[size_t(id.id)];
+			};
+
+
+
 			///////////////////////////////////
 			// messaging / errors
 
@@ -163,6 +184,7 @@ namespace panther{
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
 			std::vector<AST::Return> returns{};
+			std::vector<AST::Infix> infixes{};
 			std::vector<AST::Type> types{};
 			std::vector<AST::Block> blocks{};
 
@@ -172,6 +194,7 @@ namespace panther{
 				std::vector<object::Var> vars{};
 				std::vector<object::Func> funcs{};
 				std::vector<object::Return> returns{};
+				std::vector<object::Assignment> assignments{};
 
 				std::vector<object::Var::ID> global_vars{};
 			} objects;

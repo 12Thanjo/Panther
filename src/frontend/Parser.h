@@ -61,6 +61,8 @@ namespace panther{
 			EVO_NODISCARD auto parse_var_decl() noexcept -> Result;
 			EVO_NODISCARD auto parse_func() noexcept -> Result;
 			EVO_NODISCARD auto parse_return() noexcept -> Result;
+			EVO_NODISCARD auto parse_assignment() noexcept -> Result;
+			EVO_NODISCARD auto parse_func_call() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
@@ -138,6 +140,11 @@ namespace panther{
 				evo::debugAssert(size_t(this->cursor + skip_ammount) <= this->source.tokens.size(), "cannot skip past end of tokens");
 
 				this->cursor += ptrdiff_t(skip_ammount);
+			};
+
+
+			inline auto go_back(Token::ID id) noexcept -> void {
+				this->cursor = ptrdiff_t(id.id);
 			};
 
 	

@@ -13,6 +13,7 @@ namespace panther{
 			
 			Type,
 			Block,
+			Infix,
 
 			// tokens
 			Ident,
@@ -69,6 +70,12 @@ namespace panther{
 			std::vector<Node::ID> nodes;
 		};
 	
+
+		struct Infix{
+			Node::ID lhs;
+			Token::ID op;
+			Node::ID rhs;
+		};
 
 	};
 };

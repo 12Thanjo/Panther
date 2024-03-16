@@ -1,24 +1,22 @@
 
-// var foo: Int = 12;
-// var bar: Int = foo;
 
-
-// var bool_var: Bool = uninit;
-// var bool_var_2: Bool = bool_var;
+var global: Int = 12;
 
 
 
-func test = () -> Void {
-	
+func test_func = () -> Bool {
+	return true;
 }
 
 
-var foo: Int = 19;
-var bar: Int = foo;
-
-func main = () #export -> Int {
-	var local_1: Int = bar;
-	var local_2: Int = local_1;
-
-	return local_2;
+func get_global = () #export -> Int {
+	return global;
 }
+
+
+func set_global_to_14 = () #export -> Void {
+	global = 14;
+}
+
+
+

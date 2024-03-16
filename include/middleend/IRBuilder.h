@@ -65,19 +65,20 @@ namespace panther{
 				EVO_NODISCARD auto getFuncProto(llvm::Type* return_type, evo::ArrayProxy<llvm::Type*> params, bool is_var_args) noexcept -> llvm::FunctionType*;
 
 
-				EVO_NODISCARD auto getTypeBool() noexcept -> llvm::Type*;
+				EVO_NODISCARD auto getTypeBool() noexcept -> llvm::IntegerType*;
 
 
-				EVO_NODISCARD auto getTypeI8()  noexcept -> llvm::Type*;
-				EVO_NODISCARD auto getTypeI16() noexcept -> llvm::Type*;
-				EVO_NODISCARD auto getTypeI32() noexcept -> llvm::Type*;
-				EVO_NODISCARD auto getTypeI64() noexcept -> llvm::Type*;
+				EVO_NODISCARD auto getTypeI8()  noexcept -> llvm::IntegerType*;
+				EVO_NODISCARD auto getTypeI16() noexcept -> llvm::IntegerType*;
+				EVO_NODISCARD auto getTypeI32() noexcept -> llvm::IntegerType*;
+				EVO_NODISCARD auto getTypeI64() noexcept -> llvm::IntegerType*;
+				EVO_NODISCARD auto getTypeI128() noexcept -> llvm::IntegerType*;
 
-				EVO_NODISCARD auto getTypeI_N(unsigned n) noexcept -> llvm::Type*;
+				EVO_NODISCARD auto getTypeI_N(unsigned n) noexcept -> llvm::IntegerType*;
 
 
 
-				EVO_NODISCARD auto getTypePtr() noexcept -> llvm::Type*;
+				EVO_NODISCARD auto getTypePtr() noexcept -> llvm::PointerType*;
 
 				EVO_NODISCARD auto getTypeVoid() noexcept -> llvm::Type*;
 

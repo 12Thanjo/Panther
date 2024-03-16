@@ -34,6 +34,7 @@ namespace panther{
 			break; case AST::Kind::VarDecl: return this->analyze_var(this->source.getVarDecl(node));
 			break; case AST::Kind::Func: return this->analyze_func(this->source.getFunc(node));
 			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node));
+			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node));
 		};
 
 		EVO_FATAL_BREAK("This AST Kind is not handled (semantic analysis of stmt)");
@@ -78,7 +79,7 @@ namespace panther{
 			const AST::Node& expr_node = this->source.getNode(var_decl.expr);
 
 			if(expr_node.kind != AST::Kind::Uninit){
-				const std::optional<object::Type::ID> expr_type_id = this->get_type_of_expr(expr_node);
+				const std::optional<object::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
 
 				if(expr_type_id.has_value() == false){ return false; }
 
@@ -101,7 +102,7 @@ namespace panther{
 
 
 		///////////////////////////////////
-		// create object
+		// check value
 
 		object::Expr var_value = var_decl.expr;
 
@@ -142,6 +143,10 @@ namespace panther{
 			}
 		}
 
+
+
+		///////////////////////////////////
+		// create object
 
 		const object::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id, var_value);
 
@@ -257,7 +262,7 @@ namespace panther{
 
 			const AST::Node& expr_node = this->source.getNode(*return_stmt.value);
 
-			const std::optional<object::Type::ID> expr_type_id = this->get_type_of_expr(expr_node);
+			const std::optional<object::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
 			if(expr_type_id.has_value() == false){ return false; }
 
 			if(*expr_type_id != *this->current_func->return_type){
@@ -291,13 +296,77 @@ namespace panther{
 
 
 		const object::Return::ID ret_id = this->source.createReturn(return_value);
+		this->current_func->stmts.emplace_back(ret_id);
 
 		this->current_func->returns = true;
 
-		this->current_func->stmts.emplace_back(ret_id);
+		return true;
+	};
+
+
+
+
+	auto SemanticAnalyzer::analyze_infix(const AST::Infix& infix) noexcept -> bool {
+		// for now since there are no other infix operations yet
+		return this->analyze_assignment(infix);
+	};
+
+
+	auto SemanticAnalyzer::analyze_assignment(const AST::Infix& infix) noexcept -> bool {
+		// check if ident exists
+		const Token& ident = this->source.getIdent(infix.lhs);
+		if(this->has_in_scope(ident.value.string) == false){
+			this->source.error("Attemted to assign a value to a variable that does not exist", ident);
+			return false;
+		}
+
+
+		///////////////////////////////////
+		// check that the ident is a variable, and get it
+
+		std::optional<object::Var::ID> var_id;
+
+		for(Scope& scope : this->scopes){
+			if(scope.vars.contains(ident.value.string)){
+				// is a var
+				var_id = scope.vars.at(ident.value.string);
+				break;
+
+			}else if(scope.funcs.contains(ident.value.string)){
+				// is a function
+				this->source.error("Cannot assign a value to a function", ident);
+				return false;
+			}
+		}
+
+
+		const object::Var& var = this->source.getVar(*var_id);
+
+		const std::optional<object::Type::ID> expr_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
+		if(expr_type.has_value() == false){ return false; }
+
+		if(*expr_type != var.type){
+			SourceManager& src_manager = this->source.getSourceManager();
+
+			this->source.error(
+				"Attempted to assign a value to a variable of a different type",
+				infix.rhs,
+
+				std::vector<Message::Info>{
+					{std::string("Variable is of type:   ") + src_manager.printType(var.type)},
+					{std::string("Expression is of type: ") + src_manager.printType(*expr_type)}
+				}
+			);
+		}
+
+
+		const object::Assignment::ID assignment_id = this->source.createAssignment(*var_id, infix.op, this->get_expr_value(infix.rhs));
+		this->current_func->stmts.emplace_back(assignment_id);
 
 		return true;
 	};
+
+
 
 
 
@@ -319,7 +388,7 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<object::Type::ID> {
+	auto SemanticAnalyzer::analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<object::Type::ID> {
 		SourceManager& src_manager = this->source.getSourceManager();
 
 

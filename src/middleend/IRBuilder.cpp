@@ -134,44 +134,41 @@ namespace panther{
 		};
 
 
-		auto IRBuilder::getTypeBool()  noexcept -> llvm::Type* {
-			 llvm::IntegerType* type = this->builder->getInt1Ty();
-			 return static_cast<llvm::Type*>(type);
+		auto IRBuilder::getTypeBool()  noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt1Ty();
 		};
 
 
-		auto IRBuilder::getTypeI8()  noexcept -> llvm::Type* {
-			 llvm::IntegerType* type = this->builder->getInt8Ty();
-			 return static_cast<llvm::Type*>(type);
+		auto IRBuilder::getTypeI8()  noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt8Ty();
 		};
 
-		auto IRBuilder::getTypeI16() noexcept -> llvm::Type* {
-			 llvm::IntegerType* type = this->builder->getInt16Ty();
-			 return static_cast<llvm::Type*>(type);
+		auto IRBuilder::getTypeI16() noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt16Ty();
 		};
 
-		auto IRBuilder::getTypeI32() noexcept -> llvm::Type* {
-			 llvm::IntegerType* type = this->builder->getInt32Ty();
-			 return static_cast<llvm::Type*>(type);
+		auto IRBuilder::getTypeI32() noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt32Ty();
 		};
 
-		auto IRBuilder::getTypeI64() noexcept -> llvm::Type* {
-			 llvm::IntegerType* type = this->builder->getInt64Ty();
-			 return static_cast<llvm::Type*>(type);
+		auto IRBuilder::getTypeI64() noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt64Ty();
 		};
 
-
-		auto IRBuilder::getTypeI_N(unsigned n) noexcept -> llvm::Type* {
-			 llvm::IntegerType* type = this->builder->getIntNTy(n);
-			 return static_cast<llvm::Type*>(type);
+		auto IRBuilder::getTypeI128() noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt128Ty();
 		};
 
 
+		auto IRBuilder::getTypeI_N(unsigned n) noexcept -> llvm::IntegerType* {
+			 return this->builder->getIntNTy(n);
+		};
 
 
-		auto IRBuilder::getTypePtr() noexcept -> llvm::Type* {
-			llvm::PointerType* type = this->builder->getPtrTy();
-			return static_cast<llvm::Type*>(type);
+
+
+		auto IRBuilder::getTypePtr() noexcept -> llvm::PointerType* {
+			return this->builder->getPtrTy();
 		};
 
 		auto IRBuilder::getTypeVoid() noexcept -> llvm::Type* { return this->builder->getVoidTy(); };

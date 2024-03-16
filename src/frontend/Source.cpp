@@ -66,6 +66,14 @@ namespace panther{
 		return this->returns[node.index];
 	};
 
+	auto Source::getInfix(AST::Node::ID node_id) const noexcept -> const AST::Infix& {
+		return this->getInfix(this->getNode(node_id));
+	};
+	auto Source::getInfix(const AST::Node& node) const noexcept -> const AST::Infix& {
+		evo::debugAssert(node.kind == AST::Kind::Infix, "Node is not a Infix");
+		return this->infixes[node.index];
+	};
+
 
 
 	auto Source::getType(AST::Node::ID node_id) const noexcept -> const AST::Type& {

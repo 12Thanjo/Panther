@@ -273,6 +273,7 @@ namespace panther{
 				break; case AST::Kind::VarDecl: this->print_var_decl(source, node);
 				break; case AST::Kind::Func: this->print_func(source, node);
 				break; case AST::Kind::Return: this->print_return(source, node);
+				break; case AST::Kind::Infix: this->print_infix(source, node);
 
 				break; default: EVO_FATAL_BREAK("Unknown stmt type");
 			};
@@ -392,6 +393,35 @@ namespace panther{
 		};
 
 
+		auto Printer::print_infix(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::Infix& infix = source.getInfix(node);
+
+			this->indenter_print();
+			this->info("Infix Op:\n");
+
+			this->indenter_push();
+				this->indenter_print();
+				this->info("op: ");
+				this->debug( std::format("{}\n", Token::printKind(source.getToken(infix.op).kind)) );
+
+				this->indenter_set_arrow();
+				this->indenter_print();
+				this->info("lhs:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_expr(source, source.getNode(infix.lhs));
+				this->indenter_pop();
+
+				this->indenter_set_end();
+				this->indenter_print();
+				this->info("rhs:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_expr(source, source.getNode(infix.rhs));
+				this->indenter_pop();
+
+			this->indenter_pop();
+		};
 
 
 

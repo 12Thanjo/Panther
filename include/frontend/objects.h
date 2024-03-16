@@ -104,21 +104,36 @@ namespace panther{
 		};
 
 
+		struct Assignment{
+			struct ID{ // typesafe identifier
+				uint32_t id;
+				explicit ID(uint32_t _id) noexcept : id(_id) {};
+			};
+
+			Var::ID var;
+			Token::ID op;
+			Expr value;
+		};
+
+
 
 
 		struct Stmt{
 			enum class Kind{
 				Var,
 				Return,
+				Assignment,
 			} kind;
 
 			union {
 				Var::ID var;
 				Return::ID ret;
+				Assignment::ID assignment;
 			};
 
 			Stmt(Var::ID id) : kind(Kind::Var), var(id) {};
 			Stmt(Return::ID id) : kind(Kind::Return), ret(id) {};
+			Stmt(Assignment::ID id) : kind(Kind::Assignment), assignment(id) {};
 		};
 
 
