@@ -74,6 +74,14 @@ namespace panther{
 		return this->infixes[node.index];
 	};
 
+	auto Source::getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall& {
+		return this->getFuncCall(this->getNode(node_id));
+	};
+	auto Source::getFuncCall(const AST::Node& node) const noexcept -> const AST::FuncCall& {
+		evo::debugAssert(node.kind == AST::Kind::FuncCall, "Node is not a FuncCall");
+		return this->func_calls[node.index];
+	};
+
 
 
 	auto Source::getType(AST::Node::ID node_id) const noexcept -> const AST::Type& {
@@ -263,6 +271,12 @@ namespace panther{
 				return this->get_node_location(func.ident);
 			} break;
 
+
+			case AST::Kind::FuncCall: {
+				const AST::FuncCall& func_call = this->getFuncCall(node);
+				return this->get_node_location(func_call.target);
+			} break;
+
 			
 			case AST::Kind::Type: {
 				const AST::Type& type = this->getType(node);
@@ -271,7 +285,7 @@ namespace panther{
 			} break;
 
 			case AST::Kind::Block: {
-				EVO_FATAL_BREAK("Cannot get location of Block");
+				EVO_FATAL_BREAK("Cannot get location of AST::Block");
 			} break;
 
 

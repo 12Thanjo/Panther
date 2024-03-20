@@ -14,10 +14,12 @@ namespace panther{
 			Type,
 			Block,
 			Infix,
+			FuncCall,
 
 			// tokens
 			Ident,
 			Literal,
+			Intrinsic,
 			Uninit,
 		};
 
@@ -75,6 +77,11 @@ namespace panther{
 			Node::ID lhs;
 			Token::ID op;
 			Node::ID rhs;
+		};
+
+
+		struct FuncCall{
+			Node::ID target;
 		};
 
 	};

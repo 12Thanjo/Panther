@@ -275,6 +275,8 @@ namespace panther{
 				break; case AST::Kind::Return: this->print_return(source, node);
 				break; case AST::Kind::Infix: this->print_infix(source, node);
 
+				break; case AST::Kind::FuncCall: this->print_expr(source, node);
+
 				break; default: EVO_FATAL_BREAK("Unknown stmt type");
 			};
 		};
@@ -460,15 +462,41 @@ namespace panther{
 
 		auto Printer::print_expr(const Source& source, const AST::Node& node) noexcept -> void {
 			switch(node.kind){
-				break; case AST::Kind::Literal: this->print_literal(source, node);
-				break; case AST::Kind::Ident: {
+				case AST::Kind::Literal: {
+					this->print_literal(source, node);
+				} break;
+
+				case AST::Kind::Ident: {
 					this->indenter_print();
 					this->debug( std::format("{}\n", source.getToken(node.token).value.string) );
 				} break;
 
-				break; case AST::Kind::Uninit: {
+				case AST::Kind::Intrinsic: {
+					this->indenter_print();
+					this->debug( std::format("@{}\n", source.getToken(node.token).value.string) );
+				} break;
+
+				case AST::Kind::Uninit: {
 					this->indenter_print();
 					this->debug("[uninit]\n");
+				} break;
+
+
+				case AST::Kind::FuncCall: {
+					const AST::FuncCall& func_call = source.getFuncCall(node);
+
+					this->indenter_print();
+					this->info("Function Call:\n");
+
+					this->indenter_push();
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("Target:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(source, source.getNode(func_call.target));
+						this->indenter_pop();
+					this->indenter_pop();
 				} break;
 
 				break; default: EVO_FATAL_BREAK("Node is not an expr");

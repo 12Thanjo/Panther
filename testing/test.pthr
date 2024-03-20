@@ -1,22 +1,36 @@
 
 
-var global: Int = 12;
+var global: Int = 9;
 
 
-
-func test_func = () -> Bool {
-	return true;
+func change_global = () -> Void {
+	global = 12;
 }
 
 
-func get_global = () #export -> Int {
+
+func get_global = () -> Int {
 	return global;
 }
 
 
-func set_global_to_14 = () #export -> Void {
-	global = 14;
+func get_bool = () -> Bool {
+	return false;
 }
+
+
+
+func main = () #export -> Int {
+	change_global();
+
+	uninit;
+
+	var foo: Int = get_global();
+	return foo;
+}
+
+
+
 
 
 

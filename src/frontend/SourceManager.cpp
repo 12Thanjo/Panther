@@ -99,20 +99,10 @@ namespace panther{
 		evo::debugAssert(this->isLocked(), "Can only initialize builtin types when locked");
 
 
-		/*object::BaseType& Int = */this->base_types.emplace_back(
-			object::BaseType{
-				.is_builtin = true,
-				.builtin = Token::TypeInt,
-			}
-		);
+		/*PIR::BaseType& Int = */this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeInt);
 
 
-		/*object::BaseType& Bool = */this->base_types.emplace_back(
-			object::BaseType{
-				.is_builtin = true,
-				.builtin = Token::TypeBool,
-			}
-		);
+		/*PIR::BaseType& Bool = */this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
 
 	};
 
@@ -140,8 +130,21 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// objects
 
-	auto SourceManager::getBaseType(Token::Kind tok_kind) noexcept -> object::BaseType& {
-		for(object::BaseType& base_type : this->base_types){
+	auto SourceManager::createBaseType(PIR::BaseType&& base_type) noexcept -> PIR::BaseType::ID {
+		for(size_t i = 0; i < this->base_types.size(); i+=1){
+			if(base_type == this->base_types[i]){
+				return PIR::BaseType::ID( uint32_t(i) );
+			}
+		}
+
+
+		this->base_types.emplace_back(std::move(base_type));
+		return PIR::BaseType::ID( uint32_t(this->base_types.size() - 1) );
+	};
+
+
+	auto SourceManager::getBaseType(Token::Kind tok_kind) noexcept -> PIR::BaseType& {
+		for(PIR::BaseType& base_type : this->base_types){
 			if(base_type == tok_kind){
 				return base_type;
 			}
@@ -151,12 +154,12 @@ namespace panther{
 	};
 
 
-	auto SourceManager::getBaseTypeID(Token::Kind tok_kind) const noexcept -> object::BaseType::ID {
+	auto SourceManager::getBaseTypeID(Token::Kind tok_kind) const noexcept -> PIR::BaseType::ID {
 		for(size_t i = 0; i < this->base_types.size(); i+=1){
-			const object::BaseType& base_type = this->base_types[i];
+			const PIR::BaseType& base_type = this->base_types[i];
 
 			if(base_type == tok_kind){
-				return object::BaseType::ID( uint32_t(i) );
+				return PIR::BaseType::ID( uint32_t(i) );
 			}
 		}
 
@@ -165,32 +168,32 @@ namespace panther{
 
 
 
-	auto SourceManager::getTypeID(const object::Type& type) noexcept -> object::Type::ID {
+	auto SourceManager::getTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID {
 		// find existing type
 		for(size_t i = 0; i < this->types.size(); i+=1){
-			const object::Type& type_ref = this->types[i];
+			const PIR::Type& type_ref = this->types[i];
 
 			if(type_ref == type){
-				return object::Type::ID( uint32_t(i) );
+				return PIR::Type::ID( uint32_t(i) );
 			}
 		}
 
 
 		// create new type
 		this->types.emplace_back(type);
-		return object::Type::ID( uint32_t(this->types.size() - 1) );
+		return PIR::Type::ID( uint32_t(this->types.size() - 1) );
 	};
 
 
 
-	auto SourceManager::printType(object::Type::ID id) const noexcept -> std::string {
-		const object::Type& type = this->getType(id);
-		const object::BaseType& base_type = this->base_types[type.base_type.id];
+	auto SourceManager::printType(PIR::Type::ID id) const noexcept -> std::string {
+		const PIR::Type& type = this->getType(id);
+		const PIR::BaseType& base_type = this->base_types[type.base_type.id];
 
 
 		std::string base_type_str = [&]() noexcept {
-			if(base_type.is_builtin){
-				return Token::printKind(base_type.builtin);
+			if(base_type.kind == PIR::BaseType::Kind::Builtin){
+				return Token::printKind(base_type.builtin.kind);
 
 			}else{
 				// TODO:

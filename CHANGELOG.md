@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.11.0
+- Added function call expressions and statements
+- Added printing of the current output target in verbose mode
+- Added semantic analysis checking for literal, ident, and uninit expressions
+
 ### v0.10.0
 - Added assigning new values to variables
 

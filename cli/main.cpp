@@ -2,7 +2,7 @@
 #include "./Printer.h"
 #include "frontend/SourceManager.h"
 #include "middleend/Context.h"
-#include "ObjectsToIR.h"
+#include "PIRToLLVMIR.h"
 
 
 #include <Evo.h>
@@ -11,11 +11,11 @@
 
 
 
-#if !defined(NOMINMAX)
+#if !defined(WIN32_LEAN_AND_MEAN)
 	#define WIN32_LEAN_AND_MEAN
 #endif
 
-#if !defined(NOMINMAX)
+#if !defined(NOCOMM)
 	#define NOCOMM
 #endif
 
@@ -64,7 +64,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		.name		  = "testing",
 		.print_colors = true,
 		.verbose      = true,
-		.target       = Config::Target::PrintLLVMIR,
+		.target       = Config::Target::Run,
 	};
 
 
@@ -107,13 +107,18 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	if(config.verbose){
 		printer.info("Panther Compiler\n");
 		printer.trace("----------------\n");
-	}
 
-
-
-
-	if(config.verbose){
 		printer.debug( std::format("Relative Directory: {}\n", config.relative_directory.string()) );
+
+		switch(config.target){
+			break; case Config::Target::PrintTokens:      printer.debug("Target: PrintTokens\n");
+			break; case Config::Target::PrintAST:         printer.debug("Target: PrintAST\n");
+			break; case Config::Target::SemanticAnalysis: printer.debug("Target: SemanticAnalysis\n");
+			break; case Config::Target::PrintLLVMIR:      printer.debug("Target: PrintLLVMIR\n");
+			break; case Config::Target::LLVMIR:           printer.debug("Target: LLVMIR\n");
+			break; case Config::Target::Object:           printer.debug("Target: Object\n");
+			break; case Config::Target::Run:              printer.debug("Target: Run\n");
+		};
 	}
 
 
@@ -256,10 +261,10 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	llvm_context.init();
 
 
-	auto objects_to_ir = panther::ObjectsToIR();
-	objects_to_ir.init(config.name, llvm_context);
+	auto pir_to_llvmir = panther::PIRToLLVMIR();
+	pir_to_llvmir.init(config.name, llvm_context);
 
-	objects_to_ir.lower(source_manager);
+	pir_to_llvmir.lower(source_manager);
 
 
 	if(config.verbose){
@@ -270,16 +275,16 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	if(config.target == Config::Target::PrintLLVMIR){
 		if(config.verbose){ printer.trace("------------------------------\n"); }
-		printer.info(objects_to_ir.printLLVMIR());
+		printer.info(pir_to_llvmir.printLLVMIR());
 
-		objects_to_ir.shutdown();
+		pir_to_llvmir.shutdown();
 
 		exit();
 		return 0;
 
 	}else if(config.target == Config::Target::LLVMIR){
-		const std::string output = objects_to_ir.printLLVMIR();
-		objects_to_ir.shutdown();
+		const std::string output = pir_to_llvmir.printLLVMIR();
+		pir_to_llvmir.shutdown();
 
 
 		const std::string path_str = config.output_path.string();
@@ -310,14 +315,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		return 0;
 
 	}else if(config.target == Config::Target::Object){
-		const std::optional< std::vector<evo::byte> > output = objects_to_ir.compileToObjectFile();
+		const std::optional< std::vector<evo::byte> > output = pir_to_llvmir.compileToObjectFile();
 		if(output.has_value() == false){
 			printer.fatal("Target machine cannot output object file");
 			exit();
 			return 1;
 		}
 
-		objects_to_ir.shutdown();
+		pir_to_llvmir.shutdown();
 
 		const std::string path_str = config.output_path.string();
 
@@ -348,13 +353,13 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	}else if(config.target == Config::Target::Run){
 		if(config.verbose){ printer.trace("------------------------------\nRunning:\n"); }
 
-		uint64_t return_code = objects_to_ir.run<uint64_t>("main");
+		uint64_t return_code = pir_to_llvmir.run<uint64_t>("main");
 
 		// if(config.verbose){ printer.trace("------------------------------\n"); }
 
 		printer.info(std::format("Return Code: {}\n", return_code));
 
-		objects_to_ir.shutdown();
+		pir_to_llvmir.shutdown();
 
 
 		exit();
@@ -366,7 +371,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	//////////////////////////////////////////////////////////////////////
 	// done
 
-	objects_to_ir.shutdown();
+	pir_to_llvmir.shutdown();
 	
 
 	exit();

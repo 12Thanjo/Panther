@@ -43,8 +43,18 @@ namespace panther{
 		result = this->parse_assignment();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
-		result = this->parse_func_call();
-		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+		// meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
+		result = this->parse_expr();
+		if(result.code() == Result::Success){
+			// ;
+			if(this->expect_token(Token::get(";"), "at end of variable declaration") == false){ return Result::Error; }
+			
+			return result;
+
+		}else if(result.code() == Result::Error){
+			return Result::Error;
+		}
+
 
 		return Result::WrongType;
 	};
@@ -202,12 +212,8 @@ namespace panther{
 		const Result expr = this->parse_expr();
 		if(this->check_result_fail(expr, "Expression value in assignment")){ return Result::Error; }
 
-
 		// ;
 		if(this->expect_token(Token::get(";"), "at end of assignment") == false){ return Result::Error; }
-
-
-
 
 
 		return this->create_node(
@@ -219,28 +225,9 @@ namespace panther{
 
 
 
-	auto Parser::parse_func_call() noexcept -> Result {
 
-		return Result::WrongType;
-	};
+	
 
-
-
-
-
-	auto Parser::parse_expr() noexcept -> Result {
-		Result result = this->parse_literal();
-		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
-
-		result = this->parse_ident();
-		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
-
-		result = this->parse_uninit();
-		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
-
-
-		return Result::WrongType;
-	};
 
 
 
@@ -304,6 +291,155 @@ namespace panther{
 
 
 
+	auto Parser::parse_uninit() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordUninit){
+			return Result::WrongType;
+		}
+
+		return this->create_token_node(AST::Kind::Uninit, this->next());	
+	};
+
+
+	auto Parser::parse_expr() noexcept -> Result {
+		Result result = this->parse_uninit();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+
+		return this->parse_infix_expr();
+	};
+
+
+
+	auto Parser::parse_infix_expr() noexcept -> Result {
+		const Result lhs_result = this->parse_prefix_expr();
+		if(lhs_result.code() == Result::WrongType || lhs_result.code() == Result::Error){ return lhs_result; }
+
+		return this->parse_infix_expr_impl(lhs_result.value(), 1);
+	};
+
+
+
+	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
+		switch(kind){
+			// This warns at the moment, but the fix will come with operators
+		};
+
+		return -1;
+	};
+
+	auto Parser::parse_infix_expr_impl(AST::Node::ID lhs, int prec_level) noexcept -> Result {
+		const Token::ID peeked_op = this->peek();
+		const Token::Kind peeked_kind = this->get(peeked_op).kind;
+
+		const int next_op_prec = get_infix_op_precedence(peeked_kind);
+
+		// if not an infix operator or is same or lower precedence
+		// 		next_op_prec == -1 if its not an infix op
+		//   	< to maintain operator precedence
+		// 		<= to prevent `a + b + c` from being parsed as `a + (b + c)`
+		if(next_op_prec <= prec_level){ return lhs; }
+
+		// skip operator
+		this->skip(1);
+
+		const Result next_term = this->parse_prefix_expr();
+		if(next_term.code() == Result::WrongType || next_term.code() == Result::Error){ return next_term; }
+
+		const Result rhs_result = this->parse_infix_expr_impl(next_term.value(), next_op_prec);
+		if(next_term.code() == Result::WrongType || next_term.code() == Result::Error){ return next_term; }
+
+
+		return this->create_node(
+			this->source.infixes, AST::Kind::Infix,
+			lhs, peeked_op, rhs_result.value()
+		);
+	};
+
+
+
+	auto Parser::parse_prefix_expr() noexcept -> Result {
+		return this->parse_postfix_expr();
+	};
+
+
+
+	auto Parser::parse_postfix_expr() noexcept -> Result {
+		return this->parse_accessor_expr();
+	};
+
+
+
+	auto Parser::parse_accessor_expr() noexcept -> Result {
+		Result output = this->parse_paren_expr();
+		if(output.code() == Result::WrongType || output.code() == Result::Error){ return output; }
+
+
+		while(true){
+			if(this->get(this->peek()).kind == Token::get("(")){
+				this->skip(1);
+
+				// )
+				if(this->expect_token(Token::get(")"), "at end of function call") == false){ return Result::Error; }
+
+				output = this->create_node(this->source.func_calls, AST::Kind::FuncCall,
+					output.value()
+				);
+
+			}else{
+				break;
+			}
+		};
+
+		return output;
+	};
+
+
+
+	auto Parser::parse_paren_expr() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::get("(")){
+			return this->parse_term();
+		}
+
+		const Token::ID open_location = this->next();
+
+		const Result expr_result = this->parse_expr();
+		if(expr_result.code() == Result::WrongType || expr_result.code() == Result::Error){ return expr_result; }
+
+
+		if(this->get(this->peek()).kind != Token::get(")")){
+			const Token& open_location_token = this->source.getToken(open_location);
+			const Location open_location_location = Location(open_location_token.line_start, open_location_token.collumn_start, open_location_token.collumn_end);
+
+			this->expected_but_got("either closing parenthesis around expression or continuation of expression", 
+				std::vector<Message::Info>{ {"parenthesis opened here", open_location_location}, }
+			);
+			return Result::Error;
+		}
+
+		// skip ')'
+		this->skip(1);
+
+		return expr_result;
+	};
+
+
+
+	auto Parser::parse_term() noexcept -> Result {
+		Result result = this->parse_literal();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+		result = this->parse_ident();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+		result = this->parse_intrinsic();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+
+		return Result::WrongType;
+	};
+
+
+
 
 
 	auto Parser::parse_literal() noexcept -> Result {
@@ -330,14 +466,15 @@ namespace panther{
 		return this->create_token_node(AST::Kind::Ident, this->next());
 	};
 
-
-	auto Parser::parse_uninit() noexcept -> Result {
-		if(this->get(this->peek()).kind != Token::KeywordUninit){
+	auto Parser::parse_intrinsic() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::Intrinsic){
 			return Result::WrongType;
 		}
 
-		return this->create_token_node(AST::Kind::Uninit, this->next());	
+		return this->create_token_node(AST::Kind::Intrinsic, this->next());
 	};
+
+
 
 
 
@@ -355,9 +492,9 @@ namespace panther{
 	};
 
 
-	auto Parser::expected_but_got(evo::CStrProxy msg, Token::ID token_id) const noexcept -> void {
+	auto Parser::expected_but_got(evo::CStrProxy msg, Token::ID token_id, std::vector<Message::Info>&& infos) const noexcept -> void {
 		const Token& token = this->get(token_id);
-		this->source.error(std::format("Expected {} - got [{}] instead.", msg.data(), Token::printKind(token.kind)), token_id);
+		this->source.error(std::format("Expected {} - got [{}] instead.", msg.data(), Token::printKind(token.kind)), token_id, std::move(infos));
 	};
 
 

@@ -6,7 +6,7 @@
 #include "./Token.h"
 #include "./AST.h"
 #include "Message.h"
-#include "objects.h"
+#include "PIR.h"
 
 
 namespace panther{
@@ -41,8 +41,11 @@ namespace panther{
 			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
 
 
+			//////////////////////////////////////////////////////////////////////
+			// getting
+
 			///////////////////////////////////
-			// gettting
+			// AST
 
 			EVO_NODISCARD auto getNode(AST::Node::ID node_id) const noexcept -> const AST::Node&;
 			EVO_NODISCARD auto getToken(Token::ID token_id) const noexcept -> const Token&;
@@ -67,6 +70,9 @@ namespace panther{
 			EVO_NODISCARD auto getInfix(AST::Node::ID node_id) const noexcept -> const AST::Infix&;
 			EVO_NODISCARD auto getInfix(const AST::Node& node) const noexcept -> const AST::Infix&;
 
+			EVO_NODISCARD auto getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall&;
+			EVO_NODISCARD auto getFuncCall(const AST::Node& node) const noexcept -> const AST::FuncCall&;
+
 
 			EVO_NODISCARD auto getLiteral(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getLiteral(const AST::Node& node) const noexcept -> const Token&;
@@ -80,77 +86,90 @@ namespace panther{
 
 
 
-
-
-			template<typename... Args>
-			EVO_NODISCARD inline auto createVar(Args... args) noexcept -> object::Var::ID {
-				this->objects.vars.emplace_back(args...);
-
-				return object::Var::ID( uint32_t(this->objects.vars.size() - 1) );
-			};
-
-
-			EVO_NODISCARD inline auto getVar(object::Var::ID id) const noexcept -> const object::Var& {
-				return this->objects.vars[size_t(id.id)];
-			};
-			EVO_NODISCARD inline auto getVar(object::Var::ID id) noexcept -> object::Var& {
-				return this->objects.vars[size_t(id.id)];
-			};
-
-
-
-			template<typename... Args>
-			EVO_NODISCARD inline auto createFunc(Args... args) noexcept -> object::Func::ID {
-				this->objects.funcs.emplace_back(args...);
-
-				return object::Func::ID( uint32_t(this->objects.funcs.size() - 1) );
-			};
-
-
-			EVO_NODISCARD inline auto getFunc(object::Func::ID id) const noexcept -> const object::Func& {
-				return this->objects.funcs[size_t(id.id)];
-			};
-			EVO_NODISCARD inline auto getFunc(object::Func::ID id) noexcept -> object::Func& {
-				return this->objects.funcs[size_t(id.id)];
-			};
-
-
-
-			template<typename... Args>
-			EVO_NODISCARD inline auto createReturn(Args... args) noexcept -> object::Return::ID {
-				this->objects.returns.emplace_back(args...);
-
-				return object::Return::ID( uint32_t(this->objects.returns.size() - 1) );
-			};
-
-
-			EVO_NODISCARD inline auto getReturn(object::Return::ID id) const noexcept -> const object::Return& {
-				return this->objects.returns[size_t(id.id)];
-			};
-			EVO_NODISCARD inline auto getReturn(object::Return::ID id) noexcept -> object::Return& {
-				return this->objects.returns[size_t(id.id)];
-			};
-
-
-
-			template<typename... Args>
-			EVO_NODISCARD inline auto createAssignment(Args... args) noexcept -> object::Assignment::ID {
-				this->objects.assignments.emplace_back(args...);
-
-				return object::Assignment::ID( uint32_t(this->objects.assignments.size() - 1) );
-			};
-
-
-			EVO_NODISCARD inline auto getAssignment(object::Assignment::ID id) const noexcept -> const object::Assignment& {
-				return this->objects.assignments[size_t(id.id)];
-			};
-			EVO_NODISCARD inline auto getAssignment(object::Assignment::ID id) noexcept -> object::Assignment& {
-				return this->objects.assignments[size_t(id.id)];
-			};
-
-
-
 			///////////////////////////////////
+			// PIR
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createVar(Args... args) noexcept -> PIR::Var::ID {
+				this->pir.vars.emplace_back(args...);
+
+				return PIR::Var::ID( uint32_t(this->pir.vars.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getVar(PIR::Var::ID id) const noexcept -> const PIR::Var& {
+				return this->pir.vars[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getVar(PIR::Var::ID id) noexcept -> PIR::Var& {
+				return this->pir.vars[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createFunc(Args... args) noexcept -> PIR::Func::ID {
+				this->pir.funcs.emplace_back(args...);
+
+				return PIR::Func::ID( uint32_t(this->pir.funcs.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getFunc(PIR::Func::ID id) const noexcept -> const PIR::Func& {
+				return this->pir.funcs[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getFunc(PIR::Func::ID id) noexcept -> PIR::Func& {
+				return this->pir.funcs[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createReturn(Args... args) noexcept -> PIR::Return::ID {
+				this->pir.returns.emplace_back(args...);
+
+				return PIR::Return::ID( uint32_t(this->pir.returns.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getReturn(PIR::Return::ID id) const noexcept -> const PIR::Return& {
+				return this->pir.returns[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getReturn(PIR::Return::ID id) noexcept -> PIR::Return& {
+				return this->pir.returns[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createAssignment(Args... args) noexcept -> PIR::Assignment::ID {
+				this->pir.assignments.emplace_back(args...);
+
+				return PIR::Assignment::ID( uint32_t(this->pir.assignments.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getAssignment(PIR::Assignment::ID id) const noexcept -> const PIR::Assignment& {
+				return this->pir.assignments[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getAssignment(PIR::Assignment::ID id) noexcept -> PIR::Assignment& {
+				return this->pir.assignments[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createFuncCall(Args... args) noexcept -> PIR::FuncCall::ID {
+				this->pir.func_calls.emplace_back(args...);
+
+				return PIR::FuncCall::ID( uint32_t(this->pir.func_calls.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getFuncCall(PIR::FuncCall::ID id) const noexcept -> const PIR::FuncCall& {
+				return this->pir.func_calls[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getFuncCall(PIR::FuncCall::ID id) noexcept -> PIR::FuncCall& {
+				return this->pir.func_calls[size_t(id.id)];
+			};
+
+
+
+			//////////////////////////////////////////////////////////////////////
 			// messaging / errors
 
 			auto fatal(const std::string& msg, uint32_t line, uint32_t collumn) noexcept -> void;
@@ -185,19 +204,21 @@ namespace panther{
 			std::vector<AST::Func> funcs{};
 			std::vector<AST::Return> returns{};
 			std::vector<AST::Infix> infixes{};
+			std::vector<AST::FuncCall> func_calls{};
 			std::vector<AST::Type> types{};
 			std::vector<AST::Block> blocks{};
 
 
 
-			struct /* objects */ {
-				std::vector<object::Var> vars{};
-				std::vector<object::Func> funcs{};
-				std::vector<object::Return> returns{};
-				std::vector<object::Assignment> assignments{};
+			struct /* pir */ {
+				std::vector<PIR::Var> vars{};
+				std::vector<PIR::Func> funcs{};
+				std::vector<PIR::Return> returns{};
+				std::vector<PIR::Assignment> assignments{};
+				std::vector<PIR::FuncCall> func_calls{};
 
-				std::vector<object::Var::ID> global_vars{};
-			} objects;
+				std::vector<PIR::Var::ID> global_vars{};
+			} pir;
 
 
 		private:

@@ -5,7 +5,7 @@
 
 
 #include "Source.h"
-#include "objects.h"
+#include "PIR.h"
 #include "Message.h"
 
 #include <functional>
@@ -77,25 +77,28 @@ namespace panther{
 			///////////////////////////////////
 			// objects
 
-			EVO_NODISCARD inline auto getBaseType(object::BaseType::ID id) const noexcept -> const object::BaseType& {
+			// If an equivalent type already exists, return its ID instead
+			EVO_NODISCARD auto createBaseType(PIR::BaseType&& base_type) noexcept -> PIR::BaseType::ID;
+
+			EVO_NODISCARD inline auto getBaseType(PIR::BaseType::ID id) const noexcept -> const PIR::BaseType& {
 				return this->base_types[id.id];
 			};
 
-			EVO_NODISCARD auto getBaseType(Token::Kind tok_kind) noexcept -> object::BaseType&;
-			EVO_NODISCARD auto getBaseTypeID(Token::Kind tok_kind) const noexcept -> object::BaseType::ID;
+			EVO_NODISCARD auto getBaseType(Token::Kind tok_kind) noexcept -> PIR::BaseType&;
+			EVO_NODISCARD auto getBaseTypeID(Token::Kind tok_kind) const noexcept -> PIR::BaseType::ID;
 
 
 			// gets type with matching ID
 			// if type doesn't already exist, create a new one
 			// TODO: &&
-			EVO_NODISCARD auto getTypeID(const object::Type& type) noexcept -> object::Type::ID;
+			EVO_NODISCARD auto getTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID;
 
-			EVO_NODISCARD inline auto getType(object::Type::ID id) const noexcept -> const object::Type& {
+			EVO_NODISCARD inline auto getType(PIR::Type::ID id) const noexcept -> const PIR::Type& {
 				return this->types[id.id];
 			};
 
 
-			EVO_NODISCARD auto printType(object::Type::ID id) const noexcept -> std::string;
+			EVO_NODISCARD auto printType(PIR::Type::ID id) const noexcept -> std::string;
 
 
 
@@ -103,8 +106,8 @@ namespace panther{
 			std::vector<Source> sources{};
 			bool is_locked = false;
 
-			std::vector<object::BaseType> base_types{};
-			std::vector<object::Type> types{};
+			std::vector<PIR::BaseType> base_types{};
+			std::vector<PIR::Type> types{};
 
 
 			MessageCallback message_callback;

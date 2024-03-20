@@ -31,14 +31,18 @@ namespace panther{
 			return static_cast<llvm::Value*>(from);
 		};
 
+		auto _ptrcast_to_value(llvm::CallInst* from) noexcept -> llvm::Value* {
+			return static_cast<llvm::Value*>(from);
+		};
 
 
-		auto _ptrcast_to_value(llvm::IntegerType* from) noexcept -> llvm::Type* {
+
+		auto _ptrcast_to_type(llvm::IntegerType* from) noexcept -> llvm::Type* {
 			return static_cast<llvm::Type*>(from);
 		};
 
 
-		auto _ptrcast_to_value(llvm::PointerType* from) noexcept -> llvm::Type* {
+		auto _ptrcast_to_type(llvm::PointerType* from) noexcept -> llvm::Type* {
 			return static_cast<llvm::Type*>(from);
 		};
 		

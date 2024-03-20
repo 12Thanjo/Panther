@@ -62,15 +62,33 @@ namespace panther{
 			EVO_NODISCARD auto parse_func() noexcept -> Result;
 			EVO_NODISCARD auto parse_return() noexcept -> Result;
 			EVO_NODISCARD auto parse_assignment() noexcept -> Result;
-			EVO_NODISCARD auto parse_func_call() noexcept -> Result;
 
-			EVO_NODISCARD auto parse_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
 			EVO_NODISCARD auto parse_block() noexcept -> Result;
 
-			EVO_NODISCARD auto parse_literal() noexcept -> Result;
-			EVO_NODISCARD auto parse_ident() noexcept -> Result;
+
+			///////////////////////////////////
+			// expr
+
+			EVO_NODISCARD auto parse_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_uninit() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_infix_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_infix_expr_impl(AST::Node::ID lhs, int prec_level) noexcept -> Result;
+			EVO_NODISCARD auto parse_prefix_expr() noexcept -> Result;
+			EVO_NODISCARD auto parse_postfix_expr() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_accessor_expr() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_paren_expr() noexcept -> Result;
+
+
+			EVO_NODISCARD auto parse_term() noexcept -> Result;
+
+			EVO_NODISCARD auto parse_ident() noexcept -> Result;
+			EVO_NODISCARD auto parse_literal() noexcept -> Result;
+			EVO_NODISCARD auto parse_intrinsic() noexcept -> Result;
+
 
 
 		private:
@@ -100,9 +118,9 @@ namespace panther{
 
 			auto expect_token(Token::Kind kind, evo::CStrProxy location) noexcept -> bool; // returns if got punctuation
 
-			auto expected_but_got(evo::CStrProxy msg, Token::ID token_id) const noexcept -> void;
-			auto expected_but_got(evo::CStrProxy msg) const noexcept -> void {
-				this->expected_but_got(msg, this->peek());
+			auto expected_but_got(evo::CStrProxy msg, Token::ID token_id, std::vector<Message::Info>&& infos = {}) const noexcept -> void;
+			auto expected_but_got(evo::CStrProxy msg, std::vector<Message::Info>&& infos = {}) const noexcept -> void {
+				this->expected_but_got(msg, this->peek(), std::move(infos));
 			};
 
 
