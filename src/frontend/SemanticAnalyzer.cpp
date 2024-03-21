@@ -214,12 +214,21 @@ namespace panther{
 
 		// check attributes
 		bool is_export = false;
+		bool is_entry = false;
 		for(Token::ID attribute : func.attributes){
 			const Token& token = this->source.getToken(attribute);
 			std::string_view token_str = token.value.string;
 
 			if(token_str == "export"){
+				if(this->is_valid_export_name(ident.value.string) == false){
+					this->source.error(std::format("Function with attribute \"#export\" cannot be named \"{}\"", ident.value.string), ident);
+					return false;
+				}
+
 				is_export = true;
+
+			}else if(token_str == "entry"){
+				is_entry = true;
 
 			}else{
 				this->source.error(std::format("Uknown attribute \"#{}\"", token_str), token);
@@ -241,7 +250,6 @@ namespace panther{
 				PIR::Type( src_manager.getBaseTypeID(return_type_token.kind) )
 			);
 		}
-
 
 
 
@@ -268,7 +276,33 @@ namespace panther{
 
 		this->current_func = &this->source.pir.funcs[func_id.id];
 
+
+
+		if(is_entry){
+			SourceManager& src_manager = this->source.getSourceManager();
+
+			// check is valid return type
+			if(return_type_id.has_value() == false || *return_type_id != src_manager.getTypeInt()){
+				this->source.error("Function with attribute \"#entry\" must return type Int", ident);
+				return false;
+			}
+
+			// check there isn't already an entry function defined
+			if(src_manager.hasEntry()){
+				this->source.error("Already has entry function", ident);
+				return false;
+			}
+
+			// create entry
+			src_manager.addEntry(this->source.getID(), func_id);
+		}
+
+
+
+
+		///////////////////////////////////
 		// analyze block
+
 		const AST::Block& block = this->source.getBlock(func.block);
 		if(this->analyze_block(block) == false){
 			return false;
@@ -622,6 +656,16 @@ namespace panther{
 
 
 
+	};
+
+
+
+
+	// TODO: check for exported functions in all files (through saving in SourceManager)
+	auto SemanticAnalyzer::is_valid_export_name(std::string_view name) const noexcept -> bool {
+		if(name == "main"){ return false; }
+
+		return true;
 	};
 
 

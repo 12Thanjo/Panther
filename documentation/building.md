@@ -56,10 +56,10 @@ cmake --build . %JOBS_ARG% --target install
 if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 ```
 
-Run `setup_llvm.bat`. This will take a very long time
+Run `setup_llvm.bat`. This may take awhile (took my PC 2+ hours).
 
 ### Other Platforms:
-Not supported yet
+##### TODO
 
 
 ## Adding LLVM to the Panther Project:

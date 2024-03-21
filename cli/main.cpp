@@ -132,23 +132,33 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	//////////////////////////////////////////////////////////////////////
 	// get code
 
-	const std::string file_path = (config.relative_directory / "testing/test.pthr").make_preferred().string();
+
+	auto file_paths = std::vector<std::string>{
+		(config.relative_directory / "testing/test.pthr").make_preferred().string(),
+		(config.relative_directory / "testing/test2.pthr").make_preferred().string(),
+	};
+
+	auto source_ids = std::vector<panther::Source::ID>();
+
+
 
 	auto file = evo::fs::File{};
-	{
+
+	for(const std::string& file_path : file_paths){
 		const bool opened_successfully = file.open(file_path, evo::fs::FileMode::Read);
 		if(opened_successfully == false){
 			printer.error(std::format("Failed to open file: {}\n", file_path));
 			exit();
 			return 1;
 		}
+
+		std::string file_data = file.read().value();
+
+		file.close();
+
+		source_ids.emplace_back(source_manager.addSource(file_path, std::move(file_data)));
 	}
 
-	std::string file_data = file.read().value();
-
-	file.close();
-
-	panther::Source::ID test_file_id = source_manager.addSource(file_path, std::move(file_data));
 
 
 	source_manager.lock();
@@ -189,8 +199,10 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	if(config.target == Config::Target::PrintTokens){
-		printer.trace("------------------------------\n");
-		printer.print_tokens(source_manager.getSource(test_file_id));
+		for(panther::Source::ID source_id : source_ids){
+			printer.trace("------------------------------\n");
+			printer.print_tokens(source_manager.getSource(source_id));
+		}
 
 		exit();
 		return 0;
@@ -217,8 +229,10 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	if(config.target == Config::Target::PrintAST){
-		if(config.verbose){ printer.trace("------------------------------\n"); }
-		printer.print_ast(source_manager.getSource(test_file_id));
+		for(panther::Source::ID source_id : source_ids){
+			if(config.verbose){ printer.trace("------------------------------\n"); }
+			printer.print_ast(source_manager.getSource(source_id));
+		}
 
 		exit();
 		return 0;
@@ -267,9 +281,15 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	pir_to_llvmir.lower(source_manager);
 
 
-	if(config.verbose){
-		printer.success("Lowered to LLVM IR\n");
+	if(config.verbose){ printer.success("Lowered to LLVM IR\n"); }
+
+
+	if(source_manager.hasEntry()){
+		pir_to_llvmir.addRuntime(source_manager, source_manager.getEntry());
+
+		if(config.verbose){ printer.success("Added Panther runtime to LLVM IR\n"); }
 	}
+
 
 
 
@@ -350,7 +370,21 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		exit();
 		return 0;
 
-	}else if(config.target == Config::Target::Run){
+	}
+
+
+	if(source_manager.hasEntry() == false){
+		printer.error("Error: Cannot run because no entry point was defined\n");
+		printer.info("\tNote: an entry point is defined by giving a function the attribute \"#entry\"\n");
+
+		pir_to_llvmir.shutdown();
+
+		exit();
+		return 1;
+	}
+
+
+	if(config.target == Config::Target::Run){
 		if(config.verbose){ printer.trace("------------------------------\nRunning:\n"); }
 
 		uint64_t return_code = pir_to_llvmir.run<uint64_t>("main");

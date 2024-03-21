@@ -82,6 +82,23 @@ namespace panther{
 
 
 
+			EVO_NODISCARD inline auto addRuntime(SourceManager& source_manager, const SourceManager::Entry& entry_func) noexcept -> void {
+				const Source& source = source_manager.getSource(entry_func.src_id);
+				const PIR::Func& func = source.getFunc(entry_func.func_id);
+
+				llvm::FunctionType* prototype = this->builder->getFuncProto(llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64()), {}, false);
+				llvm::Function* main_func = this->module->createFunction("main", prototype, llvmint::LinkageTypes::ExternalLinkage);
+
+				llvm::BasicBlock* entry_block = this->builder->createBasicBlock(main_func, "entry");
+				this->builder->setInsertionPoint(entry_block);
+
+				llvm::Value* entry_ret = llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
+				this->builder->createRet(entry_ret);
+			};
+
+
+
+
 			EVO_NODISCARD auto printLLVMIR() const noexcept -> std::string {
 				return this->module->print();
 			};

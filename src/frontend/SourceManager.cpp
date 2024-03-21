@@ -206,5 +206,23 @@ namespace panther{
 	};
 
 
+
+
+	auto SourceManager::addEntry(Source::ID src_id, PIR::Func::ID func_id) noexcept -> void {
+		evo::debugAssert(this->isLocked(), "Can only do add entry when locked");
+		evo::debugAssert(this->hasEntry() == false, "Already has an entry function");
+
+		this->entry = Entry(src_id, func_id);
+	};
+
+
+	auto SourceManager::getEntry() const noexcept -> Entry {
+		evo::debugAssert(this->isLocked(), "Can only do add entry when locked");
+		evo::debugAssert(this->hasEntry(), "SourceManager does not have an entry");
+
+		return *this->entry;
+	};
+
+
 	
 };

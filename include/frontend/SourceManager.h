@@ -17,6 +17,13 @@ namespace panther{
 		public:
 			using MessageCallback = std::function<void(const Message&)>;
 
+			struct Entry{
+				Source::ID src_id;
+				PIR::Func::ID func_id;
+			};
+
+		public:
+
 			SourceManager(MessageCallback msg_callback) : message_callback(msg_callback) {};
 			~SourceManager() = default;
 
@@ -97,8 +104,24 @@ namespace panther{
 				return this->types[id.id];
 			};
 
+			// TODO: better way of doing this
+			EVO_NODISCARD inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
+			EVO_NODISCARD inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
+
+
+
 
 			EVO_NODISCARD auto printType(PIR::Type::ID id) const noexcept -> std::string;
+
+
+
+
+
+
+			EVO_NODISCARD auto addEntry(Source::ID src_id, PIR::Func::ID func_id) noexcept -> void;
+
+			EVO_NODISCARD inline auto hasEntry() const noexcept -> bool { return this->entry.has_value(); };
+			EVO_NODISCARD auto getEntry() const noexcept -> Entry;
 
 
 
@@ -108,6 +131,8 @@ namespace panther{
 
 			std::vector<PIR::BaseType> base_types{};
 			std::vector<PIR::Type> types{};
+
+			std::optional<Entry> entry{};
 
 
 			MessageCallback message_callback;

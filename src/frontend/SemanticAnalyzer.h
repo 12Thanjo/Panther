@@ -39,6 +39,9 @@ namespace panther{
 			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> PIR::Expr;
 
 
+			EVO_NODISCARD auto is_valid_export_name(std::string_view name) const noexcept -> bool;
+
+
 			struct Scope{
 				std::unordered_map<std::string_view, PIR::Var::ID> vars{};
 				std::unordered_map<std::string_view, PIR::Func::ID> funcs{};

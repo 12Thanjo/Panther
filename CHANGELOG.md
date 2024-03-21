@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.12.0
+- Added Panther runtime
+- Added `#entry` function attribute
+
 ### v0.11.0
 - Added function call expressions and statements
 - Added printing of the current output target in verbose mode
