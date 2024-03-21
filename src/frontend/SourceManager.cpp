@@ -98,12 +98,13 @@ namespace panther{
 	auto SourceManager::initBuiltinTypes() noexcept -> void {
 		evo::debugAssert(this->isLocked(), "Can only initialize builtin types when locked");
 
+		// Int (0)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeInt);
+		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(0)) );
 
-		/*PIR::BaseType& Int = */this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeInt);
-
-
-		/*PIR::BaseType& Bool = */this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
-
+		// Bool (1)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
+		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(1)) );
 	};
 
 

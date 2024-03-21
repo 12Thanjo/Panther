@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.13.1
+- Fixed `copy` expressions in globals
+- Fixed bug where compiler sometimes incorrectly errored that the entry function returned the incorrect type
+
 ### v0.13.0
 - Added `copy` expressions
 
@@ -8,6 +12,7 @@
 - Added `#entry` function attribute
 
 ### v0.11.0
+- Added parenthesis expressions
 - Added function call expressions and statements
 - Added printing of the current output target in verbose mode
 - Added semantic analysis checking for literal, ident, and uninit expressions

@@ -104,7 +104,7 @@ namespace panther{
 				return this->types[id.id];
 			};
 
-			// TODO: better way of doing this
+			// TODO: better way of doing this?
 			EVO_NODISCARD inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
 			EVO_NODISCARD inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
 

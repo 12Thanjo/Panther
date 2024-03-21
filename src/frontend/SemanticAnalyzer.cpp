@@ -130,7 +130,24 @@ namespace panther{
 
 		auto var_value = [&]() noexcept {
 			if(this->is_global_scope()){
-				const AST::Node& value_node = this->source.getNode(var_decl.expr);
+				const AST::Node& value_node = [&]() noexcept {
+					const AST::Node& value_node_value = this->source.getNode(var_decl.expr);
+
+					if(value_node_value.kind == AST::Kind::Prefix){
+						const AST::Prefix& prefix = this->source.getPrefix(value_node_value);
+
+						switch(this->source.getToken(prefix.op).kind){
+							case Token::KeywordCopy: {					
+								return this->source.getNode(prefix.rhs);
+							} break;
+
+							default: EVO_FATAL_BREAK("Unknown prefix kind - SemanticAnalyzer::analyze_var()");
+						};
+					}
+
+					return value_node_value;
+				}();
+
 
 				// get ident value / pointer
 				if(value_node.kind == AST::Kind::Ident){
@@ -293,6 +310,7 @@ namespace panther{
 			// check is valid return type
 			if(return_type_id.has_value() == false || *return_type_id != src_manager.getTypeInt()){
 				this->source.error("Function with attribute \"#entry\" must return type Int", ident);
+				evo::breakpoint();
 				return false;
 			}
 
@@ -404,8 +422,15 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_assignment(const AST::Infix& infix) noexcept -> bool {
-		// check if ident exists
 		const Token& ident = this->source.getIdent(infix.lhs);
+
+		// check if at global scope
+		if(this->is_global_scope()){
+			this->source.error("Assignment statements are not allowed at global scope", ident);
+			return false;
+		}
+
+		// check if ident exists
 		if(this->has_in_scope(ident.value.string) == false){
 			this->source.error("Attemted to assign a value to a variable that does not exist", ident);
 			return false;
@@ -700,6 +725,7 @@ namespace panther{
 			} break;
 
 
+			// TODO: get rid of this default
 			default: {
 				return PIR::Expr(node_id);
 			} break;

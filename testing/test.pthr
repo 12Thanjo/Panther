@@ -1,8 +1,13 @@
 
-func get_9 = () -> Int {
-	return 9;
-}
+// var a: Int = 12;
+// var b: Int = copy a;
 
+// var asdf: Bool = true;
+// var asdf_2: Bool = copy asdf;
+
+func test = () -> Void {
+	var meow: Bool = true;
+}
 
 
 func entry = () #entry -> Int {
