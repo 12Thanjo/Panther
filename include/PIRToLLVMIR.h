@@ -308,51 +308,63 @@ namespace panther{
 
 
 			EVO_NODISCARD inline auto get_value(const Source& source, PIR::Expr value) noexcept -> llvm::Value* {
-				if(value.kind == PIR::Expr::Kind::ASTNode){
-					const AST::Node& node = source.getNode(value.ast_node);
+				switch(value.kind){
+					case PIR::Expr::Kind::ASTNode: {
+						const AST::Node& node = source.getNode(value.ast_node);
 
-					switch(node.kind){
-						case AST::Kind::Literal: {
-							const Token& token = source.getLiteral(value.ast_node);
+						switch(node.kind){
+							case AST::Kind::Literal: {
+								const Token& token = source.getLiteral(value.ast_node);
 
-							switch(token.kind){
-								case Token::LiteralInt: {
-									return llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(token.value.integer));
-								} break;
+								switch(token.kind){
+									case Token::LiteralInt: {
+										return llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(token.value.integer));
+									} break;
 
-								case Token::LiteralBool: {
-									return llvmint::ptrcast<llvm::Value>(this->builder->valueBool(token.value.boolean));
-								} break;
-							};
-						} break;
-						
+									case Token::LiteralBool: {
+										return llvmint::ptrcast<llvm::Value>(this->builder->valueBool(token.value.boolean));
+									} break;
+								};
+							} break;
+							
 
-						default: {
-							EVO_FATAL_BREAK("Unknown AST::Kind - PIRToLLVMIR::get_value()");
-						} break;
-					};
+							default: {
+								EVO_FATAL_BREAK("Unknown AST::Kind - PIRToLLVMIR::get_value()");
+							} break;
+						};
+					} break;
 
-					
+					case PIR::Expr::Kind::Var: {
+						const PIR::Var& var = source.getVar(value.var);
+						if(var.is_alloca){
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca));
+						}else{
+							const SourceManager& source_manager = source.getSourceManager();
+							llvm::Type* var_type = this->get_type(source_manager, source_manager.getType(var.type));
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.value, var_type));
+						}
+					} break;
 
-				}else if(value.kind == PIR::Expr::Kind::Var){
-					const PIR::Var& var = source.getVar(value.var);
-					if(var.is_alloca){
-						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca));
-					}else{
-						const SourceManager& source_manager = source.getSourceManager();
-						llvm::Type* var_type = this->get_type(source_manager, source_manager.getType(var.type));
-						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.value, var_type));
-					}
+					case PIR::Expr::Kind::FuncCall: {
+						const PIR::FuncCall& func_call = source.getFuncCall(value.func_call);
+						const PIR::Func& func = source.getFunc(func_call.func);
 
-				}else if(value.kind == PIR::Expr::Kind::FuncCall){
-					const PIR::FuncCall& func_call = source.getFuncCall(value.func_call);
-					const PIR::Func& func = source.getFunc(func_call.func);
+						return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
+					} break;
 
-					return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
-				}
+					case PIR::Expr::Kind::Prefix: {
+						const PIR::Prefix& prefix = source.getPrefix(value.prefix);
+
+						switch(source.getToken(prefix.op).kind){
+							case Token::KeywordCopy: {
+								return this->get_value(source, prefix.rhs);
+							} break;
+						};
+					} break;
+				};
 
 
-				EVO_FATAL_BREAK("Invalid value kind");
+				EVO_FATAL_BREAK("Invalid value kind - PIRToLLVMIR::get_const_value()");
 			};
 
 

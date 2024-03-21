@@ -358,12 +358,39 @@ namespace panther{
 
 
 	auto Parser::parse_prefix_expr() noexcept -> Result {
-		return this->parse_postfix_expr();
+		// get prefix operation
+		const Token::ID op_token = this->peek();
+		switch(this->get(op_token).kind){
+			case Token::KeywordCopy:
+				break;
+
+			default:
+				return this->parse_postfix_expr();
+		};
+
+		this->skip(1);
+
+		// get rhs
+		const Result rhs = this->parse_postfix_expr();
+		if(rhs.code() == Result::Error){
+			return Result::Error;
+
+		}else if(rhs.code() == Result::WrongType){
+			this->expected_but_got(std::format("expression on right-hand size of [{}] operator", Token::printKind(this->get(op_token).kind)));
+			return Result::Error;
+		}
+
+
+		return this->create_node(
+			this->source.prefixes, AST::Kind::Prefix,
+			op_token, rhs.value()
+		);
 	};
 
 
-
+	// TODO: remove me?
 	auto Parser::parse_postfix_expr() noexcept -> Result {
+		// nothing at the moment
 		return this->parse_accessor_expr();
 	};
 

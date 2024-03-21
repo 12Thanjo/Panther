@@ -165,6 +165,7 @@ namespace panther{
 
 			else if(ident_name == "return") { this->create_token(Token::Kind::KeywordReturn); }
 
+			else if(ident_name == "copy") { this->create_token(Token::Kind::KeywordCopy); }
 			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
 
 

@@ -135,7 +135,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	auto file_paths = std::vector<std::string>{
 		(config.relative_directory / "testing/test.pthr").make_preferred().string(),
-		(config.relative_directory / "testing/test2.pthr").make_preferred().string(),
+		// (config.relative_directory / "testing/test2.pthr").make_preferred().string(),
 	};
 
 	auto source_ids = std::vector<panther::Source::ID>();

@@ -13,6 +13,7 @@ namespace panther{
 			
 			Type,
 			Block,
+			Prefix,
 			Infix,
 			FuncCall,
 
@@ -73,6 +74,12 @@ namespace panther{
 		};
 	
 
+
+		struct Prefix{
+			Token::ID op;
+			Node::ID rhs;
+		};
+
 		struct Infix{
 			Node::ID lhs;
 			Token::ID op;
@@ -83,6 +90,7 @@ namespace panther{
 		struct FuncCall{
 			Node::ID target;
 		};
+
 
 	};
 };

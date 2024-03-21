@@ -75,6 +75,15 @@ namespace panther{
 		///////////////////////////////////
 		// type checking
 
+		const ExprValueType expr_value_type = this->get_expr_value_type(var_decl.expr);
+		if(expr_value_type != ExprValueType::Ephemeral){
+			// TODO: better messaging
+			this->source.error("Variables must be assigned with a ephemeral value", var_decl.expr);
+			return false;
+		}
+
+
+
 		const AST::Type& type = this->source.getType(var_decl.type);
 		const Token& type_token = this->source.getToken(type.token);
 
@@ -424,6 +433,18 @@ namespace panther{
 
 		const PIR::Var& var = this->source.getVar(*var_id);
 
+
+		///////////////////////////////////
+		// check typing
+
+		const ExprValueType expr_value_type = this->get_expr_value_type(infix.rhs);
+		if(expr_value_type != ExprValueType::Ephemeral){
+			// TODO: better messaging
+			this->source.error("Variables must be assigned with an ephemeral value", infix.rhs);
+			return false;
+		}
+
+
 		const std::optional<PIR::Type::ID> expr_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
 		if(expr_type.has_value() == false){ return false; }
 
@@ -441,6 +462,9 @@ namespace panther{
 			);
 		}
 
+
+		///////////////////////////////////
+		// create object
 
 		const PIR::Assignment::ID assignment_id = this->source.createAssignment(*var_id, infix.op, this->get_expr_value(infix.rhs));
 		this->current_func->stmts.emplace_back(assignment_id);
@@ -518,7 +542,6 @@ namespace panther{
 	auto SemanticAnalyzer::analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<PIR::Type::ID> {
 		SourceManager& src_manager = this->source.getSourceManager();
 
-
 		switch(node.kind){
 			case AST::Kind::Literal: {
 				const Token& literal_value = this->source.getLiteral(node);
@@ -593,9 +616,29 @@ namespace panther{
 			} break;
 
 
+			case AST::Kind::Prefix: {
+				const AST::Prefix& prefix = this->source.getPrefix(node);
+
+				switch(this->source.getToken(prefix.op).kind){
+					case Token::KeywordCopy: {
+						const ExprValueType expr_value_type = this->get_expr_value_type(prefix.rhs);
+						if(expr_value_type != ExprValueType::Concrete){
+							this->source.error("right-hand-side of copy expression must be a concrete expression", prefix.rhs);
+							return std::nullopt;
+						}
+
+						return this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
+					} break;
+
+					default: EVO_FATAL_BREAK("Unknown prefix operator - SemanticAnalyzer::analyze_and_get_type_of_expr");
+				};
+
+			} break;
+
+
 
 			case AST::Kind::Uninit: {
-				EVO_FATAL_BREAK("[uninit] exprs should not be analyzed with this function");
+				EVO_FATAL_BREAK("[uninit] exprs should not be analyzed with this function - SemanticAnalyzer::analyze_and_get_type_of_expr");
 			} break;
 		};
 
@@ -649,14 +692,40 @@ namespace panther{
 			} break;
 
 
+			case AST::Kind::Prefix: {
+				const AST::Prefix& prefix = this->source.getPrefix(node_id);
+
+				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, this->get_expr_value(prefix.rhs));
+				return PIR::Expr(prefix_id);
+			} break;
+
+
 			default: {
 				return PIR::Expr(node_id);
 			} break;
 		};
 
-
-
 	};
+
+
+
+	auto SemanticAnalyzer::get_expr_value_type(AST::Node::ID node_id) const noexcept -> ExprValueType {
+		const AST::Node& value_node = this->source.getNode(node_id);
+
+		switch(value_node.kind){
+			break; case AST::Kind::Prefix: return ExprValueType::Ephemeral;
+			break; case AST::Kind::FuncCall: return ExprValueType::Ephemeral;
+
+			break; case AST::Kind::Ident: return ExprValueType::Concrete;
+			break; case AST::Kind::Literal: return ExprValueType::Ephemeral;
+			break; case AST::Kind::Uninit: return ExprValueType::Ephemeral;
+		};
+
+		EVO_FATAL_BREAK("Unknown AST::Node::Kind - SemanticAnalyzer::get_expr_value_type()");
+	};
+
+
+
 
 
 

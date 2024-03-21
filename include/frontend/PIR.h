@@ -118,6 +118,12 @@ namespace panther{
 		};
 
 
+		struct PrefixID{ // typesafe identifier
+			uint32_t id;
+			explicit PrefixID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+
 
 		///////////////////////////////////
 		// expressions
@@ -138,19 +144,30 @@ namespace panther{
 				Var,
 				ASTNode,
 				FuncCall,
+				Prefix,
 			} kind;
 
 			union {
 				VarID var;
 				AST::Node::ID ast_node;
 				FuncCall::ID func_call;
+				PrefixID prefix;
 			};
 
 			explicit Expr(VarID id) : kind(Kind::Var), var(id) {};
 			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), ast_node(node) {};
 			explicit Expr(FuncCall::ID func_call_id) : kind(Kind::FuncCall), func_call(func_call_id) {};
+			explicit Expr(PrefixID prefix_id) : kind(Kind::Prefix), prefix(prefix_id) {};
 		};
 
+
+
+		struct Prefix{
+			using ID = PrefixID;
+
+			Token::ID op;
+			Expr rhs;
+		};
 
 
 		///////////////////////////////////

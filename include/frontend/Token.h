@@ -51,6 +51,7 @@ namespace panther{
 
 			KeywordReturn,
 
+			KeywordCopy,
 			KeywordUninit,
 
 
@@ -206,6 +207,7 @@ namespace panther{
 
 				break; case Kind::KeywordReturn: return "return";
 
+				break; case Kind::KeywordCopy: return "copy";
 				break; case Kind::KeywordUninit: return "uninit";
 
 

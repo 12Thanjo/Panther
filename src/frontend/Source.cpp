@@ -66,6 +66,14 @@ namespace panther{
 		return this->returns[node.index];
 	};
 
+	auto Source::getPrefix(AST::Node::ID node_id) const noexcept -> const AST::Prefix& {
+		return this->getPrefix(this->getNode(node_id));
+	};
+	auto Source::getPrefix(const AST::Node& node) const noexcept -> const AST::Prefix& {
+		evo::debugAssert(node.kind == AST::Kind::Prefix, "Node is not a Prefix");
+		return this->prefixes[node.index];
+	};
+
 	auto Source::getInfix(AST::Node::ID node_id) const noexcept -> const AST::Infix& {
 		return this->getInfix(this->getNode(node_id));
 	};

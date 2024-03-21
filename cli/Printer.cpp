@@ -499,6 +499,33 @@ namespace panther{
 					this->indenter_pop();
 				} break;
 
+
+				case AST::Kind::Prefix: {
+					const AST::Prefix& prefix = source.getPrefix(node);
+
+					this->indenter_print();
+					this->info("Prefix Op:\n");
+
+					this->indenter_push();
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("Op: ");
+						this->debug( std::format("{}\n", Token::printKind(source.getToken(prefix.op).kind)) );
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("RHS:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(source, source.getNode(prefix.rhs));
+						this->indenter_pop();
+
+					this->indenter_pop();
+
+
+				} break;
+
 				break; default: EVO_FATAL_BREAK("Node is not an expr");
 			};
 		};

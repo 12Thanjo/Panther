@@ -1,7 +1,17 @@
 
+func get_9 = () -> Int {
+	return 9;
+}
+
+
 
 func entry = () #entry -> Int {
-	return 12;
+	var foo: Int = 12;
+	var bar: Int = uninit;
+	bar = copy foo;
+
+
+	return bar;
 }
 
 

@@ -67,6 +67,9 @@ namespace panther{
 			EVO_NODISCARD auto getBlock(AST::Node::ID node_id) const noexcept -> const AST::Block&;
 			EVO_NODISCARD auto getBlock(const AST::Node& node) const noexcept -> const AST::Block&;
 
+			EVO_NODISCARD auto getPrefix(AST::Node::ID node_id) const noexcept -> const AST::Prefix&;
+			EVO_NODISCARD auto getPrefix(const AST::Node& node) const noexcept -> const AST::Prefix&;
+
 			EVO_NODISCARD auto getInfix(AST::Node::ID node_id) const noexcept -> const AST::Infix&;
 			EVO_NODISCARD auto getInfix(const AST::Node& node) const noexcept -> const AST::Infix&;
 
@@ -92,7 +95,6 @@ namespace panther{
 			template<typename... Args>
 			EVO_NODISCARD inline auto createVar(Args... args) noexcept -> PIR::Var::ID {
 				this->pir.vars.emplace_back(args...);
-
 				return PIR::Var::ID( uint32_t(this->pir.vars.size() - 1) );
 			};
 
@@ -108,7 +110,6 @@ namespace panther{
 			template<typename... Args>
 			EVO_NODISCARD inline auto createFunc(Args... args) noexcept -> PIR::Func::ID {
 				this->pir.funcs.emplace_back(args...);
-
 				return PIR::Func::ID( uint32_t(this->pir.funcs.size() - 1) );
 			};
 
@@ -124,7 +125,6 @@ namespace panther{
 			template<typename... Args>
 			EVO_NODISCARD inline auto createReturn(Args... args) noexcept -> PIR::Return::ID {
 				this->pir.returns.emplace_back(args...);
-
 				return PIR::Return::ID( uint32_t(this->pir.returns.size() - 1) );
 			};
 
@@ -140,7 +140,6 @@ namespace panther{
 			template<typename... Args>
 			EVO_NODISCARD inline auto createAssignment(Args... args) noexcept -> PIR::Assignment::ID {
 				this->pir.assignments.emplace_back(args...);
-
 				return PIR::Assignment::ID( uint32_t(this->pir.assignments.size() - 1) );
 			};
 
@@ -156,7 +155,6 @@ namespace panther{
 			template<typename... Args>
 			EVO_NODISCARD inline auto createFuncCall(Args... args) noexcept -> PIR::FuncCall::ID {
 				this->pir.func_calls.emplace_back(args...);
-
 				return PIR::FuncCall::ID( uint32_t(this->pir.func_calls.size() - 1) );
 			};
 
@@ -165,6 +163,21 @@ namespace panther{
 			};
 			EVO_NODISCARD inline auto getFuncCall(PIR::FuncCall::ID id) noexcept -> PIR::FuncCall& {
 				return this->pir.func_calls[size_t(id.id)];
+			};
+
+
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createPrefix(Args... args) noexcept -> PIR::Prefix::ID {
+				this->pir.prefixes.emplace_back(args...);
+				return PIR::Prefix::ID( uint32_t(this->pir.prefixes.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getPrefix(PIR::Prefix::ID id) const noexcept -> const PIR::Prefix& {
+				return this->pir.prefixes[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getPrefix(PIR::Prefix::ID id) noexcept -> PIR::Prefix& {
+				return this->pir.prefixes[size_t(id.id)];
 			};
 
 
@@ -203,6 +216,7 @@ namespace panther{
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
 			std::vector<AST::Return> returns{};
+			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
 			std::vector<AST::FuncCall> func_calls{};
 			std::vector<AST::Type> types{};
@@ -216,6 +230,7 @@ namespace panther{
 				std::vector<PIR::Return> returns{};
 				std::vector<PIR::Assignment> assignments{};
 				std::vector<PIR::FuncCall> func_calls{};
+				std::vector<PIR::Prefix> prefixes{};
 
 				std::vector<PIR::Var::ID> global_vars{};
 			} pir;
