@@ -73,6 +73,9 @@ namespace panther{
 			EVO_NODISCARD auto getInfix(AST::Node::ID node_id) const noexcept -> const AST::Infix&;
 			EVO_NODISCARD auto getInfix(const AST::Node& node) const noexcept -> const AST::Infix&;
 
+			EVO_NODISCARD auto getPostfix(AST::Node::ID node_id) const noexcept -> const AST::Postfix&;
+			EVO_NODISCARD auto getPostfix(const AST::Node& node) const noexcept -> const AST::Postfix&;
+
 			EVO_NODISCARD auto getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall&;
 			EVO_NODISCARD auto getFuncCall(const AST::Node& node) const noexcept -> const AST::FuncCall&;
 
@@ -181,6 +184,20 @@ namespace panther{
 			};
 
 
+			template<typename... Args>
+			EVO_NODISCARD inline auto createDeref(Args... args) noexcept -> PIR::Deref::ID {
+				this->pir.derefs.emplace_back(args...);
+				return PIR::Deref::ID( uint32_t(this->pir.derefs.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getDeref(PIR::Deref::ID id) const noexcept -> const PIR::Deref& {
+				return this->pir.derefs[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getDeref(PIR::Deref::ID id) noexcept -> PIR::Deref& {
+				return this->pir.derefs[size_t(id.id)];
+			};
+
+
 
 			//////////////////////////////////////////////////////////////////////
 			// messaging / errors
@@ -218,6 +235,7 @@ namespace panther{
 			std::vector<AST::Return> returns{};
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
+			std::vector<AST::Postfix> postfixes{};
 			std::vector<AST::FuncCall> func_calls{};
 			std::vector<AST::Type> types{};
 			std::vector<AST::Block> blocks{};
@@ -231,6 +249,7 @@ namespace panther{
 				std::vector<PIR::Assignment> assignments{};
 				std::vector<PIR::FuncCall> func_calls{};
 				std::vector<PIR::Prefix> prefixes{};
+				std::vector<PIR::Deref> derefs{};
 
 				std::vector<PIR::Var::ID> global_vars{};
 			} pir;

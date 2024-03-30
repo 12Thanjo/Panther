@@ -53,6 +53,7 @@ namespace panther{
 
 			KeywordCopy,
 			KeywordUninit,
+			KeywordAddr,
 
 
 			///////////////////////////////////
@@ -60,9 +61,12 @@ namespace panther{
 			
 			Equal, // =
 
-			DoubleEqual, // ==
+			// DoubleEqual, // ==
 
 			RightArrow, // ->
+
+			Pointer, // ^
+			Dereference, // .^
 
 
 			///////////////////////////////////
@@ -76,7 +80,6 @@ namespace panther{
 			CloseBrace,
 
 			Comma,
-			Period,
 			SemiColon,
 			Colon,
 		};
@@ -146,11 +149,13 @@ namespace panther{
 			// operators
 
 			// length 2
-			if(is_token("==")){ return Token::DoubleEqual; }
+			// if(is_token("==")){ return Token::DoubleEqual; }
 			if(is_token("->")){ return Token::RightArrow; }
+			if(is_token(".^")){ return Token::Dereference; }
 
 			// length 1
 			if(is_token("=")){ return Token::Equal; }
+			if(is_token("^")){ return Token::Pointer; }
 			if(is_token("(")){ return Token::OpenParen; }
 			if(is_token(")")){ return Token::CloseParen; }
 			if(is_token("[")){ return Token::OpenBracket; }
@@ -159,7 +164,6 @@ namespace panther{
 			if(is_token("}")){ return Token::CloseBrace; }
 
 			if(is_token(",")){ return Token::Comma; }
-			if(is_token(".")){ return Token::Period; }
 			if(is_token(";")){ return Token::SemiColon; }
 			if(is_token(":")){ return Token::Colon; }
 
@@ -209,6 +213,7 @@ namespace panther{
 
 				break; case Kind::KeywordCopy: return "copy";
 				break; case Kind::KeywordUninit: return "uninit";
+				break; case Kind::KeywordAddr: return "addr";
 
 
 				///////////////////////////////////
@@ -216,9 +221,12 @@ namespace panther{
 				
 				break; case Kind::Equal: return "=";
 
-				break; case Kind::DoubleEqual: return "==";
+				// break; case Kind::DoubleEqual: return "==";
 
 				break; case Kind::RightArrow: return "->";
+
+				break; case Kind::Pointer: return "^";
+				break; case Kind::Dereference: return ".^";
 
 
 				///////////////////////////////////
@@ -232,7 +240,6 @@ namespace panther{
 				break; case Kind::CloseBrace: return "}";
 
 				break; case Kind::Comma: return ",";
-				break; case Kind::Period: return ".";
 				break; case Kind::SemiColon: return ";";
 				break; case Kind::Colon: return ":";
 				

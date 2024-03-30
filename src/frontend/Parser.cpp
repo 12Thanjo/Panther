@@ -187,11 +187,11 @@ namespace panther{
 		const Token::ID start = this->peek();
 
 		// ident
-		const Result ident = this->parse_ident();
-		if(ident.code() == Result::Error){
+		const Result lhs = this->parse_expr();
+		if(lhs.code() == Result::Error){
 			return Result::Error;
 
-		}else if(ident.code() == Result::WrongType){
+		}else if(lhs.code() == Result::WrongType){
 			return Result::WrongType;
 		}
 
@@ -218,7 +218,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.infixes, AST::Kind::Infix,
-			ident.value(), op, expr.value()
+			lhs.value(), op, expr.value()
 		);
 	};
 
@@ -248,10 +248,16 @@ namespace panther{
 		const Token::ID base_type = this->next();
 
 
+		auto qualifiers = std::vector<AST::Type::Qualifier>();
+		while(this->get(this->peek()).kind == Token::get("^")){
+			qualifiers.emplace_back(true);
+			this->skip(1);
+		};
+
 
 		return this->create_node(
 			this->source.types, AST::Kind::Type,
-			base_type
+			base_type, std::move(qualifiers)
 		);
 	};
 
@@ -362,6 +368,7 @@ namespace panther{
 		const Token::ID op_token = this->peek();
 		switch(this->get(op_token).kind){
 			case Token::KeywordCopy:
+			case Token::KeywordAddr:
 				break;
 
 			default:
@@ -402,7 +409,14 @@ namespace panther{
 
 
 		while(true){
-			if(this->get(this->peek()).kind == Token::get("(")){
+			if(this->get(this->peek()).kind == Token::get(".^")){
+				const Token::ID op_token = this->next();
+
+				output = this->create_node(this->source.postfixes, AST::Kind::Postfix,
+					output.value(), op_token
+				);
+
+			}else if(this->get(this->peek()).kind == Token::get("(")){
 				this->skip(1);
 
 				// )

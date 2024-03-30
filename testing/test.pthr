@@ -1,25 +1,25 @@
 
-// var a: Int = 12;
-// var b: Int = copy a;
+var global: Int = 9;
 
-// var asdf: Bool = true;
-// var asdf_2: Bool = copy asdf;
 
-func test = () -> Void {
-	var meow: Bool = true;
+func get_global_ptr = () -> Int^ {
+	return (addr global);
 }
-
 
 func entry = () #entry -> Int {
 	var foo: Int = 12;
-	var bar: Int = uninit;
-	bar = copy foo;
+
+	var foo_ptr: Int^ = addr foo;
+	var foo_ptr_ptr: Int^^ = addr foo_ptr;
 
 
-	return bar;
+	// foo_ptr.^ = 14;
+	// foo_ptr_ptr.^.^ = 15;
+	// foo = 15;
+
+	foo_ptr = get_global_ptr();
+	global = 10;
+
+	return foo_ptr_ptr.^.^;
+	// return foo;
 }
-
-
-
-
-

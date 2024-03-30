@@ -244,18 +244,16 @@ namespace panther{
 
 
 			inline auto lower_assignment(Source& source, PIR::Assignment& assignment) noexcept -> void {
-				evo::debugAssert(source.getToken(assignment.op).kind == Token::get("="), "Only normal assignment (=) is supported for lowering at the moment");
+				evo::debugAssert(
+					source.getToken(assignment.op).kind == Token::get("="),
+					"Only normal assignment (=) is supported for lowering at the moment"
+				);
 
+
+				llvm::Value* dst = this->get_concrete_value(source, assignment.dst);
 				llvm::Value* value = this->get_value(source, assignment.value);
 
-				const PIR::Var& var = source.getVar(assignment.var);
-
-				if(var.is_alloca){
-					this->builder->createStore(var.llvm.alloca, value, false);
-				}else{
-					this->builder->createStore(var.llvm.value, value, false);
-				}
-
+				this->builder->createStore(dst, value, false);
 			};
 
 
@@ -271,6 +269,14 @@ namespace panther{
 
 
 			EVO_NODISCARD inline auto get_type(const SourceManager& source_manager, const PIR::Type& type) noexcept -> llvm::Type* {
+				if(type.qualifiers.empty() == false){
+					if(type.qualifiers.back().is_ptr){
+						return llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr());
+					}else{
+						EVO_FATAL_BREAK("Unsupported qualifiers");
+					}
+				}
+
 				const PIR::BaseType& base_type = source_manager.getBaseType(type.base_type);
 
 
@@ -282,7 +288,7 @@ namespace panther{
 					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
 				}
 
-				EVO_FATAL_BREAK("Unknown type - PIRToLLVMIR::get_type()");
+				EVO_FATAL_BREAK("Unknown type");
 			};
 
 
@@ -302,7 +308,7 @@ namespace panther{
 					} break;
 				};
 
-				EVO_FATAL_BREAK("Invalid value kind - PIRToLLVMIR::get_const_value()");
+				EVO_FATAL_BREAK("Invalid value kind");
 			};
 
 
@@ -329,7 +335,7 @@ namespace panther{
 							
 
 							default: {
-								EVO_FATAL_BREAK("Unknown AST::Kind - PIRToLLVMIR::get_value()");
+								EVO_FATAL_BREAK("Unknown AST::Kind");
 							} break;
 						};
 					} break;
@@ -359,12 +365,60 @@ namespace panther{
 							case Token::KeywordCopy: {
 								return this->get_value(source, prefix.rhs);
 							} break;
+
+							case Token::KeywordAddr: {
+								const PIR::Var& var = source.getVar(prefix.rhs.var);
+								if(var.is_alloca){
+									return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+								}else{
+									return var.llvm.value;
+								}
+
+							} break;
+
+							default: EVO_FATAL_BREAK("Invalid or unknown prefix operator");
 						};
 					} break;
+
+
+					case PIR::Expr::Kind::Deref: {
+						const PIR::Deref& deref = source.getDeref(value.deref);
+
+						llvm::Value* lhs_value = this->get_value(source, deref.ptr);
+
+						const SourceManager& source_manager = source.getSourceManager();
+						llvm::Type* deref_type = this->get_type(source_manager, source_manager.getType(deref.type));
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type));
+					} break;
+
 				};
 
 
-				EVO_FATAL_BREAK("Invalid value kind - PIRToLLVMIR::get_const_value()");
+				EVO_FATAL_BREAK("Invalid value kind");
+			};
+
+
+			EVO_NODISCARD inline auto get_concrete_value(const Source& source, const PIR::Expr& expr) noexcept -> llvm::Value* {
+				switch(expr.kind){
+					case PIR::Expr::Kind::Var: {
+						const PIR::Var& var = source.getVar(expr.var);
+
+						if(var.is_alloca){
+							return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+						}else{
+							return var.llvm.value;
+						}
+					} break;
+
+
+					case PIR::Expr::Kind::Deref: {
+						const PIR::Deref& deref = source.getDeref(expr.deref);
+						
+						return this->get_value(source, deref.ptr);
+					} break;
+
+					default: EVO_FATAL_BREAK("Unknown or unsupported concrete expr kind");
+				};
 			};
 
 

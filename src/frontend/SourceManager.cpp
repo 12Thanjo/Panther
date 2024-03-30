@@ -193,15 +193,25 @@ namespace panther{
 
 
 		std::string base_type_str = [&]() noexcept {
-			if(base_type.kind == PIR::BaseType::Kind::Builtin){
-				return Token::printKind(base_type.builtin.kind);
+			switch(base_type.kind){
+				case PIR::BaseType::Kind::Builtin: {
+					return std::string( Token::printKind(base_type.builtin.kind) );
+				} break;
 
-			}else{
-				// TODO:
-				EVO_FATAL_BREAK("Printing of non-builtin types are not supported yet");
-			}
+				case PIR::BaseType::Kind::Function: {
+					// TODO:
+					return std::string("[[FUNCTION]]");
+				} break;
+
+				default: EVO_FATAL_BREAK("Unknown base-type kind - SourceManager::printType()");
+			};
 		}();
 		
+
+		for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+			if(qualifier.is_ptr){ base_type_str += "^"; }
+		}
+
 
 		return base_type_str;
 	};

@@ -51,15 +51,6 @@ struct Config{
 
 
 auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexcept -> int {
-
-
-	// print UTF-8 characters on windows
-	#if defined(EVO_PLATFORM_WINDOWS)
-		::SetConsoleOutputCP(CP_UTF8);
-	#endif
-
-
-
 	auto config = Config{
 		.name		  = "testing",
 		.print_colors = true,
@@ -68,6 +59,11 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	};
 
 
+	// print UTF-8 characters on windows
+	#if defined(EVO_PLATFORM_WINDOWS)
+		::SetConsoleOutputCP(CP_UTF8);
+	#endif
+	
 
 	auto printer = panther::cli::Printer(config.print_colors);
 

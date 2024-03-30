@@ -15,6 +15,7 @@ namespace panther{
 			Block,
 			Prefix,
 			Infix,
+			Postfix,
 			FuncCall,
 
 			// tokens
@@ -67,6 +68,11 @@ namespace panther{
 
 		struct Type{
 			Token::ID token;
+
+			struct Qualifier{
+				bool is_ptr;	
+			};
+			std::vector<Qualifier> qualifiers;
 		};
 
 		struct Block{
@@ -84,6 +90,11 @@ namespace panther{
 			Node::ID lhs;
 			Token::ID op;
 			Node::ID rhs;
+		};
+
+		struct Postfix{
+			Node::ID lhs;
+			Token::ID op;
 		};
 
 

@@ -91,7 +91,7 @@ namespace panther{
 		SourceManager& src_manager = this->source.getSourceManager();
 
 		const PIR::Type::ID var_type_id = src_manager.getTypeID(
-			PIR::Type( src_manager.getBaseTypeID(type_token.kind) )
+			PIR::Type(src_manager.getBaseTypeID(type_token.kind), type.qualifiers)
 		);
 
 		
@@ -141,7 +141,7 @@ namespace panther{
 								return this->source.getNode(prefix.rhs);
 							} break;
 
-							default: EVO_FATAL_BREAK("Unknown prefix kind - SemanticAnalyzer::analyze_var()");
+							default: EVO_FATAL_BREAK("Unknown prefix kind");
 						};
 					}
 
@@ -273,7 +273,7 @@ namespace panther{
 			SourceManager& src_manager = this->source.getSourceManager();
 
 			return_type_id = src_manager.getTypeID(
-				PIR::Type( src_manager.getBaseTypeID(return_type_token.kind) )
+				PIR::Type(src_manager.getBaseTypeID(return_type_token.kind), return_type.qualifiers)
 			);
 		}
 
@@ -377,6 +377,7 @@ namespace panther{
 			if(*expr_type_id != *this->current_func->return_type){
 				SourceManager& src_manager = this->source.getSourceManager();
 
+				evo::breakpoint();
 				this->source.error(
 					"Return value type and function return type do not match", 
 					expr_node,
@@ -421,68 +422,54 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::analyze_assignment(const AST::Infix& infix) noexcept -> bool {
-		const Token& ident = this->source.getIdent(infix.lhs);
 
+	auto SemanticAnalyzer::analyze_assignment(const AST::Infix& infix) noexcept -> bool {
 		// check if at global scope
 		if(this->is_global_scope()){
-			this->source.error("Assignment statements are not allowed at global scope", ident);
-			return false;
-		}
-
-		// check if ident exists
-		if(this->has_in_scope(ident.value.string) == false){
-			this->source.error("Attemted to assign a value to a variable that does not exist", ident);
+			this->source.error("Assignment statements are not allowed at global scope", infix.op);
 			return false;
 		}
 
 
 		///////////////////////////////////
-		// check that the ident is a variable, and get it
+		// checking of lhs
 
-		std::optional<PIR::Var::ID> var_id;
-
-		for(Scope& scope : this->scopes){
-			if(scope.vars.contains(ident.value.string)){
-				// is a var
-				var_id = scope.vars.at(ident.value.string);
-				break;
-
-			}else if(scope.funcs.contains(ident.value.string)){
-				// is a function
-				this->source.error("Cannot assign a value to a function", ident);
-				return false;
-			}
+		const ExprValueType dst_value_type = this->get_expr_value_type(infix.lhs);
+		if(dst_value_type != ExprValueType::Concrete){
+			this->source.error("Only concrete values may be assigned to", infix.lhs);
+			return false;
 		}
 
-
-		const PIR::Var& var = this->source.getVar(*var_id);
+		const std::optional<PIR::Type::ID> dst_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
+		if(dst_type.has_value() == false){ return false; }
 
 
 		///////////////////////////////////
-		// check typing
+		// checking of rhs
 
 		const ExprValueType expr_value_type = this->get_expr_value_type(infix.rhs);
 		if(expr_value_type != ExprValueType::Ephemeral){
-			// TODO: better messaging
-			this->source.error("Variables must be assigned with an ephemeral value", infix.rhs);
+			this->source.error("Only ephemeral values may be assignment values", infix.rhs);
 			return false;
 		}
-
 
 		const std::optional<PIR::Type::ID> expr_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
 		if(expr_type.has_value() == false){ return false; }
 
-		if(*expr_type != var.type){
+
+		///////////////////////////////////
+		// type checking
+
+		if(*dst_type != *expr_type){
 			SourceManager& src_manager = this->source.getSourceManager();
 
 			this->source.error(
-				"Attempted to assign a value to a variable of a different type",
+				"The types of the left-hand-side and right-hand-side of an assignment statement do not match",
 				infix.rhs,
 
 				std::vector<Message::Info>{
-					{std::string("Variable is of type:   ") + src_manager.printType(var.type)},
-					{std::string("Expression is of type: ") + src_manager.printType(*expr_type)}
+					{std::string("left-hand-side is of type:  ") + src_manager.printType(*dst_type)},
+					{std::string("right-hand-side is of type: ") + src_manager.printType(*expr_type)}
 				}
 			);
 		}
@@ -491,8 +478,11 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Assignment::ID assignment_id = this->source.createAssignment(*var_id, infix.op, this->get_expr_value(infix.rhs));
+		const PIR::Assignment::ID assignment_id = this->source.createAssignment(
+			this->get_expr_value(infix.lhs), infix.op, this->get_expr_value(infix.rhs)
+		);
 		this->current_func->stmts.emplace_back(assignment_id);
+
 
 		return true;
 	};
@@ -655,19 +645,77 @@ namespace panther{
 						return this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
 					} break;
 
-					default: EVO_FATAL_BREAK("Unknown prefix operator - SemanticAnalyzer::analyze_and_get_type_of_expr");
+
+					case Token::KeywordAddr: {
+						// check value type
+						const ExprValueType expr_value_type = this->get_expr_value_type(prefix.rhs);
+						if(expr_value_type != ExprValueType::Concrete){
+							this->source.error("right-hand-side of addr expression must be a concrete expression", prefix.rhs);
+							return std::nullopt;
+						}
+
+						// get type of rhs
+						const std::optional<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
+						if(type_of_rhs.has_value() == false){ return std::nullopt; }
+
+						const PIR::Type& rhs_type = this->source.getSourceManager().getType(*type_of_rhs);
+						PIR::Type rhs_type_copy = rhs_type;
+
+
+						// make the type pointer of the type of rhs
+						rhs_type_copy.qualifiers.emplace_back(true);
+
+						return this->source.getSourceManager().getTypeID(rhs_type_copy);
+					} break;
+
+					default: EVO_FATAL_BREAK("Unknown prefix operator");
+				};
+
+			} break;
+
+
+			case AST::Kind::Postfix: {
+				const AST::Postfix& postfix = this->source.getPostfix(node);
+
+				switch(this->source.getToken(postfix.op).kind){
+					case Token::get(".^"): {
+						// get type of lhs
+						const std::optional<PIR::Type::ID> type_of_lhs = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
+						if(type_of_lhs.has_value() == false){ return std::nullopt; }
+
+						// check that type of lhs is pointer
+						const PIR::Type& lhs_type = this->source.getSourceManager().getType(*type_of_lhs);
+						if(lhs_type.qualifiers.empty() || lhs_type.qualifiers.back().is_ptr == false){
+							this->source.error(
+								"left-hand-side of dereference expression must be of a pointer type", postfix.op,
+								std::vector<Message::Info>{
+									{std::string("expression is of type: ") + src_manager.printType(*type_of_lhs)},
+								}
+							);
+							return std::nullopt;
+						}
+
+						// get dereferenced type
+						PIR::Type lhs_type_copy = lhs_type;
+						lhs_type_copy.qualifiers.pop_back();
+
+						return this->source.getSourceManager().getTypeID(lhs_type_copy);
+					} break;
+
+					default: EVO_FATAL_BREAK("Unknown postfix operator");
 				};
 
 			} break;
 
 
 
+
 			case AST::Kind::Uninit: {
-				EVO_FATAL_BREAK("[uninit] exprs should not be analyzed with this function - SemanticAnalyzer::analyze_and_get_type_of_expr");
+				EVO_FATAL_BREAK("[uninit] exprs should not be analyzed with this function");
 			} break;
 		};
 
-		EVO_FATAL_BREAK("Unknown expr type - SemanticAnalyzer::analyze_and_get_type_of_expr");
+		EVO_FATAL_BREAK("Unknown expr type");
 	};
 
 
@@ -675,7 +723,6 @@ namespace panther{
 
 	auto SemanticAnalyzer::get_expr_value(AST::Node::ID node_id) const noexcept -> PIR::Expr {
 		evo::debugAssert(this->is_global_scope() == false, "SemanticAnalyzer::get_expr_value() is not for use in global variables");
-
 
 		const AST::Node& value_node = this->source.getNode(node_id);
 
@@ -725,10 +772,29 @@ namespace panther{
 			} break;
 
 
-			// TODO: get rid of this default
-			default: {
+			case AST::Kind::Postfix: {
+				const AST::Postfix& postfix = this->source.getPostfix(node_id);
+
+				// get deref type
+				const std::optional<PIR::Type::ID> ptr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
+				evo::debugAssert(ptr_type_id.has_value(), "Failed to get deref type - should have caught error earlier");
+
+				const PIR::Type& ptr_type = this->source.getSourceManager().getType(*ptr_type_id);
+				PIR::Type ptr_type_copy = ptr_type;
+				ptr_type_copy.qualifiers.pop_back();
+				const PIR::Type::ID deref_type_id = this->source.getSourceManager().getTypeID(ptr_type_copy);
+
+				const PIR::Deref::ID deref_id = this->source.createDeref(this->get_expr_value(postfix.lhs), deref_type_id);
+				return PIR::Expr(deref_id);
+			} break;
+
+
+
+			case AST::Kind::Literal: {
 				return PIR::Expr(node_id);
 			} break;
+
+			default: EVO_FATAL_BREAK("Unknown node value kind");
 		};
 
 	};
@@ -742,12 +808,22 @@ namespace panther{
 			break; case AST::Kind::Prefix: return ExprValueType::Ephemeral;
 			break; case AST::Kind::FuncCall: return ExprValueType::Ephemeral;
 
+			break; case AST::Kind::Postfix: {
+				const AST::Postfix& postfix = this->source.getPostfix(value_node);
+
+				switch(this->source.getToken(postfix.op).kind){
+					break; case Token::get(".^"): return ExprValueType::Concrete;
+
+					default: EVO_FATAL_BREAK("Unknown postfix kind");
+				};
+			} break;
+
 			break; case AST::Kind::Ident: return ExprValueType::Concrete;
 			break; case AST::Kind::Literal: return ExprValueType::Ephemeral;
 			break; case AST::Kind::Uninit: return ExprValueType::Ephemeral;
 		};
 
-		EVO_FATAL_BREAK("Unknown AST::Node::Kind - SemanticAnalyzer::get_expr_value_type()");
+		EVO_FATAL_BREAK("Unknown AST::Node::Kind");
 	};
 
 

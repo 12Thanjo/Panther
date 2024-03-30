@@ -97,6 +97,8 @@ namespace panther{
 
 			BaseType::ID base_type;
 
+			std::vector<AST::Type::Qualifier> qualifiers;
+
 
 			EVO_NODISCARD auto operator==(const Type& rhs) const noexcept -> bool;
 		};
@@ -123,6 +125,11 @@ namespace panther{
 			explicit PrefixID(uint32_t _id) noexcept : id(_id) {};
 		};
 
+		struct DerefID{ // typesafe identifier
+			uint32_t id;
+			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
+		};
+
 
 
 		///////////////////////////////////
@@ -145,6 +152,7 @@ namespace panther{
 				ASTNode,
 				FuncCall,
 				Prefix,
+				Deref,
 			} kind;
 
 			union {
@@ -152,12 +160,14 @@ namespace panther{
 				AST::Node::ID ast_node;
 				FuncCall::ID func_call;
 				PrefixID prefix;
+				DerefID deref;
 			};
 
 			explicit Expr(VarID id) : kind(Kind::Var), var(id) {};
 			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), ast_node(node) {};
 			explicit Expr(FuncCall::ID func_call_id) : kind(Kind::FuncCall), func_call(func_call_id) {};
 			explicit Expr(PrefixID prefix_id) : kind(Kind::Prefix), prefix(prefix_id) {};
+			explicit Expr(DerefID deref_id) : kind(Kind::Deref), deref(deref_id) {};
 		};
 
 
@@ -169,6 +179,13 @@ namespace panther{
 			Expr rhs;
 		};
 
+		struct Deref{
+			using ID = DerefID;
+
+			Expr ptr;
+			Type::ID type;
+		};
+
 
 		///////////////////////////////////
 		// statements
@@ -178,7 +195,6 @@ namespace panther{
 
 			Token::ID ident;
 			Type::ID type;
-			// AST::Node::ID value;
 			Expr value;
 
 			union {
@@ -210,7 +226,7 @@ namespace panther{
 				explicit ID(uint32_t _id) noexcept : id(_id) {};
 			};
 
-			Var::ID var;
+			Expr dst;
 			Token::ID op;
 			Expr value;
 		};

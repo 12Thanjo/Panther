@@ -82,6 +82,14 @@ namespace panther{
 		return this->infixes[node.index];
 	};
 
+	auto Source::getPostfix(AST::Node::ID node_id) const noexcept -> const AST::Postfix& {
+		return this->getPostfix(this->getNode(node_id));
+	};
+	auto Source::getPostfix(const AST::Node& node) const noexcept -> const AST::Postfix& {
+		evo::debugAssert(node.kind == AST::Kind::Postfix, "Node is not a Postfix");
+		return this->postfixes[node.index];
+	};
+
 	auto Source::getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall& {
 		return this->getFuncCall(this->getNode(node_id));
 	};
@@ -279,12 +287,10 @@ namespace panther{
 				return this->get_node_location(func.ident);
 			} break;
 
-
-			case AST::Kind::FuncCall: {
-				const AST::FuncCall& func_call = this->getFuncCall(node);
-				return this->get_node_location(func_call.target);
+			case AST::Kind::Return: {
+				// TODO:
+				EVO_FATAL_BREAK("Getting location of return stmt is not supported yet");
 			} break;
-
 			
 			case AST::Kind::Type: {
 				const AST::Type& type = this->getType(node);
@@ -294,6 +300,31 @@ namespace panther{
 
 			case AST::Kind::Block: {
 				EVO_FATAL_BREAK("Cannot get location of AST::Block");
+			} break;
+
+
+			case AST::Kind::Prefix: {
+				const AST::Prefix& prefix = this->getPrefix(node);
+				const Token& op_token = this->getToken(prefix.op);
+				return Location{op_token.line_start, op_token.collumn_start, op_token.collumn_end};
+			} break;
+
+			case AST::Kind::Infix: {
+				const AST::Infix& infix = this->getInfix(node);
+				const Token& op_token = this->getToken(infix.op);
+				return Location{op_token.line_start, op_token.collumn_start, op_token.collumn_end};
+			} break;
+
+			case AST::Kind::Postfix: {
+				const AST::Postfix& postfix = this->getPostfix(node);
+				const Token& op_token = this->getToken(postfix.op);
+				return Location{op_token.line_start, op_token.collumn_start, op_token.collumn_end};
+			} break;
+
+
+			case AST::Kind::FuncCall: {
+				// TODO:
+				EVO_FATAL_BREAK("Getting location of func call is not supported yet");
 			} break;
 
 

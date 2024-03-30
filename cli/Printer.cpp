@@ -431,8 +431,19 @@ namespace panther{
 			const AST::Type& type = source.getType(node);
 
 			this->indenter_print();
-			this->debug( std::format("{} ", Token::printKind(source.getToken(type.token).kind)) );
-			this->trace("[BUILTIN]\n");
+
+			auto print_str = std::string( Token::printKind(source.getToken(type.token).kind) );
+			for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+				if(qualifier.is_ptr){
+					print_str += '^';
+				}
+			}
+
+			this->debug(print_str);
+
+
+			// TODO: check if builtin
+			this->trace(" [BUILTIN]\n");
 		};
 
 		auto Printer::print_block(const Source& source, const AST::Node& node) noexcept -> void {
@@ -522,11 +533,34 @@ namespace panther{
 						this->indenter_pop();
 
 					this->indenter_pop();
-
-
 				} break;
 
-				break; default: EVO_FATAL_BREAK("Node is not an expr");
+
+				case AST::Kind::Postfix: {
+					const AST::Postfix& postfix = source.getPostfix(node);
+
+					this->indenter_print();
+					this->info("Postfix Op:\n");
+
+					this->indenter_push();
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("Op: ");
+						this->debug( std::format("{}\n", Token::printKind(source.getToken(postfix.op).kind)) );
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("LHS:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(source, source.getNode(postfix.lhs));
+						this->indenter_pop();
+
+					this->indenter_pop();
+				} break;
+
+				break; default: EVO_FATAL_BREAK("Node is not an expr - Printer::print_expr()");
 			};
 		};
 

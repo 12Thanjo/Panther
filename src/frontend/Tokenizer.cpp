@@ -167,6 +167,7 @@ namespace panther{
 
 			else if(ident_name == "copy") { this->create_token(Token::Kind::KeywordCopy); }
 			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
+			else if(ident_name == "addr") { this->create_token(Token::Kind::KeywordAddr); }
 
 
 			///////////////////////////////////
@@ -197,7 +198,6 @@ namespace panther{
 			break; case '}': tok_kind = Token::CloseBrace;
 
 			break; case ',': tok_kind = Token::Comma;
-			break; case '.': tok_kind = Token::Period;
 			break; case ';': tok_kind = Token::SemiColon;
 			break; case ':': tok_kind = Token::Colon;
 		};
@@ -234,11 +234,13 @@ namespace panther{
 
 
 		// length 2
-		if(is_op("==")){ set_op("=="); return true; }
+		// if(is_op("==")){ set_op("=="); return true; }
 		if(is_op("->")){ set_op("->"); return true; }
+		if(is_op(".^")){ set_op(".^"); return true; }
 
 		// length 1
 		if(is_op("=")){ set_op("="); return true; }
+		if(is_op("^")){ set_op("^"); return true; }
 
 
 		return false;

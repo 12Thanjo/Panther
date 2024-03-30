@@ -29,7 +29,7 @@ namespace panther{
 			EVO_NODISCARD auto analyze_return(const AST::Return& return_stmt) noexcept -> bool;
 			EVO_NODISCARD auto analyze_infix(const AST::Infix& infix) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool;
-			EVO_NODISCARD auto analyze_assignment(const AST::Infix& infix) noexcept -> bool;
+			EVO_NODISCARD auto analyze_assignment(const AST::Infix& infix) noexcept -> bool;			
 			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
 
 			// returns nullopt if error occurs
