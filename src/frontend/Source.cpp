@@ -288,8 +288,9 @@ namespace panther{
 			} break;
 
 			case AST::Kind::Return: {
-				// TODO:
-				EVO_FATAL_BREAK("Getting location of return stmt is not supported yet");
+				const AST::Return& return_stmt = this->getReturn(node);
+				const Token& token = this->getToken(return_stmt.keyword);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
 			} break;
 			
 			case AST::Kind::Type: {
@@ -323,8 +324,8 @@ namespace panther{
 
 
 			case AST::Kind::FuncCall: {
-				// TODO:
-				EVO_FATAL_BREAK("Getting location of func call is not supported yet");
+				const AST::FuncCall& func_call = this->getFuncCall(node);
+				return this->get_node_location(func_call.target);
 			} break;
 
 

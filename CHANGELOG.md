@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.14.1
+- Added location printing for function calls
+- Added location printing for return statements
+
 ### v0.14.0
 - Added pointer types
 - Added the `addr` keyword
