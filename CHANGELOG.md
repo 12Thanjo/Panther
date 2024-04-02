@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.14.2
+- Fixed printing of AST for postfix operators
+- Fixed "crashing" when doing semantic analysis of intrinsics
+- Added marking functions as not throwing (in LLVM IR)
+
 ### v0.14.1
 - Added location printing for function calls
 - Added location printing for return statements

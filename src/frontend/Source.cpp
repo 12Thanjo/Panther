@@ -134,6 +134,14 @@ namespace panther{
 		return this->getToken(node.token);
 	};
 
+	auto Source::getIntrinsic(AST::Node::ID node_id) const noexcept -> const Token& {
+		return this->getIntrinsic(this->getNode(node_id));
+	};
+	auto Source::getIntrinsic(const AST::Node& node) const noexcept -> const Token& {
+		evo::debugAssert(node.kind == AST::Kind::Intrinsic, "Node is not a Intrinsic");
+		return this->getToken(node.token);
+	};
+
 
 	auto Source::getUninit(AST::Node::ID node_id) const noexcept -> const Token& {
 		return this->getUninit(this->getNode(node_id));
@@ -331,6 +339,11 @@ namespace panther{
 
 			case AST::Kind::Ident: {
 				const Token& token = this->getIdent(node);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
+			} break;
+
+			case AST::Kind::Intrinsic: {
+				const Token& token = this->getIntrinsic(node);
 				return Location{token.line_start, token.collumn_start, token.collumn_end};
 			} break;
 

@@ -544,7 +544,6 @@ namespace panther{
 
 					this->indenter_push();
 
-						this->indenter_set_end();
 						this->indenter_print();
 						this->info("Op: ");
 						this->debug( std::format("{}\n", Token::printKind(source.getToken(postfix.op).kind)) );
@@ -560,7 +559,7 @@ namespace panther{
 					this->indenter_pop();
 				} break;
 
-				break; default: EVO_FATAL_BREAK("Node is not an expr - Printer::print_expr()");
+				break; default: EVO_FATAL_BREAK("Node is not an expr");
 			};
 		};
 

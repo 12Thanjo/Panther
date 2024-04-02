@@ -6,20 +6,18 @@ func get_global_ptr = () -> Int^ {
 	return (addr global);
 }
 
+
+
+
+
+
 func entry = () #entry -> Int {
-	var foo: Int = 12;
+	// @config = 12;
+	@printHelloWorld();
 
-	var foo_ptr: Int^ = addr foo;
-	var foo_ptr_ptr: Int^^ = addr foo_ptr;
+	get_global_ptr().^ = 12;
 
-
-	// foo_ptr.^ = 14;
-	// foo_ptr_ptr.^.^ = 15;
-	// foo = 15;
-
-	foo_ptr = get_global_ptr();
-	global = 10;
-
-	return foo_ptr_ptr.^.^;
-	// return foo;
+	return global;
 }
+
+

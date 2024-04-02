@@ -86,6 +86,9 @@ namespace panther{
 			EVO_NODISCARD auto getIdent(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getIdent(const AST::Node& node) const noexcept -> const Token&;
 
+			EVO_NODISCARD auto getIntrinsic(AST::Node::ID node_id) const noexcept -> const Token&;
+			EVO_NODISCARD auto getIntrinsic(const AST::Node& node) const noexcept -> const Token&;
+
 			EVO_NODISCARD auto getUninit(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getUninit(const AST::Node& node) const noexcept -> const Token&;
 

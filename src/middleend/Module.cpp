@@ -18,7 +18,13 @@ namespace panther{
 
 
 		auto Module::createFunction(evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage) noexcept -> llvm::Function* {
-			return llvm::Function::Create(prototype, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), name.data(), this->module);
+			llvm::Function* func = llvm::Function::Create(
+				prototype, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), name.data(), this->module
+			);
+
+			func->setDoesNotThrow();
+
+			return func; 
 		};
 
 

@@ -599,6 +599,12 @@ namespace panther{
 			} break;
 
 
+			case AST::Kind::Intrinsic: {
+				this->source.error("Intrinsics are not supported yet", node);
+				return std::nullopt;
+			} break;
+
+
 			case AST::Kind::FuncCall: {
 				const AST::FuncCall& func_call = this->source.getFuncCall(node);
 
@@ -819,6 +825,7 @@ namespace panther{
 			} break;
 
 			break; case AST::Kind::Ident: return ExprValueType::Concrete;
+			break; case AST::Kind::Intrinsic: return ExprValueType::Concrete;
 			break; case AST::Kind::Literal: return ExprValueType::Ephemeral;
 			break; case AST::Kind::Uninit: return ExprValueType::Ephemeral;
 		};
