@@ -239,6 +239,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	// semantic analysis
 
 	source_manager.initBuiltinTypes();
+	source_manager.initIntrinsics();
 
 
 	const evo::uint semantic_analysis_successful = source_manager.semanticAnalysis();
@@ -273,6 +274,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	auto pir_to_llvmir = panther::PIRToLLVMIR();
 	pir_to_llvmir.init(config.name, llvm_context);
+	pir_to_llvmir.initLibC();
 
 	pir_to_llvmir.lower(source_manager);
 

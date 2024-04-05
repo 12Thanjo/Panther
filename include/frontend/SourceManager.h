@@ -73,6 +73,7 @@ namespace panther{
 			EVO_NODISCARD auto parse() noexcept -> evo::uint;
 
 			auto initBuiltinTypes() noexcept -> void;
+			auto initIntrinsics() noexcept -> void;
 
 			// returns number of sources taht failed parsing
 			EVO_NODISCARD auto semanticAnalysis() noexcept -> evo::uint;
@@ -125,6 +126,9 @@ namespace panther{
 
 
 
+			EVO_NODISCARD auto getIntrinsics() const noexcept -> const std::vector<PIR::Intrinsic>&;
+			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::ID id) const noexcept -> const PIR::Intrinsic&;
+
 		private:
 			std::vector<Source> sources{};
 			bool is_locked = false;
@@ -133,6 +137,9 @@ namespace panther{
 			std::vector<PIR::Type> types{};
 
 			std::optional<Entry> entry{};
+
+			std::vector<PIR::Intrinsic> intrinsics{};
+			
 
 
 			MessageCallback message_callback;

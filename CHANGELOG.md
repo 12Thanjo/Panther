@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.15.0
+- Added the intrinsic function `@__printHelloWorld()`
+	- This existance of this is just temporary
+
 ### v0.14.2
 - Fixed printing of AST for postfix operators
 - Fixed "crashing" when doing semantic analysis of intrinsics

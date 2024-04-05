@@ -135,6 +135,14 @@ namespace panther{
 		};
 
 
+		Token(Kind _kind, std::string_view value) noexcept
+			: kind(_kind), line_start(0), line_end(0), collumn_start(0), collumn_end(0) {
+			evo::debugAssert(kind == Kind::Intrinsic, "This constructor should only be used for intrinsics (builtin-initialization)");
+
+			this->value.string = value;
+		}
+
+
 
 		//////////////////////////////////////////////////////////////////////
 		// helper functions

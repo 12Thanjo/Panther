@@ -108,6 +108,24 @@ namespace panther{
 	};
 
 
+	auto SourceManager::initIntrinsics() noexcept -> void {
+		evo::debugAssert(this->isLocked(), "Can only initialize intrinsics when locked");
+		
+		{ // __printHelloWorld()
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.call_operators.emplace_back(std::vector<PIR::Type::ID>{}, std::nullopt);
+
+			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+
+			// this->intrinsics.tokens.emplace_back(Token::Kind::Intrinsic, "__printHelloWorld");
+
+			// this->intrinsics.funcs.emplace_back(Token::ID( uint32_t(this->intrinsics.tokens.size() - 1) ), base_type_id, std::nullopt, false);
+
+			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printHelloWorld, "__printHelloWorld", base_type_id);
+		}
+	};
+
+
 
 	// TODO: multithreading
 	auto SourceManager::semanticAnalysis() noexcept -> evo::uint {
@@ -232,6 +250,23 @@ namespace panther{
 		evo::debugAssert(this->hasEntry(), "SourceManager does not have an entry");
 
 		return *this->entry;
+	};
+
+
+
+
+
+	auto SourceManager::getIntrinsics() const noexcept -> const std::vector<PIR::Intrinsic>& {
+		evo::debugAssert(this->isLocked(), "Can only get intrinsics when locked");
+
+		return this->intrinsics;
+	};
+
+
+	auto SourceManager::getIntrinsic(PIR::Intrinsic::ID id) const noexcept -> const PIR::Intrinsic& {
+		evo::debugAssert(this->isLocked(), "Can only get intrinsics when locked");
+
+		return this->intrinsics[id.id];
 	};
 
 

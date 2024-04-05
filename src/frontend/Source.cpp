@@ -161,7 +161,7 @@ namespace panther{
 
 		auto message = Message{
 			.type     = Message::Type::Fatal,
-			.source   = *this,
+			.source   = this,
 			.message  = msg,
 			.location = {
 				.line          = line,
@@ -179,7 +179,7 @@ namespace panther{
 
 		auto message = Message{
 			.type     = Message::Type::Fatal,
-			.source   = *this,
+			.source   = this,
 			.message  = msg,
 			.location = {
 				.line          = line,
@@ -222,7 +222,7 @@ namespace panther{
 
 		auto message = Message{
 			.type     = Message::Type::Error,
-			.source   = *this,
+			.source   = this,
 			.message  = msg,
 			.location = location,
 			.infos	  = std::move(infos),
@@ -263,7 +263,7 @@ namespace panther{
 
 		auto message = Message{
 			.type     = Message::Type::Warning,
-			.source   = *this,
+			.source   = this,
 			.message  = msg,
 			.location = location,
 			.infos	  = std::move(infos),

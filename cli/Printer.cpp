@@ -78,14 +78,14 @@ namespace panther{
 				break; case panther::Message::Type::Warning: this->warning( std::format("Warning: {}\n", msg.message) );
 			};
 
-			this->trace( std::format("\t{}:{}:{}\n", msg.source.getLocation(), msg.location.line, msg.location.collumn_start) );
+			if(msg.source != nullptr){
+				this->trace( std::format("\t{}:{}:{}\n", msg.source->getLocation(), msg.location.line, msg.location.collumn_start) );
+				this->print_location(*msg.source, msg.location, msg.type);
+			}else{
+				this->trace("\t[BUILTIN]\n");
+			}
 
 
-
-			///////////////////////////////////
-			// print location
-
-			this->print_location(msg.source, msg.location, msg.type);
 
 
 			///////////////////////////////////
@@ -94,8 +94,8 @@ namespace panther{
 			for(const Message::Info& info : msg.infos){
 				this->info( std::format("\tNote: {}\n", info.string) );
 
-				if(info.location.has_value()){
-					this->print_location(msg.source, *info.location, Message::Type::Info);
+				if(msg.source != nullptr && info.location.has_value()){
+					this->print_location(*msg.source, *info.location, Message::Type::Info);
 				}
 			}
 		};
@@ -164,6 +164,7 @@ namespace panther{
 
 
 		auto Printer::print_location(const Source& source, Location location, Message::Type type) const noexcept -> void {
+
 			// find line in the source code
 			size_t cursor = 0;
 			size_t current_line = 1;

@@ -24,7 +24,7 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_stmt(const AST::Node& node) noexcept -> bool {
-		if(this->current_func != nullptr && this->current_func->returns){
+		if(this->current_func != nullptr && this->current_func->has_return_stmt){
 			// TODO: better messaging
 			this->source.error("Code after return statement", node);
 			return false;
@@ -291,8 +291,6 @@ namespace panther{
 
 
 
-
-
 		///////////////////////////////////
 		// create object
 
@@ -335,7 +333,7 @@ namespace panther{
 			return false;
 		}
 
-		if(return_type_id.has_value() && this->current_func->returns == false){
+		if(return_type_id.has_value() && this->current_func->has_return_stmt == false){
 			this->source.error("Function with return type does not return", ident);
 			return false;
 		}
@@ -408,7 +406,7 @@ namespace panther{
 		const PIR::Return::ID ret_id = this->source.createReturn(return_value);
 		this->current_func->stmts.emplace_back(ret_id);
 
-		this->current_func->returns = true;
+		this->current_func->has_return_stmt = true;
 
 		return true;
 	};
@@ -509,28 +507,55 @@ namespace panther{
 			return false;
 		}
 
-		///////////////////////////////////
-		// get_func
 
-		const PIR::Func::ID func_id = [&]() noexcept {
-			for(Scope& scope : this->scopes){
-				auto find = scope.funcs.find(this->source.getIdent(func_call.target).value.string);
-				if(find != scope.funcs.end()){
-					return find->second;
+
+		switch(this->source.getNode(func_call.target).kind){
+			case AST::Kind::Ident: {
+				const Token& ident_tok = this->source.getIdent(func_call.target);
+
+				// get_func
+				const PIR::Func::ID func_id = [&]() noexcept {
+					for(Scope& scope : this->scopes){
+						auto find = scope.funcs.find(ident_tok.value.string);
+						if(find != scope.funcs.end()){
+							return find->second;
+						}
+					}
+
+					EVO_FATAL_BREAK("Unknown func ident");
+				}();
+
+
+				// create object
+				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id);
+				this->current_func->stmts.emplace_back(func_call_id);
+
+				return true;
+			} break;
+			
+			case AST::Kind::Intrinsic: {
+				const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
+
+				const std::vector<PIR::Intrinsic>& intrinsics = src_manager.getIntrinsics();
+
+				for(size_t i = 0; i < intrinsics.size(); i+=1){
+					const PIR::Intrinsic& intrinsic = intrinsics[i];
+
+					if(intrinsic.ident == intrinsic_tok.value.string){
+						// create object
+						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall( PIR::IntrinsicID(uint32_t(i)) );
+						this->current_func->stmts.emplace_back(func_call_id);
+						
+						return true;
+					}
 				}
-			}
-
-			EVO_FATAL_BREAK("Unknown func ident");
-		}();
 
 
-		///////////////////////////////////
-		// create object
-
-		const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id);
-		this->current_func->stmts.emplace_back(func_call_id);
-
-		return true;
+				EVO_FATAL_BREAK("Unknown intrinsic func");
+			} break;
+		};
+		
+		EVO_FATAL_BREAK("Unknown or unsupported func call target");
 	};
 
 
@@ -600,7 +625,16 @@ namespace panther{
 
 
 			case AST::Kind::Intrinsic: {
-				this->source.error("Intrinsics are not supported yet", node);
+				const Token& intrinsic_tok = this->source.getIntrinsic(node);
+
+				for(const PIR::Intrinsic& intrinsic : src_manager.getIntrinsics()){
+					if(intrinsic.ident == intrinsic_tok.value.string){
+						return src_manager.getTypeID(PIR::Type(intrinsic.base_type));
+					}
+				}
+
+
+				this->source.error(std::format("Intrinsic \"@{}\" does not exist", intrinsic_tok.value.string), intrinsic_tok);
 				return std::nullopt;
 			} break;
 

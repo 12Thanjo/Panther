@@ -82,6 +82,16 @@ namespace panther{
 
 
 
+			EVO_NODISCARD inline auto initLibC() noexcept -> void {
+				llvm::FunctionType* printf_proto = this->builder->getFuncProto(
+					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, true
+				);
+				this->libc.printf = this->module->createFunction("printf", printf_proto, llvmint::LinkageTypes::ExternalLinkage);
+			};
+
+
+
+
 			EVO_NODISCARD inline auto addRuntime(SourceManager& source_manager, const SourceManager::Entry& entry_func) noexcept -> void {
 				const Source& source = source_manager.getSource(entry_func.src_id);
 				const PIR::Func& func = source.getFunc(entry_func.func_id);
@@ -198,7 +208,7 @@ namespace panther{
 				}
 
 
-				if(func.returns == false){
+				if(func.has_return_stmt == false){
 					this->builder->createRet();
 				}
 			};
@@ -259,9 +269,29 @@ namespace panther{
 
 
 			inline auto lower_func_call(Source& source, PIR::FuncCall& func_call) noexcept -> void {
-				const PIR::Func& func = source.getFunc(func_call.func);
+				switch(func_call.kind){
+					case PIR::FuncCall::Kind::Func: {
+						const PIR::Func& func = source.getFunc(func_call.func);
+						this->builder->createCall(func.llvm_func, {}, '\0');
+					} break;
 
-				this->builder->createCall(func.llvm_func, {}, '\0');
+
+					case PIR::FuncCall::Kind::Intrinsic: {
+						const PIR::Intrinsic& intrinsic = source.getSourceManager().getIntrinsic(func_call.intrinsic);
+
+						switch(intrinsic.kind){
+							case PIR::Intrinsic::Kind::__printHelloWorld: {
+								evo::debugAssert(this->libc.printf != nullptr, "libc was not initialized");
+
+								static llvm::GlobalVariable* hello_world_str = this->builder->valueString("Hello World, I'm Panther!\n", "hello_world_str");
+								this->builder->createCall(this->libc.printf, { llvmint::ptrcast<llvm::Value>(hello_world_str) });
+							} break;
+						};
+					} break;
+
+
+					default: EVO_FATAL_BREAK("Unknown func call kind");
+				};
 			};
 
 
@@ -449,6 +479,10 @@ namespace panther{
 		private:
 			llvmint::IRBuilder* builder = nullptr;
 			llvmint::Module* module = nullptr;
+
+			struct /* libc */ {
+				llvm::Function* printf = nullptr;
+			} libc;
 	};
 
 

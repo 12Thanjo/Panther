@@ -22,7 +22,7 @@ namespace panther{
 
 
 		Type type;
-		const class Source& source;
+		const class Source* source;
 		const std::string message;
 
 		Location location;

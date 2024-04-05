@@ -119,6 +119,11 @@ namespace panther{
 			explicit FuncID(uint32_t _id) noexcept : id(_id) {};
 		};
 
+		struct IntrinsicID{ // typesafe identifier
+			uint32_t id;
+			explicit IntrinsicID(uint32_t _id) noexcept : id(_id) {};
+		};
+
 
 		struct PrefixID{ // typesafe identifier
 			uint32_t id;
@@ -141,7 +146,19 @@ namespace panther{
 				explicit ID(uint32_t _id) noexcept : id(_id) {};
 			};
 
-			FuncID func;
+			enum class Kind{
+				Func,
+				Intrinsic
+			} kind;
+
+
+			union{
+				FuncID func;
+				IntrinsicID intrinsic;
+			};
+
+			explicit FuncCall(FuncID func_id) : kind(Kind::Func), func(func_id) {};
+			explicit FuncCall(IntrinsicID intrinsic_id) : kind(Kind::Intrinsic), intrinsic(intrinsic_id) {};
 		};
 
 
@@ -274,7 +291,23 @@ namespace panther{
 			llvm::Function* llvm_func = nullptr;
 			std::vector<Stmt> stmts{};
 
-			bool returns = false;
+			bool has_return_stmt = false;
+		};
+
+
+
+
+		struct Intrinsic{
+			using ID = IntrinsicID;
+
+			enum class Kind{
+				__printHelloWorld,
+			} kind;
+
+
+			std::string_view ident;
+
+			BaseType::ID base_type;
 		};
 
 
