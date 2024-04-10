@@ -1,7 +1,8 @@
 
 #include "./Printer.h"
 #include "frontend/SourceManager.h"
-#include "middleend/Context.h"
+#include "LLVM_interface/Context.h"
+#include "LLD_interface/LLDInterface.h"
 #include "PIRToLLVMIR.h"
 
 
@@ -41,6 +42,7 @@ struct Config{
 		PrintLLVMIR,
 		LLVMIR,
 		Object,
+		Executable,
 		Run,
 	} target;
 	std::filesystem::path output_path{};
@@ -93,7 +95,30 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		}
 	}
 
-	config.output_path = config.relative_directory / "testing/output.o";
+
+
+	if(config.output_path.empty()){
+		const char* file_ext = [&]() noexcept {
+			switch(config.target){
+				break; case Config::Target::LLVMIR: return "ll";
+				break; case Config::Target::Object: return "o";
+
+				#if defined(EVO_PLATFORM_WINDOWS)
+					break; case Config::Target::Executable: return "exe";
+				#elif defined(EVO_PLATFORM_LINUX)
+					break; case Config::Target::Executable: return "out";
+				#endif
+
+				// I'm not entirely sure why I need this static cast here, but MSVC complains
+				//  (I haven't bothered checking other compilers)
+				break; default: return static_cast<const char*>(nullptr);
+			};
+		}();
+
+		if(file_ext != nullptr){
+			config.output_path = config.relative_directory / std::format("{}.{}", config.name, file_ext);
+		}
+	}
 
 
 
@@ -113,7 +138,9 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 			break; case Config::Target::PrintLLVMIR:      printer.debug("Target: PrintLLVMIR\n");
 			break; case Config::Target::LLVMIR:           printer.debug("Target: LLVMIR\n");
 			break; case Config::Target::Object:           printer.debug("Target: Object\n");
+			break; case Config::Target::Executable:       printer.debug("Target: Executable\n");
 			break; case Config::Target::Run:              printer.debug("Target: Run\n");
+			break; default: EVO_FATAL_BREAK("Unknown target");
 		};
 	}
 
@@ -130,8 +157,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	auto file_paths = std::vector<std::string>{
-		(config.relative_directory / "testing/test.pthr").make_preferred().string(),
-		// (config.relative_directory / "testing/test2.pthr").make_preferred().string(),
+		(config.relative_directory / "test.pthr").make_preferred().string(),
+		// (config.relative_directory / "test2.pthr").make_preferred().string(),
 	};
 
 	auto source_ids = std::vector<panther::Source::ID>();
@@ -385,17 +412,85 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	if(config.target == Config::Target::Run){
 		if(config.verbose){ printer.trace("------------------------------\nRunning:\n"); }
 
-		uint64_t return_code = pir_to_llvmir.run<uint64_t>("main");
+		const uint64_t return_code = pir_to_llvmir.run<uint64_t>("main");
 
 		// if(config.verbose){ printer.trace("------------------------------\n"); }
 
 		printer.info(std::format("Return Code: {}\n", return_code));
 
+
+		pir_to_llvmir.shutdown();
+		exit();
+		return 0;
+
+	}else if(config.target == Config::Target::Executable){
+
+		///////////////////////////////////
+		// create object file
+
+		const std::optional< std::vector<evo::byte> > output = pir_to_llvmir.compileToObjectFile();
+		if(output.has_value() == false){
+			printer.fatal("Target machine cannot output object file");
+			exit();
+			return 1;
+		}
+
 		pir_to_llvmir.shutdown();
 
 
+		///////////////////////////////////
+		// write object file
+
+		// TODO: better output path for obj_path_str
+		const std::string obj_path_str = (config.relative_directory / (config.name + ".o")).string();
+		const std::string path_str = config.output_path.string();
+
+
+		auto output_file = evo::fs::BinaryFile();
+		if(output_file.open(obj_path_str, evo::fs::FileMode::Write) == false){
+			printer.error( std::format("Failed to open file: \"{}\"\n", obj_path_str) );
+			exit();
+			return 1;
+		}
+
+		if(output_file.write(*output) == false){
+			printer.error( std::format("Failed to write to file: \"{}\"\n", obj_path_str) );
+			exit();
+			return 1;
+		}
+
+		output_file.close();
+
+		if(config.verbose){
+			printer.success( std::format("Successfully wrote object file to: \"{}\"\n", obj_path_str) );
+		}
+
+
+		///////////////////////////////////
+		// link / create executable
+
+		auto lld_interface = panther::LLDInterface();
+
+		const panther::LLDInterface::LinkerOutput linking_result = lld_interface.link(obj_path_str, path_str, panther::LLDInterface::Linker::WinLink);
+
+		if(linking_result.succeeded() == false){
+			for(const std::string& link_err_msg : linking_result.err_messages){
+				// TODO: nicer printint (note giving a path_str that has a non-existant path will give an error)
+				printer.error(std::format("Error: Linker: {}", link_err_msg));
+			}
+
+			printer.error("Error: Failed to link executable\n");
+
+			exit();
+			return 1;	
+		}
+
+		if(config.verbose){
+			printer.success( std::format("Successfully wrote output to: \"{}\"\n", path_str) );
+		}
+		
 		exit();
-		return 0;		
+		return 0;
 	}
 
 

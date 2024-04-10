@@ -12,10 +12,10 @@
 
 #include <Evo.h>
 
-#include "./middleend/Context.h"
-#include "./middleend/IRBuilder.h"
-#include "./middleend/Module.h"
-#include "./middleend/ExecutionEngine.h"
+#include "./LLVM_interface/Context.h"
+#include "./LLVM_interface/IRBuilder.h"
+#include "./LLVM_interface/Module.h"
+#include "./LLVM_interface/ExecutionEngine.h"
 
 
 namespace panther{

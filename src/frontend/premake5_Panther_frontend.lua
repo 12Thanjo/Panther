@@ -1,12 +1,11 @@
 -- premake5
 
-
-project "CLI"
-	kind "ConsoleApp"
+project "Panther_frontend"
+	kind "StaticLib"
 	-- staticruntime "On"
 	
 
-	targetdir(target.bin)
+	targetdir(target.lib)
 	objdir(target.obj)
 
 	files {
@@ -19,18 +18,13 @@ project "CLI"
 	includedirs{
 		(config.location .. "/libs"),
 
-		"../include/",
-		"./",
+		"../../include/",
+		"../",
 	}
 
 	links{
 		"Evo",
-		"Panther_frontend",
-		"LLVM_interface",
-		"LLD_interface",
 	}
-
-
 
 
 project "*"

@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.16.0
+- Reorganized part of the build system
+- Changed debug working directory to `/testing`
+- Added output to executable
+- Added default file output naming
+
 ### v0.15.0
 - Added the intrinsic function `@__printHelloWorld()`
 	- This existance of this is just temporary

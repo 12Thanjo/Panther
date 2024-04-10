@@ -156,7 +156,7 @@ allmodulespublic "Off"
 
 filter "configurations:Debug"
 	warnings "High"
-	debugdir(config.location)
+	debugdir(config.location .. "/testing")
 
 	defines{
 		"PANTHER_BUILD_DEBUG",
@@ -169,7 +169,7 @@ filter {}
 
 filter "configurations:Dev"
 	warnings "High"
-	debugdir (config.location)
+	debugdir (config.location .. "/testing")
 
 	defines{
 		"PANTHER_BUILD_DEV",
@@ -180,7 +180,7 @@ filter {}
 
 
 filter "configurations:Optimize"
-	debugdir (config.location)
+	debugdir (config.location .. "/testing")
 
 	defines{
 		"PANTHER_BUILD_OPTIMIZE",
@@ -191,7 +191,7 @@ filter {}
 
 
 filter "configurations:Release"
-	debugdir (config.location)
+	debugdir (config.location .. "/testing")
 
 	defines{
 		"PANTHER_BUILD_RELEASE",
@@ -213,7 +213,11 @@ filter {}
 ------------------------------------------------------------------------------
 -- projects
 
-include "./src/premake5_panther.lua"
+include "./libs/premake5_LLVM.lua"
+
+include "./src/frontend/premake5_Panther_frontend.lua"
+include "./src/LLVM_interface/premake5_LLVM_interface.lua"
+include "./src/LLD_interface/premake5_LLD_interface.lua"
 include "./cli/premake5_cli.lua"
 
 

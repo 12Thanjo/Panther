@@ -31,14 +31,6 @@
 
 
 
-
-        // #include <clang/Frontend/CompilerInstance.h>
-        // #include <clang/Basic/DiagnosticOptions.h>
-        // #include <clang/Frontend/TextDiagnosticPrinter.h>
-        // #include <clang/CodeGen/CodeGenAction.h>
-        // #include <clang/Basic/TargetInfo.h>
-        // #include <llvm/Support/TargetSelect.h>
-
         
     #undef _SILENCE_CXX20_CISO646_REMOVED_WARNING
     #pragma warning(default : 4996)

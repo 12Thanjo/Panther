@@ -3,7 +3,7 @@
 
 #include <Evo.h>
 
-#include "middleend/llvm_protos.h"
+#include "LLVM_interface/llvm_protos.h"
 
 
 namespace panther{

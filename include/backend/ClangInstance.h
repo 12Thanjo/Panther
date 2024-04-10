@@ -10,6 +10,10 @@ namespace panther{
 		public:
 			ClangInstance() = default;
 			~ClangInstance() = default;
+
+			auto init() noexcept -> void;
+
+			auto run() noexcept -> bool;
 	
 		private:
 			

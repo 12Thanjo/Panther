@@ -3,6 +3,11 @@
 build/
 libs/LLVM
 
+# outputs
+*.o
+*.exe
+*.pdb
+
 # sublime
 *.sublime-project
 *.sublime-workspace

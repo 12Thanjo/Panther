@@ -1,8 +1,8 @@
-#include "middleend/IRBuilder.h"
+#include "LLVM_interface/IRBuilder.h"
 
 #include <LLVM.h>
 
-#include "middleend/Module.h"
+#include "LLVM_interface/Module.h"
 
 namespace panther{
 	namespace llvmint{
