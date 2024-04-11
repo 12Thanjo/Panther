@@ -302,6 +302,7 @@ namespace panther{
 
 			enum class Kind{
 				__printHelloWorld,
+				breakpoint,
 			} kind;
 
 

@@ -12,6 +12,11 @@ namespace panther{
 
 		class IRBuilder{
 			public:
+				enum class IntrinsicID{
+					debugtrap,
+				};
+
+			public:
 				IRBuilder(llvm::LLVMContext& context);
 				~IRBuilder();
 
@@ -34,6 +39,8 @@ namespace panther{
 				auto createRet() noexcept -> llvm::ReturnInst*;
 
 				auto createCall(llvm::Function* func, evo::ArrayProxy<llvm::Value*> params, evo::CStrProxy name = '\0') noexcept -> llvm::CallInst*;
+
+				auto createIntrinsicCall(IntrinsicID id, evo::ArrayProxy<llvm::Value*> params) noexcept -> llvm::CallInst*;
 
 
 				//////////////////////////////////////////////////////////////////////

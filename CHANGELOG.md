@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.17.0
+- Added `@breakpoint` intrinsic
+- Panther functions (not marked with `#export`) now use the fast calling convention
+
 ### v0.16.0
 - Reorganized part of the build system
 - Changed debug working directory to `/testing`

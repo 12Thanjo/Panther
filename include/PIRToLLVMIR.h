@@ -37,6 +37,7 @@ namespace panther{
 
 
 				const std::string target_triple = llvmint::Module::getDefaultTargetTriple();
+				
 
 
 				const std::string data_layout_err = this->module->setDataLayout(target_triple, "generic", "");
@@ -86,7 +87,7 @@ namespace panther{
 				llvm::FunctionType* printf_proto = this->builder->getFuncProto(
 					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, true
 				);
-				this->libc.printf = this->module->createFunction("printf", printf_proto, llvmint::LinkageTypes::ExternalLinkage);
+				this->libc.printf = this->module->createFunction("printf", printf_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
 			};
 
 
@@ -97,7 +98,7 @@ namespace panther{
 				const PIR::Func& func = source.getFunc(entry_func.func_id);
 
 				llvm::FunctionType* prototype = this->builder->getFuncProto(llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64()), {}, false);
-				llvm::Function* main_func = this->module->createFunction("main", prototype, llvmint::LinkageTypes::ExternalLinkage);
+				llvm::Function* main_func = this->module->createFunction("main", prototype, llvmint::LinkageTypes::ExternalLinkage, true, false);
 
 				llvm::BasicBlock* entry_block = this->builder->createBasicBlock(main_func, "entry");
 				this->builder->setInsertionPoint(entry_block);
@@ -187,8 +188,9 @@ namespace panther{
 
 
 				llvm::FunctionType* prototype = this->builder->getFuncProto(return_type, {}, false);
-				auto linkage = func.is_export ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::InternalLinkage;
-				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, linkage);
+				const auto linkage = func.is_export ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::InternalLinkage;
+				const bool fast_call_conv = !func.is_export;
+				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, linkage, true, fast_call_conv);
 
 				func.llvm_func = llvm_func;
 
@@ -286,6 +288,14 @@ namespace panther{
 								static llvm::GlobalVariable* hello_world_str = this->builder->valueString("Hello World, I'm Panther!\n", "hello_world_str");
 								this->builder->createCall(this->libc.printf, { llvmint::ptrcast<llvm::Value>(hello_world_str) });
 							} break;
+
+							case PIR::Intrinsic::Kind::breakpoint: {
+								this->builder->createIntrinsicCall(llvmint::IRBuilder::IntrinsicID::debugtrap, {});
+							} break;
+
+							default: {
+								EVO_FATAL_BREAK("Unknown intrinsic");
+							};
 						};
 					} break;
 

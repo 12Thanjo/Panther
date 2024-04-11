@@ -17,12 +17,13 @@ namespace panther{
 		
 
 
-		auto Module::createFunction(evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage) noexcept -> llvm::Function* {
+		auto Module::createFunction(evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage, bool nothrow, bool fast_call_conv) noexcept -> llvm::Function* {
 			llvm::Function* func = llvm::Function::Create(
 				prototype, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), name.data(), this->module
 			);
 
-			func->setDoesNotThrow();
+			if(nothrow){ func->setDoesNotThrow(); }
+			if(fast_call_conv){ func->setCallingConv(llvm::CallingConv::Fast); }
 
 			return func; 
 		};

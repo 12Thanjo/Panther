@@ -71,7 +71,22 @@ namespace panther{
 
 
 		auto IRBuilder::createCall(llvm::Function* func, evo::ArrayProxy<llvm::Value*> params, evo::CStrProxy name) noexcept -> llvm::CallInst* {
-			return this->builder->CreateCall(func, llvm::ArrayRef<llvm::Value*>{params.data(), params.size()}, name.data());
+			llvm::CallInst* call_inst = this->builder->CreateCall(func, llvm::ArrayRef<llvm::Value*>{params.data(), params.size()}, name.data());
+			call_inst->setDoesNotThrow();
+
+			return call_inst;
+		};
+
+		auto IRBuilder::createIntrinsicCall(IntrinsicID id, evo::ArrayProxy<llvm::Value*> params) noexcept -> llvm::CallInst* {
+			// llvm/IR/IntrinsicEnums.inc
+			const llvm::Intrinsic::ID intrinsic_id = [&]() noexcept {
+				switch(id){
+					case IntrinsicID::debugtrap: return llvm::Intrinsic::IndependentIntrinsics::debugtrap;
+					default: EVO_FATAL_BREAK("Unknown llvm intrinsic");
+				};
+			}();
+
+			return this->builder->CreateIntrinsic(this->getTypeVoid(), intrinsic_id, llvm::ArrayRef<llvm::Value*>{params.data(), params.size()});
 		};
 
 

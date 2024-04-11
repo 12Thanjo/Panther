@@ -16,7 +16,7 @@ namespace panther{
 				~Module();
 
 				EVO_NODISCARD auto createFunction(
-					evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage
+					evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage, bool nothrow, bool fast_call_conv
 				) noexcept -> llvm::Function*;
 
 

@@ -14,6 +14,9 @@ func get_global_ptr = () -> Int^ {
 func entry = () #entry -> Int {
 	// @config = 12;
 	@__printHelloWorld();
+	@breakpoint();
+	@__printHelloWorld();
+	
 
 	get_global_ptr().^ = 12;
 
