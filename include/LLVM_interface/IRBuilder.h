@@ -38,6 +38,9 @@ namespace panther{
 				auto createRet(llvm::Value* value) noexcept -> llvm::ReturnInst*;
 				auto createRet() noexcept -> llvm::ReturnInst*;
 
+				auto createBranch(llvm::BasicBlock* block) noexcept -> llvm::BranchInst*;
+				auto createCondBranch(llvm::Value* cond, llvm::BasicBlock* then_block, llvm::BasicBlock* else_block) noexcept -> llvm::BranchInst*;
+
 				auto createCall(llvm::Function* func, evo::ArrayProxy<llvm::Value*> params, evo::CStrProxy name = '\0') noexcept -> llvm::CallInst*;
 
 				auto createIntrinsicCall(IntrinsicID id, evo::ArrayProxy<llvm::Value*> params) noexcept -> llvm::CallInst*;

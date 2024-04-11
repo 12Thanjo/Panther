@@ -26,11 +26,12 @@ namespace panther{
 			EVO_NODISCARD auto analyze_stmt(const AST::Node& node) noexcept -> bool;
 			EVO_NODISCARD auto analyze_var(const AST::VarDecl& var_decl) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func(const AST::Func& func) noexcept -> bool;
+			EVO_NODISCARD auto analyze_conditional(const AST::Conditional& cond) noexcept -> bool;
 			EVO_NODISCARD auto analyze_return(const AST::Return& return_stmt) noexcept -> bool;
 			EVO_NODISCARD auto analyze_infix(const AST::Infix& infix) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool;
 			EVO_NODISCARD auto analyze_assignment(const AST::Infix& infix) noexcept -> bool;			
-			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
+			EVO_NODISCARD auto analyze_block(const AST::Block& block, std::vector<PIR::Stmt>& stmts_entry) noexcept -> bool;
 
 			// returns nullopt if error occurs
 			EVO_NODISCARD auto analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<PIR::Type::ID>;
@@ -49,6 +50,8 @@ namespace panther{
 
 
 			struct Scope{
+				std::vector<PIR::Stmt>* stmts_entry;
+
 				std::unordered_map<std::string_view, PIR::Var::ID> vars{};
 				std::unordered_map<std::string_view, PIR::Func::ID> funcs{};
 			};
@@ -57,21 +60,18 @@ namespace panther{
 			PIR::Func* current_func = nullptr;
 
 
-			auto enter_scope() noexcept -> void;
+			auto enter_scope(std::vector<PIR::Stmt>* stmts_entry) noexcept -> void;
 			auto leave_scope() noexcept -> void;
 
 			auto add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void;
 			auto add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void;
 
+			EVO_NODISCARD auto get_stmts_entry() noexcept -> std::vector<PIR::Stmt>&;
+			EVO_NODISCARD auto has_in_scope(std::string_view ident) const noexcept -> bool;
 			EVO_NODISCARD inline auto is_global_scope() const noexcept -> bool { return this->scopes.size() == 1; };
 
 
-
-			auto has_in_scope(std::string_view ident) const noexcept -> bool;
-
 			auto already_defined(const Token& ident) const noexcept -> void;
-
-
 
 
 	

@@ -10,6 +10,7 @@ namespace panther{
 			VarDecl,
 			Func,
 			Return,
+			Conditional,
 			
 			Type,
 			Block,
@@ -63,6 +64,13 @@ namespace panther{
 		struct Return{
 			Token::ID keyword;
 			std::optional<Node::ID> value;
+		};
+
+		struct Conditional{
+			Token::ID if_tok;
+			Node::ID if_expr;
+			Node::ID then_block;
+			std::optional<Node::ID> else_block;
 		};
 
 

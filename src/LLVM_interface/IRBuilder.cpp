@@ -69,6 +69,16 @@ namespace panther{
 		};
 
 
+		auto IRBuilder::createBranch(llvm::BasicBlock* block) noexcept -> llvm::BranchInst* {
+			return this->builder->CreateBr(block);
+		};
+
+		auto IRBuilder::createCondBranch(llvm::Value* cond, llvm::BasicBlock* then_block, llvm::BasicBlock* else_block) noexcept -> llvm::BranchInst* {
+			return this->builder->CreateCondBr(cond, then_block, else_block);
+		};
+
+
+
 
 		auto IRBuilder::createCall(llvm::Function* func, evo::ArrayProxy<llvm::Value*> params, evo::CStrProxy name) noexcept -> llvm::CallInst* {
 			llvm::CallInst* call_inst = this->builder->CreateCall(func, llvm::ArrayRef<llvm::Value*>{params.data(), params.size()}, name.data());

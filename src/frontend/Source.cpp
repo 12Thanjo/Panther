@@ -57,6 +57,14 @@ namespace panther{
 		return this->funcs[node.index];
 	};
 
+	auto Source::getConditional(AST::Node::ID node_id) const noexcept -> const AST::Conditional& {
+		return this->getConditional(this->getNode(node_id));
+	};
+	auto Source::getConditional(const AST::Node& node) const noexcept -> const AST::Conditional& {
+		evo::debugAssert(node.kind == AST::Kind::Conditional, "Node is not a Conditional");
+		return this->conditionals[node.index];
+	};
+
 
 	auto Source::getReturn(AST::Node::ID node_id) const noexcept -> const AST::Return& {
 		return this->getReturn(this->getNode(node_id));
@@ -293,6 +301,12 @@ namespace panther{
 			case AST::Kind::Func: {
 				const AST::Func& func = this->getFunc(node);
 				return this->get_node_location(func.ident);
+			} break;
+
+			case AST::Kind::Conditional: {
+				const AST::Conditional& conditional = this->getConditional(node);
+				const Token& token = this->getToken(conditional.if_tok);
+				return Location{token.line_start, token.collumn_start, token.collumn_end};
 			} break;
 
 			case AST::Kind::Return: {

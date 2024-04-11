@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.18.0
+- Added conditional statements
+	- `if`
+	- `else if`
+	- `else`
+
 ### v0.17.0
 - Added `@breakpoint` intrinsic
 - Panther functions (not marked with `#export`) now use the fast calling convention

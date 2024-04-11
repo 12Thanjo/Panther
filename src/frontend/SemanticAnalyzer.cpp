@@ -6,7 +6,7 @@ namespace panther{
 	
 
 	auto SemanticAnalyzer::semantic_analysis() noexcept -> bool {
-		this->enter_scope();
+		this->enter_scope(nullptr);
 
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
@@ -33,6 +33,7 @@ namespace panther{
 		switch(node.kind){
 			break; case AST::Kind::VarDecl: return this->analyze_var(this->source.getVarDecl(node));
 			break; case AST::Kind::Func: return this->analyze_func(this->source.getFunc(node));
+			break; case AST::Kind::Conditional: return this->analyze_conditional(this->source.getConditional(node));
 			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node));
 			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node));
 			break; case AST::Kind::FuncCall: return this->analyze_func_call(this->source.getFuncCall(node));
@@ -206,7 +207,7 @@ namespace panther{
 		if(this->is_global_scope()){
 			this->source.pir.global_vars.emplace_back(var_id);
 		}else{
-			this->current_func->stmts.emplace_back(var_id);
+			this->get_stmts_entry().emplace_back(var_id);
 		}
 
 
@@ -329,9 +330,7 @@ namespace panther{
 		// analyze block
 
 		const AST::Block& block = this->source.getBlock(func.block);
-		if(this->analyze_block(block) == false){
-			return false;
-		}
+		if(this->analyze_block(block, this->current_func->stmts) == false){ return false; }
 
 		if(return_type_id.has_value() && this->current_func->has_return_stmt == false){
 			this->source.error("Function with return type does not return", ident);
@@ -350,6 +349,91 @@ namespace panther{
 
 
 
+	auto SemanticAnalyzer::analyze_conditional(const AST::Conditional& cond) noexcept -> bool {
+		SourceManager& src_manager = this->source.getSourceManager();
+
+		if(this->current_func == nullptr){
+			this->source.error("Conditional statements can only be inside functions", cond.if_tok);
+			return false;
+		}
+
+
+		///////////////////////////////////
+		// condition
+
+		const AST::Node& cond_expr = this->source.getNode(cond.if_expr);
+
+		const std::optional<PIR::Type::ID> cond_type_id = this->analyze_and_get_type_of_expr(cond_expr);
+		if(cond_type_id.has_value() == false){ return false; }
+
+		if(*cond_type_id != src_manager.getTypeBool()){
+			this->source.error(
+				"Conditional expression must be a boolean", cond_expr,
+				std::vector<Message::Info>{
+					{std::string("Conditional expression is of type: ") + src_manager.printType(*cond_type_id)}
+				}
+			);
+			return false;
+		}
+
+
+		///////////////////////////////////
+		// setup stmt blocks
+
+		auto then_stmts = std::vector<PIR::Stmt>();
+		auto else_stmts = std::vector<PIR::Stmt>();
+
+
+		///////////////////////////////////
+		// then block
+
+		const AST::Block& then_block = this->source.getBlock(cond.then_block);
+		if(this->analyze_block(then_block, then_stmts) == false){ return false; }
+
+
+		///////////////////////////////////
+		// else block
+
+		if(cond.else_block.has_value()){
+			const AST::Node& else_block_node = this->source.getNode(*cond.else_block);
+
+			if(else_block_node.kind == AST::Kind::Block){
+				const AST::Block& else_block = this->source.getBlock(else_block_node);
+				if(this->analyze_block(else_block, else_stmts) == false){ return false; }
+
+			}else if(else_block_node.kind == AST::Kind::Conditional){
+				this->enter_scope(&else_stmts);
+
+				const AST::Conditional& else_block = this->source.getConditional(else_block_node);
+				if(this->analyze_conditional(else_block) == false){ return false; }		
+
+				this->leave_scope();
+
+			}else{
+				EVO_FATAL_BREAK("Unkonwn else block kind");
+			}
+		}
+
+
+		///////////////////////////////////
+		// create object
+
+		const PIR::Conditional::ID cond_id = this->source.createConditional(
+			this->get_expr_value(cond.if_expr), std::move(then_stmts), std::move(else_stmts)
+		);
+		this->get_stmts_entry().emplace_back(cond_id);
+
+
+
+		///////////////////////////////////
+		// done
+
+		return true;
+	};
+
+
+
+
 	auto SemanticAnalyzer::analyze_return(const AST::Return& return_stmt) noexcept -> bool {
 		if(this->current_func == nullptr){
 			this->source.error("Return statements can only be inside functions", return_stmt.keyword);
@@ -360,7 +444,7 @@ namespace panther{
 		std::optional<PIR::Expr> return_value = std::nullopt;
 
 		if(return_stmt.value.has_value()){
-			// return expr;
+			// "return expr;"
 
 			if(this->current_func->return_type.has_value() == false){
 				this->source.error("Return statement has value when function's return type is \"Void\"", return_stmt.keyword);
@@ -393,7 +477,7 @@ namespace panther{
 
 
 		}else{
-			// return;
+			// "return;"
 			
 			if(this->current_func->return_type.has_value()){
 				this->source.error("Return statement has no value when function's return type is not \"Void\"", return_stmt.keyword);
@@ -404,7 +488,7 @@ namespace panther{
 
 
 		const PIR::Return::ID ret_id = this->source.createReturn(return_value);
-		this->current_func->stmts.emplace_back(ret_id);
+		this->get_stmts_entry().emplace_back(ret_id);
 
 		this->current_func->has_return_stmt = true;
 
@@ -479,7 +563,7 @@ namespace panther{
 		const PIR::Assignment::ID assignment_id = this->source.createAssignment(
 			this->get_expr_value(infix.lhs), infix.op, this->get_expr_value(infix.rhs)
 		);
-		this->current_func->stmts.emplace_back(assignment_id);
+		this->get_stmts_entry().emplace_back(assignment_id);
 
 
 		return true;
@@ -528,7 +612,7 @@ namespace panther{
 
 				// create object
 				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id);
-				this->current_func->stmts.emplace_back(func_call_id);
+				this->get_stmts_entry().emplace_back(func_call_id);
 
 				return true;
 			} break;
@@ -544,7 +628,7 @@ namespace panther{
 					if(intrinsic.ident == intrinsic_tok.value.string){
 						// create object
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall( PIR::IntrinsicID(uint32_t(i)) );
-						this->current_func->stmts.emplace_back(func_call_id);
+						this->get_stmts_entry().emplace_back(func_call_id);
 						
 						return true;
 					}
@@ -562,8 +646,8 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_block(const AST::Block& block) noexcept -> bool {
-		this->enter_scope();
+	auto SemanticAnalyzer::analyze_block(const AST::Block& block, std::vector<PIR::Stmt>& stmts_entry) noexcept -> bool {
+		this->enter_scope(&stmts_entry);
 
 		for(AST::Node::ID node_id : block.nodes){
 			if(this->analyze_stmt(this->source.getNode(node_id)) == false){
@@ -885,8 +969,8 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// scope
 
-	auto SemanticAnalyzer::enter_scope() noexcept -> void {
-		this->scopes.emplace_back();
+	auto SemanticAnalyzer::enter_scope(std::vector<PIR::Stmt>* stmts_entry) noexcept -> void {
+		this->scopes.emplace_back(stmts_entry);
 	};
 
 	auto SemanticAnalyzer::leave_scope() noexcept -> void {
@@ -903,6 +987,13 @@ namespace panther{
 	};
 
 
+	auto SemanticAnalyzer::get_stmts_entry() noexcept -> std::vector<PIR::Stmt>& {
+		Scope& current_scope = this->scopes.back();
+
+		evo::debugAssert(current_scope.stmts_entry != nullptr, "Cannot get stmts entry as it doesn't exist for this scope");
+
+		return *current_scope.stmts_entry;
+	};
 
 	auto SemanticAnalyzer::has_in_scope(std::string_view ident) const noexcept -> bool {
 		for(const Scope& scope : this->scopes){

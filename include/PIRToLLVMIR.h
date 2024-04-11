@@ -175,7 +175,21 @@ namespace panther{
 
 
 
+			inline auto lower_stmt(Source& source, const PIR::Stmt& stmt) noexcept -> void {
+				switch(stmt.kind){
+					break; case PIR::Stmt::Kind::Var: this->lower_var(source, source.getVar(stmt.var));
+					break; case PIR::Stmt::Kind::Conditional: this->lower_conditional(source, source.getConditional(stmt.conditional));
+					break; case PIR::Stmt::Kind::Return: this->lower_return(source, source.getReturn(stmt.ret));
+					break; case PIR::Stmt::Kind::Assignment: this->lower_assignment(source, source.getAssignment(stmt.assignment));
+					break; case PIR::Stmt::Kind::FuncCall: this->lower_func_call(source, source.getFuncCall(stmt.func_call));
+					break; default: EVO_FATAL_BREAK("Unknown stmt kind");
+				};
+			};
+
+
+
 			inline auto lower_func(Source& source, PIR::Func& func) noexcept -> void {
+				this->current_func = &func;
 				const std::string mangled_name = PIRToLLVMIR::mangle_name(source, func);
 
 				llvm::Type* return_type = this->builder->getTypeVoid();
@@ -200,19 +214,15 @@ namespace panther{
 
 
 				for(const PIR::Stmt& stmt : func.stmts){
-					switch(stmt.kind){
-						break; case PIR::Stmt::Kind::Var: this->lower_var(source, source.getVar(stmt.var));
-						break; case PIR::Stmt::Kind::Return: this->lower_return(source, source.getReturn(stmt.ret));
-						break; case PIR::Stmt::Kind::Assignment: this->lower_assignment(source, source.getAssignment(stmt.assignment));
-						break; case PIR::Stmt::Kind::FuncCall: this->lower_func_call(source, source.getFuncCall(stmt.func_call));
-						break; default: EVO_FATAL_BREAK("Unknown PIR::Stmt::Kind");
-					};
+					this->lower_stmt(source, stmt);
 				}
 
 
 				if(func.has_return_stmt == false){
 					this->builder->createRet();
 				}
+
+				this->current_func = nullptr;
 			};
 
 
@@ -241,6 +251,51 @@ namespace panther{
 					this->builder->createStore(alloca_val, this->get_value(source, var.value), false);
 				}
 
+			};
+
+
+			inline auto lower_conditional(Source& source, PIR::Conditional& cond) noexcept -> void {
+				llvm::BasicBlock* then_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.then");
+				llvm::BasicBlock* end_block = nullptr;
+
+				llvm::Value* cond_value = this->get_value(source, cond.if_cond);
+
+				if(cond.else_stmts.empty()){
+					end_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.end");
+
+					this->builder->createCondBranch(cond_value, then_block, end_block);
+
+					this->builder->setInsertionPoint(then_block);
+					for(const PIR::Stmt& stmt : cond.then_stmts){
+						this->lower_stmt(source, stmt);
+					}
+					this->builder->createBranch(end_block);
+
+				}else{
+					llvm::BasicBlock* else_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.else");
+
+					this->builder->createCondBranch(cond_value, then_block, else_block);
+
+					// then block
+					this->builder->setInsertionPoint(then_block);
+					for(const PIR::Stmt& stmt : cond.then_stmts){
+						this->lower_stmt(source, stmt);
+					}
+
+					// else block
+					this->builder->setInsertionPoint(else_block);
+					for(const PIR::Stmt& stmt : cond.else_stmts){
+						this->lower_stmt(source, stmt);
+					}
+
+					// end block
+					end_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.end");
+					this->builder->createBranch(end_block);
+					this->builder->setInsertionPoint(then_block);
+					this->builder->createBranch(end_block);
+				}
+
+				this->builder->setInsertionPoint(end_block);
 			};
 
 
@@ -489,6 +544,7 @@ namespace panther{
 		private:
 			llvmint::IRBuilder* builder = nullptr;
 			llvmint::Module* module = nullptr;
+			PIR::Func* current_func = nullptr;
 
 			struct /* libc */ {
 				llvm::Function* printf = nullptr;

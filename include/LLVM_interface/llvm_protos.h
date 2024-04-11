@@ -28,6 +28,7 @@ namespace llvm{
 	class StoreInst;
 	class ReturnInst;
 	class CallInst;
+	class BranchInst;
 
 	class ExecutionEngine;
 };

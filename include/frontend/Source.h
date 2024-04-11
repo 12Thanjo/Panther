@@ -57,6 +57,9 @@ namespace panther{
 			EVO_NODISCARD auto getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func&;
 			EVO_NODISCARD auto getFunc(const AST::Node& node) const noexcept -> const AST::Func&;
 
+			EVO_NODISCARD auto getConditional(AST::Node::ID node_id) const noexcept -> const AST::Conditional&;
+			EVO_NODISCARD auto getConditional(const AST::Node& node) const noexcept -> const AST::Conditional&;
+
 			EVO_NODISCARD auto getReturn(AST::Node::ID node_id) const noexcept -> const AST::Return&;
 			EVO_NODISCARD auto getReturn(const AST::Node& node) const noexcept -> const AST::Return&;
 
@@ -124,6 +127,19 @@ namespace panther{
 			};
 			EVO_NODISCARD inline auto getFunc(PIR::Func::ID id) noexcept -> PIR::Func& {
 				return this->pir.funcs[size_t(id.id)];
+			};
+
+			template<typename... Args>
+			EVO_NODISCARD inline auto createConditional(Args... args) noexcept -> PIR::Conditional::ID {
+				this->pir.conditionals.emplace_back(args...);
+				return PIR::Conditional::ID( uint32_t(this->pir.conditionals.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getConditional(PIR::Conditional::ID id) const noexcept -> const PIR::Conditional& {
+				return this->pir.conditionals[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getConditional(PIR::Conditional::ID id) noexcept -> PIR::Conditional& {
+				return this->pir.conditionals[size_t(id.id)];
 			};
 
 
@@ -235,6 +251,7 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
+			std::vector<AST::Conditional> conditionals{};
 			std::vector<AST::Return> returns{};
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
@@ -248,6 +265,7 @@ namespace panther{
 			struct /* pir */ {
 				std::vector<PIR::Var> vars{};
 				std::vector<PIR::Func> funcs{};
+				std::vector<PIR::Conditional> conditionals{};
 				std::vector<PIR::Return> returns{};
 				std::vector<PIR::Assignment> assignments{};
 				std::vector<PIR::FuncCall> func_calls{};

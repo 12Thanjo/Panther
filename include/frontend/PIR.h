@@ -55,7 +55,7 @@ namespace panther{
 
 
 				// function
-				BaseType(Kind _kind) : kind(_kind){
+				explicit BaseType(Kind _kind) : kind(_kind){
 					evo::debugAssert(_kind == Kind::Function, "This constructor must be only used for function kind");
 				}
 
@@ -250,6 +250,10 @@ namespace panther{
 
 
 
+		struct ConditionalID{ // typesafe identifier
+			uint32_t id;
+			explicit ConditionalID(uint32_t _id) noexcept : id(_id) {};
+		};
 
 		struct Stmt{
 			enum class Kind{
@@ -257,6 +261,7 @@ namespace panther{
 				Return,
 				Assignment,
 				FuncCall,
+				Conditional,
 			} kind;
 
 			union {
@@ -264,15 +269,26 @@ namespace panther{
 				Return::ID ret;
 				Assignment::ID assignment;
 				FuncCall::ID func_call;
+				ConditionalID conditional;
 			};
 
-			Stmt(Var::ID id) : kind(Kind::Var), var(id) {};
-			Stmt(Return::ID id) : kind(Kind::Return), ret(id) {};
-			Stmt(Assignment::ID id) : kind(Kind::Assignment), assignment(id) {};
-			Stmt(FuncCall::ID id) : kind(Kind::FuncCall), func_call(id) {};
+			explicit Stmt(Var::ID id) : kind(Kind::Var), var(id) {};
+			explicit Stmt(Return::ID id) : kind(Kind::Return), ret(id) {};
+			explicit Stmt(Assignment::ID id) : kind(Kind::Assignment), assignment(id) {};
+			explicit Stmt(FuncCall::ID id) : kind(Kind::FuncCall), func_call(id) {};
+			explicit Stmt(ConditionalID id) : kind(Kind::Conditional), conditional(id) {};
 		};
 
 
+
+
+		struct Conditional{
+			using ID = ConditionalID;
+
+			Expr if_cond;
+			std::vector<Stmt> then_stmts;
+			std::vector<Stmt> else_stmts;
+		};
 
 
 

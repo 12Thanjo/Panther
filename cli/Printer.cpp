@@ -273,6 +273,7 @@ namespace panther{
 			switch(node.kind){
 				break; case AST::Kind::VarDecl: this->print_var_decl(source, node);
 				break; case AST::Kind::Func: this->print_func(source, node);
+				break; case AST::Kind::Conditional: this->print_conditional(source, node);
 				break; case AST::Kind::Return: this->print_return(source, node);
 				break; case AST::Kind::Infix: this->print_infix(source, node);
 
@@ -299,7 +300,7 @@ namespace panther{
 			this->indenter_print();
 			this->info("Type:\n");
 			this->indenter_push();
-			this->indenter_set_end();
+				this->indenter_set_end();
 				this->print_type(source, source.getNode(var_decl.type));
 			this->indenter_pop();
 
@@ -307,7 +308,7 @@ namespace panther{
 			this->indenter_print();
 			this->info("Expr:\n");
 			this->indenter_push();
-			this->indenter_set_end();
+				this->indenter_set_end();
 				this->print_expr(source, source.getNode(var_decl.expr));
 			this->indenter_pop();
 
@@ -324,53 +325,104 @@ namespace panther{
 			this->info("Func:\n");
 			this->indenter_push();
 
-			this->indenter_print();
-			this->info("Ident: ");
-			this->debug( std::format("{}\n", source.getToken(source.getNode(func.ident).token).value.string) );
+				this->indenter_print();
+				this->info("Ident: ");
+				this->debug( std::format("{}\n", source.getToken(source.getNode(func.ident).token).value.string) );
 
 
-			this->indenter_print();
-			if(func.attributes.empty()){
-				this->info("Attributes: ");
-				this->debug("[None]\n");
-			}else{
-				this->info("Attributes:\n");
+				this->indenter_print();
+				if(func.attributes.empty()){
+					this->info("Attributes: ");
+					this->debug("[None]\n");
+				}else{
+					this->info("Attributes:\n");
 
-				this->indenter_push();
-				for(size_t i = 0; i < func.attributes.size(); i+=1){
-					if(i < func.attributes.size() - 1){
-						this->indenter_set_arrow();
-					}else{
-						this->indenter_set_end();
+					this->indenter_push();
+					for(size_t i = 0; i < func.attributes.size(); i+=1){
+						if(i < func.attributes.size() - 1){
+							this->indenter_set_arrow();
+						}else{
+							this->indenter_set_end();
+						}
+
+						this->indenter_print();
+
+						this->debug( std::format("#{}\n", source.getToken(func.attributes[i]).value.string) );
 					}
-
-					this->indenter_print();
-
-					this->debug( std::format("#{}\n", source.getToken(func.attributes[i]).value.string) );
+					this->indenter_pop();
 				}
+
+
+
+				this->indenter_set_arrow();
+				this->indenter_print();
+				this->info("Return Type:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_type(source, source.getNode(func.return_type));
 				this->indenter_pop();
-			}
 
 
+					this->indenter_set_end();
+				this->indenter_print();
+				this->info("Block:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_block(source, source.getNode(func.block));
+				this->indenter_pop();
 
-			this->indenter_set_arrow();
-			this->indenter_print();
-			this->info("Return Type:\n");
-			this->indenter_push();
-			this->indenter_set_end();
-				this->print_type(source, source.getNode(func.return_type));
 			this->indenter_pop();
+		};
 
 
-			this->indenter_set_end();
+		auto Printer::print_conditional(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::Conditional& conditional = source.getConditional(node);
+
 			this->indenter_print();
-			this->info("Block:\n");
+			this->info("Conditional:\n");
 			this->indenter_push();
-			this->indenter_set_end();
-				this->print_block(source, source.getNode(func.block));
-			this->indenter_pop();
+
+				this->indenter_print();
+				this->info("If:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_expr(source, source.getNode(conditional.if_expr));
+				this->indenter_pop();
 
 
+				this->indenter_set_arrow();
+				this->indenter_print();
+				this->info("Then:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_block(source, source.getNode(conditional.then_block));
+				this->indenter_pop();
+
+
+				this->indenter_set_end();
+				this->indenter_print();
+				if(conditional.else_block.has_value()){
+					this->info("Else:\n");
+					this->indenter_push();
+						this->indenter_set_end();
+
+						const AST::Node& else_block = source.getNode(*conditional.else_block);
+						if(else_block.kind == AST::Kind::Block){
+							this->print_block(source, else_block);
+
+						}else if(else_block.kind == AST::Kind::Conditional){
+							this->print_conditional(source, else_block);
+
+						}else{
+							EVO_FATAL_BREAK("Unsupported else-block kind");
+						}
+
+					this->indenter_pop();
+
+				}else{
+					this->info("Else: ");
+					this->debug("[NONE]\n");
+				}
 
 			this->indenter_pop();
 		};
@@ -384,7 +436,7 @@ namespace panther{
 			if(return_stmt.value.has_value()){
 				this->info("Return:\n");
 				this->indenter_push();
-				this->indenter_set_end();
+					this->indenter_set_end();
 					this->print_expr(source, source.getNode(*return_stmt.value));
 				this->indenter_pop();
 

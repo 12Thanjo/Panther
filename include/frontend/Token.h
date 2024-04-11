@@ -50,6 +50,8 @@ namespace panther{
 			KeywordFunc,
 
 			KeywordReturn,
+			KeywordIf,
+			KeywordElse,
 
 			KeywordCopy,
 			KeywordUninit,
@@ -218,6 +220,8 @@ namespace panther{
 				break; case Kind::KeywordFunc: return "func";
 
 				break; case Kind::KeywordReturn: return "return";
+				break; case Kind::KeywordIf: return "if";
+				break; case Kind::KeywordElse: return "else";
 
 				break; case Kind::KeywordCopy: return "copy";
 				break; case Kind::KeywordUninit: return "uninit";

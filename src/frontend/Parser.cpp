@@ -37,6 +37,9 @@ namespace panther{
 		result = this->parse_func();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
+		result = this->parse_conditional();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
 		result = this->parse_return();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
@@ -150,12 +153,65 @@ namespace panther{
 
 
 
+
+	auto Parser::parse_conditional() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordIf){
+			return Result::WrongType;
+		}
+
+		const Token::ID keyword_if_tok = this->next();
+
+		// (
+		if(this->expect_token(Token::get("("), "in function declaration") == false){ return Result::Error; }
+
+		// conditional
+		const Result cond_expr = this->parse_expr();
+		if(this->check_result_fail(cond_expr, "expression in conditional")){ return Result::Error; }
+
+		// )
+		if(this->expect_token(Token::get(")"), "in function declaration") == false){ return Result::Error; }
+
+		// then block
+		const Result then_block = this->parse_block();
+		if(this->check_result_fail(then_block, "statement block in conditional")){ return Result::Error; }
+
+
+		auto else_stmt = std::optional<AST::Node::ID>();
+		if(this->get(this->peek()).kind == Token::KeywordElse){
+			this->skip(1);
+
+			const Result else_stmt_result = [&]() noexcept {
+				if(this->get(this->peek()).kind == Token::KeywordIf){
+					return this->parse_conditional();
+				}else{
+					return this->parse_block();
+				}
+			}();
+
+			// TODO: better message
+			if(this->check_result_fail(else_stmt_result, "conditional")){ return Result::Error; }
+
+			else_stmt = else_stmt_result.value();
+		}
+
+
+
+		return this->create_node(
+			this->source.conditionals, AST::Kind::Conditional,
+			keyword_if_tok, cond_expr.value(), then_block.value(), else_stmt
+		);
+	};
+
+
+
+
+
 	auto Parser::parse_return() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::KeywordReturn){
 			return Result::WrongType;
 		}
 
-		const Token::ID keyword = this->next();
+		const Token::ID keyword_ret_tok = this->next();
 
 		std::optional<AST::Node::ID> value = std::nullopt;
 
@@ -177,7 +233,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.returns, AST::Kind::Return,
-			keyword, value
+			keyword_ret_tok, value
 		);
 	};
 

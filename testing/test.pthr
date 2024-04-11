@@ -1,26 +1,28 @@
 
-var global: Int = 9;
 
+var global: Bool = true;
 
-func get_global_ptr = () -> Int^ {
+func get_global_ptr = () -> Bool^ {
 	return (addr global);
 }
 
 
-
-
-
-
 func entry = () #entry -> Int {
-	// @config = 12;
-	@__printHelloWorld();
-	@breakpoint();
-	@__printHelloWorld();
-	
+	var foo: Int = 0;
 
-	get_global_ptr().^ = 12;
+	if(get_global_ptr().^){
+		@__printHelloWorld();
+		foo = 12;
 
-	return global;
+	}else if(true){
+		foo = 18;
+
+	}else{
+		@__printHelloWorld();
+		@__printHelloWorld();
+	}
+
+	return foo;
 }
 
 
