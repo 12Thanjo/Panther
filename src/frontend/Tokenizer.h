@@ -23,6 +23,7 @@ namespace panther{
 			EVO_NODISCARD auto tokenize_punctuation() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_operators() noexcept -> bool;
 			EVO_NODISCARD auto tokenize_number_literal() noexcept -> bool;
+			EVO_NODISCARD auto tokenize_string_literal() noexcept -> bool;
 
 			auto create_token(Token::Kind kind) noexcept -> void;
 			template<typename T> auto create_token(Token::Kind kind, T val) noexcept -> void;

@@ -20,6 +20,7 @@ namespace panther{
 			if(this->tokenize_punctuation()){ continue; }
 			if(this->tokenize_operators()){ continue; }
 			if(this->tokenize_number_literal()){ continue; }
+			if(this->tokenize_string_literal()){ continue; }
 
 			// unrecognized character
 			this->error_unrecognized_character();
@@ -59,6 +60,7 @@ namespace panther{
 		}else if(this->char_stream.peek(1) == '*'){
 			// multi-line comment
 
+			// TODO: remove and use this->line_start, etc.
 			const uint32_t comment_beginning_line = this->char_stream.get_line();
 			const uint32_t comment_beginning_collumn = this->char_stream.get_collumn();
 
@@ -69,7 +71,7 @@ namespace panther{
 				if(this->char_stream.ammount_left() < 2){
 					this->source.error(
 						"Unterminated multi-line comment",
-						Location{comment_beginning_line, comment_beginning_collumn, comment_beginning_collumn + 1},
+						Location{comment_beginning_line, comment_beginning_line, comment_beginning_collumn, comment_beginning_collumn + 1},
 						std::vector<Message::Info>{{"Expected a \"*/\" before the end of the file"}}
 					);
 					return true;
@@ -567,13 +569,106 @@ namespace panther{
 
 
 
+	auto Tokenizer::tokenize_string_literal() noexcept -> bool {
+		if(this->char_stream.peek() != '"' && this->char_stream.peek() != '\''){ return false; }
+
+		const char delimiter = this->char_stream.next();
+
+		auto literal_value = std::string();
+
+		do{
+			bool unexpected_eof = false;
+
+			if(this->char_stream.eof()){
+				unexpected_eof = true;
+
+			}else if(this->char_stream.peek() == '\\'){
+				switch(this->char_stream.peek(1)){
+					break; case '0': literal_value += '\0';
+					break; case 'a': literal_value += '\a';
+					break; case 'b': literal_value += '\b';
+					break; case 't': literal_value += '\t';
+					break; case 'n': literal_value += '\n';
+					break; case 'v': literal_value += '\v';
+					break; case 'f': literal_value += '\f';
+					break; case 'r': literal_value += '\r';
+
+					break; case '\'': literal_value += '\'';
+					break; case '"': literal_value += '"';
+					break; case '\\': literal_value += '\\';
+
+					break; default: {
+						this->source.error(
+							std::format("Unknown string escape code '\\{}'", this->char_stream.peek(1)),
+							Location(
+								this->char_stream.get_line(), this->char_stream.get_line(),
+								this->char_stream.get_collumn(), this->char_stream.get_collumn() + 1
+							)
+						);
+
+						return true;
+					}
+				};
+
+				this->char_stream.skip(2);
+
+			}else{
+				literal_value += this->char_stream.next();
+			}
+
+			// needed because some code above may have called next() or skip()
+			if(this->char_stream.eof()){
+				unexpected_eof = true;
+			}
+
+			if(unexpected_eof){
+				const char* string_type_name = [&]() noexcept {
+					if(delimiter == '"'){ return "string"; }
+					if(delimiter == '\''){ return "character"; }
+					evo::unreachable();
+				}();
+
+				this->source.error(
+					std::format("Unterminated {} literal", string_type_name),
+					this->line_start, this->collumn_start,
+
+					std::vector<Message::Info>{
+						Message::Info(std::format("Expected a {} before the end of the file", delimiter)),
+					}
+				);
+				
+				return true;	
+			}
+
+		}while(this->char_stream.peek() != delimiter);
+
+
+		this->char_stream.skip(1);
+
+		const std::unique_ptr<std::string>& string_literal_value = this->source.string_literal_values.emplace_back(
+			std::make_unique<std::string>(std::move(literal_value))
+		);
+
+
+		if(delimiter == '\''){
+			this->create_token(Token::LiteralChar, std::string_view(*string_literal_value));
+		}else{
+			this->create_token(Token::LiteralString, std::string_view(*string_literal_value));
+		}
+
+
+		return true;
+	};
+
+
+
 
 
 
 
 	auto Tokenizer::create_token(Token::Kind kind) noexcept -> void {
 		this->source.tokens.emplace_back(
-			kind, this->line_start, this->char_stream.get_line(), this->collumn_start, this->char_stream.get_collumn() - 1
+			kind, Location(this->line_start, this->char_stream.get_line(), this->collumn_start, this->char_stream.get_collumn() - 1)
 		);
 	};
 
@@ -581,7 +676,7 @@ namespace panther{
 	template<typename T>
 	auto Tokenizer::create_token(Token::Kind kind, T value) noexcept -> void {
 		this->source.tokens.emplace_back(
-			kind, this->line_start, this->char_stream.get_line(), this->collumn_start, this->char_stream.get_collumn() - 1, value
+			kind, Location(this->line_start, this->char_stream.get_line(), this->collumn_start, this->char_stream.get_collumn() - 1), value
 		);
 	};
 

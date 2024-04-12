@@ -246,6 +246,7 @@ namespace panther{
 
 		public:
 			std::vector<Token> tokens{};
+			std::vector<std::unique_ptr<std::string>> string_literal_values{};
 
 			std::vector<AST::Node::ID> global_stmts{};
 			std::vector<AST::Node> nodes{};

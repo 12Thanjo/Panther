@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.18.1
+- Added tokenizing of string and char literals
+	- supports escape characters: `\0`, `\a`, `\b`, `\t`, `\n`, `\v`, `\f`, `\r`, `\'`, `\"`, and `\\`
+- Improved messaging location of multiline objects
+
 ### v0.18.0
 - Added conditional statements
 	- `if`

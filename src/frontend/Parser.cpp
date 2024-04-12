@@ -505,10 +505,9 @@ namespace panther{
 
 		if(this->get(this->peek()).kind != Token::get(")")){
 			const Token& open_location_token = this->source.getToken(open_location);
-			const Location open_location_location = Location(open_location_token.line_start, open_location_token.collumn_start, open_location_token.collumn_end);
 
 			this->expected_but_got("either closing parenthesis around expression or continuation of expression", 
-				std::vector<Message::Info>{ {"parenthesis opened here", open_location_location}, }
+				std::vector<Message::Info>{ {"parenthesis opened here", open_location_token.location}, }
 			);
 			return Result::Error;
 		}

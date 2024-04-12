@@ -10,6 +10,9 @@ func get_global_ptr = () -> Bool^ {
 func entry = () #entry -> Int {
 	var foo: Int = 0;
 
+	var bar: Int = "asdf";
+	
+
 	if(get_global_ptr().^){
 		@__printHelloWorld();
 		foo = 12;
@@ -24,5 +27,4 @@ func entry = () #entry -> Int {
 
 	return foo;
 }
-
 

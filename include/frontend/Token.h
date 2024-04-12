@@ -3,6 +3,8 @@
 
 #include <Evo.h>
 
+#include "frontend/Message.h"
+
 namespace panther{
 
 
@@ -30,8 +32,8 @@ namespace panther{
 			LiteralBool,
 			LiteralInt,
 			LiteralFloat,
-			// LiteralChar,
-			// LiteralString,
+			LiteralChar,
+			LiteralString,
 
 
 			///////////////////////////////////
@@ -94,11 +96,7 @@ namespace panther{
 
 		Kind kind;
 
-		// TODO; make Location
-		uint32_t line_start;
-		uint32_t line_end;
-		uint32_t collumn_start;
-		uint32_t collumn_end;
+		Location location;
 
 		union {
 			evo::byte none = 0;
@@ -110,35 +108,35 @@ namespace panther{
 		} value;
 
 
-		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn) noexcept
-			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {};
+		Token(Kind _kind, Location _location) noexcept
+			: kind(_kind), location(_location) {};
 
-		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, std::string_view value) noexcept
-			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
+		Token(Kind _kind, Location _location, std::string_view value) noexcept
+			: kind(_kind), location(_location) {
 			this->value.string = value;
 		};
 
 
-		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, bool value) noexcept
-			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
+		Token(Kind _kind, Location _location, bool value) noexcept
+			: kind(_kind), location(_location) {
 			this->value.boolean = value;
 		};
 
 
-		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, uint64_t value) noexcept
-			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
+		Token(Kind _kind, Location _location, uint64_t value) noexcept
+			: kind(_kind), location(_location) {
 			this->value.integer = value;
 		};
 
 
-		Token(Kind _kind, uint32_t start_line, uint32_t end_line, uint32_t start_collumn, uint32_t end_collumn, float64_t value) noexcept
-			: kind(_kind), line_start(start_line), line_end(end_line), collumn_start(start_collumn), collumn_end(end_collumn) {
+		Token(Kind _kind, Location _location, float64_t value) noexcept
+			: kind(_kind), location(_location) {
 			this->value.floating_point = value;
 		};
 
 
 		Token(Kind _kind, std::string_view value) noexcept
-			: kind(_kind), line_start(0), line_end(0), collumn_start(0), collumn_end(0) {
+			: kind(_kind), location(0, 0, 0, 0) {
 			evo::debugAssert(kind == Kind::Intrinsic, "This constructor should only be used for intrinsics (builtin-initialization)");
 
 			this->value.string = value;
@@ -202,6 +200,8 @@ namespace panther{
 				break; case Kind::LiteralBool: return "LiteralBool";
 				break; case Kind::LiteralInt: return "LiteralInt";
 				break; case Kind::LiteralFloat: return "LiteralFloat";
+				break; case Kind::LiteralChar: return "LiteralChar";
+				break; case Kind::LiteralString: return "LiteralString";
 
 
 				///////////////////////////////////

@@ -79,7 +79,7 @@ namespace panther{
 			};
 
 			if(msg.source != nullptr){
-				this->trace( std::format("\t{}:{}:{}\n", msg.source->getLocation(), msg.location.line, msg.location.collumn_start) );
+				this->trace( std::format("\t{}:{}:{}\n", msg.source->getLocation(), msg.location.line_start, msg.location.collumn_start) );
 				this->print_location(*msg.source, msg.location, msg.type);
 			}else{
 				this->trace("\t[BUILTIN]\n");
@@ -116,7 +116,7 @@ namespace panther{
 			auto location_strings = std::vector<std::string>();
 
 			for(const Token& token : source.tokens){
-				location_strings.push_back( std::format("<{}:{}>", token.line_start, token.collumn_start) );
+				location_strings.push_back( std::format("<{}:{}>", token.location.line_start, token.location.collumn_start) );
 			};
 
 			const size_t longest_location_string_length = std::ranges::max_element(
@@ -150,6 +150,8 @@ namespace panther{
 					break; case Token::LiteralBool: this->debug( std::format(" \"{}\"", token.value.boolean) );
 					break; case Token::LiteralInt: this->debug( std::format(" \"{}\"", token.value.integer) );
 					break; case Token::LiteralFloat: this->debug( std::format(" \"{}\"", token.value.floating_point) );
+					break; case Token::LiteralChar: this->debug( std::format(" \'{}\'", token.value.string) );
+					break; case Token::LiteralString: this->debug( std::format(" \"{}\"", token.value.string) );
 				};
 
 
@@ -168,7 +170,7 @@ namespace panther{
 			// find line in the source code
 			size_t cursor = 0;
 			size_t current_line = 1;
-			while(current_line < location.line){
+			while(current_line < location.line_start){
 				evo::debugAssert(cursor < source.getData().size(), "out of bounds looking for line in source code for error");
 
 				if(source.getData()[cursor] == '\n'){
@@ -206,7 +208,7 @@ namespace panther{
 
 
 			// print line
-			const std::string line_number_str = std::to_string(location.line);
+			const std::string line_number_str = std::to_string(location.line_start);
 
 			this->trace( std::format("\t{} | {}\n", line_number_str, line_str) );
 
@@ -227,8 +229,18 @@ namespace panther{
 
 			pointer_str.clear();
 
-			for(uint32_t i = location.collumn_start; i < location.collumn_end + 1; i+=1){
-				pointer_str += '^';
+			if(location.line_start == location.line_end){
+				for(uint32_t i = location.collumn_start; i < location.collumn_end + 1; i+=1){
+					pointer_str += '^';
+				}
+			}else{
+				for(size_t i = point_collumn; i < line_str.size() + 1; i+=1){
+					if(i == point_collumn){
+						pointer_str += '^';
+					}else{
+						pointer_str += '~';
+					}
+				}
 			}
 
 			pointer_str += '\n';

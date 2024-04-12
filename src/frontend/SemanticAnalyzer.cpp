@@ -168,14 +168,11 @@ namespace panther{
 								this->source.getNode(value_var.value.ast_node).kind == AST::Kind::Uninit
 							){
 								const Token& value_var_token = this->source.getToken(value_var.ident);
-								const Location value_var_location = Location(
-									value_var_token.line_start, value_var_token.collumn_start, value_var_token.collumn_end
-								);
 
 								this->source.warning(
 									"declaring global variable with value of another global variable that's has the value of \"uninit\"", value_ident,
 									std::vector<Message::Info>{
-										{std::format("global variable \"{}\" defined here", value_ident_str), value_var_location},
+										{std::format("global variable \"{}\" defined here", value_ident_str), value_var_token.location},
 									}
 								);
 							}
@@ -1025,14 +1022,10 @@ namespace panther{
 		}();
 
 
-
-
-
 		this->source.error(
-			std::format("Identifier \"{}\" already defined", ident.value.string),
-			ident,
+			std::format("Identifier \"{}\" already defined", ident.value.string), ident,
 			std::vector<Message::Info>{
-				{"First defined here:", Location(token.line_start, token.collumn_start, token.collumn_end)}
+				{"First defined here:", token.location}
 			}
 		);
 	};

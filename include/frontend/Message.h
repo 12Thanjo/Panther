@@ -6,7 +6,8 @@
 namespace panther{
 
 	struct Location{
-		uint32_t line;
+		uint32_t line_start;
+		uint32_t line_end;
 		uint32_t collumn_start;
 		uint32_t collumn_end;
 	};

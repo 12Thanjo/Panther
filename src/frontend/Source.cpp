@@ -172,7 +172,8 @@ namespace panther{
 			.source   = this,
 			.message  = msg,
 			.location = {
-				.line          = line,
+				.line_start    = line,
+				.line_end      = line,
 				.collumn_start = collumn,
 				.collumn_end   = collumn,
 			},
@@ -190,7 +191,8 @@ namespace panther{
 			.source   = this,
 			.message  = msg,
 			.location = {
-				.line          = line,
+				.line_start    = line,
+				.line_end      = line,
 				.collumn_start = collumn_start,
 				.collumn_end   = collumn_end,
 			},
@@ -203,16 +205,16 @@ namespace panther{
 
 
 	auto Source::error(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void {
-		this->error(msg, Location{line, collumn, collumn}, std::move(infos));
+		this->error(msg, Location{line, line, collumn, collumn}, std::move(infos));
 	};
 
 	auto Source::error(const std::string& msg, Token::ID token_id, std::vector<Message::Info>&& infos) noexcept -> void {
 		const Token& token = this->getToken(token_id);
-		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
+		this->error(msg, token.location, std::move(infos));
 	};
 
 	auto Source::error(const std::string& msg, const Token& token, std::vector<Message::Info>&& infos) noexcept -> void {
-		this->error(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
+		this->error(msg, token.location, std::move(infos));
 	};
 
 	auto Source::error(const std::string& msg, AST::Node::ID node_id, std::vector<Message::Info>&& infos) noexcept -> void {
@@ -243,16 +245,16 @@ namespace panther{
 
 
 	auto Source::warning(const std::string& msg, uint32_t line, uint32_t collumn, std::vector<Message::Info>&& infos) noexcept -> void {
-		this->warning(msg, Location{line, collumn, collumn}, std::move(infos));
+		this->warning(msg, Location{line, line, collumn, collumn}, std::move(infos));
 	};
 
 	auto Source::warning(const std::string& msg, Token::ID token_id, std::vector<Message::Info>&& infos) noexcept -> void {
 		const Token& token = this->getToken(token_id);
-		this->warning(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
+		this->warning(msg, token.location, std::move(infos));
 	};
 
 	auto Source::warning(const std::string& msg, const Token& token, std::vector<Message::Info>&& infos) noexcept -> void {
-		this->warning(msg, Location{token.line_start, token.collumn_start, token.collumn_end}, std::move(infos));
+		this->warning(msg, token.location, std::move(infos));
 	};
 
 	auto Source::warning(const std::string& msg, AST::Node::ID node_id, std::vector<Message::Info>&& infos) noexcept -> void {
@@ -306,19 +308,19 @@ namespace panther{
 			case AST::Kind::Conditional: {
 				const AST::Conditional& conditional = this->getConditional(node);
 				const Token& token = this->getToken(conditional.if_tok);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 
 			case AST::Kind::Return: {
 				const AST::Return& return_stmt = this->getReturn(node);
 				const Token& token = this->getToken(return_stmt.keyword);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 			
 			case AST::Kind::Type: {
 				const AST::Type& type = this->getType(node);
 				const Token& token = this->getToken(type.token);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 
 			case AST::Kind::Block: {
@@ -329,19 +331,19 @@ namespace panther{
 			case AST::Kind::Prefix: {
 				const AST::Prefix& prefix = this->getPrefix(node);
 				const Token& op_token = this->getToken(prefix.op);
-				return Location{op_token.line_start, op_token.collumn_start, op_token.collumn_end};
+				return op_token.location;
 			} break;
 
 			case AST::Kind::Infix: {
 				const AST::Infix& infix = this->getInfix(node);
 				const Token& op_token = this->getToken(infix.op);
-				return Location{op_token.line_start, op_token.collumn_start, op_token.collumn_end};
+				return op_token.location;
 			} break;
 
 			case AST::Kind::Postfix: {
 				const AST::Postfix& postfix = this->getPostfix(node);
 				const Token& op_token = this->getToken(postfix.op);
-				return Location{op_token.line_start, op_token.collumn_start, op_token.collumn_end};
+				return op_token.location;
 			} break;
 
 
@@ -353,22 +355,22 @@ namespace panther{
 
 			case AST::Kind::Ident: {
 				const Token& token = this->getIdent(node);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 
 			case AST::Kind::Intrinsic: {
 				const Token& token = this->getIntrinsic(node);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 
 			case AST::Kind::Literal: {
 				const Token& token = this->getLiteral(node);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 
 			case AST::Kind::Uninit: {
 				const Token& token = this->getUninit(node);
-				return Location{token.line_start, token.collumn_start, token.collumn_end};
+				return token.location;
 			} break;
 
 		};
