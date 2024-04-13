@@ -46,6 +46,9 @@ namespace panther{
 		result = this->parse_assignment();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
+		result = this->parse_unreachable();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
 		// meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
 		result = this->parse_expr();
 		if(result.code() == Result::Success){
@@ -280,15 +283,20 @@ namespace panther{
 
 
 
+	auto Parser::parse_unreachable() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordUnreachable){ return Result::WrongType; }
 
+		const Token::ID tok = this->next();
 
-	
+		// ;
+		if(this->expect_token(Token::get(";"), "at end of \"unreachable\" statement") == false){ return Result::Error; }
 
+		return this->create_token_node(AST::Kind::Unreachable, tok);
+	};
 
 
 
 	auto Parser::parse_type() noexcept -> Result {
-
 		switch(this->get(this->peek()).kind){
 			case Token::TypeVoid:
 			case Token::TypeInt:

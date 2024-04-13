@@ -262,9 +262,12 @@ namespace panther{
 				Assignment,
 				FuncCall,
 				Conditional,
+				Unreachable,
 			} kind;
 
 			union {
+				evo::byte dummy;
+
 				Var::ID var;
 				Return::ID ret;
 				Assignment::ID assignment;
@@ -277,6 +280,53 @@ namespace panther{
 			explicit Stmt(Assignment::ID id) : kind(Kind::Assignment), assignment(id) {};
 			explicit Stmt(FuncCall::ID id) : kind(Kind::FuncCall), func_call(id) {};
 			explicit Stmt(ConditionalID id) : kind(Kind::Conditional), conditional(id) {};
+
+			EVO_NODISCARD static inline auto getUnreachable() noexcept -> Stmt { return Stmt(Kind::Unreachable); };
+
+
+			private:
+				Stmt(Kind _kind) : kind(_kind) {};
+		};
+
+
+
+		class StmtBlock{
+			public:
+				StmtBlock() noexcept : stmts() {};
+				~StmtBlock() = default;
+
+				// StmtBlock(const StmtBlock& rhs) noexcept : stmts(rhs.stmts) {};
+				StmtBlock(StmtBlock&& rhs) noexcept : stmts(std::move(rhs.stmts)), is_terminated(rhs.is_terminated) {
+					rhs.is_terminated = false;
+				};
+
+				
+
+				EVO_NODISCARD inline auto setTerminated() noexcept -> void { this->is_terminated = true; };
+				EVO_NODISCARD inline auto isTerminated() const noexcept -> bool { return this->is_terminated; };
+
+
+
+				///////////////////////////////////
+				// interface with the stmts vector
+				
+				inline auto emplace_back(auto&&... args) noexcept -> Stmt& {
+					return this->stmts.emplace_back(std::forward<decltype(args)>(args)...);
+				};
+
+
+				inline auto begin()       noexcept -> std::vector<Stmt>::iterator       { return this->stmts.begin(); };
+				inline auto begin() const noexcept -> std::vector<Stmt>::const_iterator { return this->stmts.begin(); };
+
+				inline auto end()       noexcept -> std::vector<Stmt>::iterator       { return this->stmts.end(); };
+				inline auto end() const noexcept -> std::vector<Stmt>::const_iterator { return this->stmts.end(); };
+
+				EVO_NODISCARD inline auto empty() const noexcept -> bool { return this->stmts.empty(); };
+
+		
+			private:
+				std::vector<Stmt> stmts;
+				bool is_terminated = false;
 		};
 
 
@@ -286,8 +336,8 @@ namespace panther{
 			using ID = ConditionalID;
 
 			Expr if_cond;
-			std::vector<Stmt> then_stmts;
-			std::vector<Stmt> else_stmts;
+			StmtBlock then_stmts;
+			StmtBlock else_stmts;
 		};
 
 
@@ -305,9 +355,8 @@ namespace panther{
 			
 
 			llvm::Function* llvm_func = nullptr;
-			std::vector<Stmt> stmts{};
-
-			bool has_return_stmt = false;
+			StmtBlock stmts{};
+			bool terminates_in_base_scope = false;
 		};
 
 

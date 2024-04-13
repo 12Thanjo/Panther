@@ -166,6 +166,7 @@ namespace panther{
 			else if(ident_name == "func") { this->create_token(Token::Kind::KeywordFunc); }
 
 			else if(ident_name == "return") { this->create_token(Token::Kind::KeywordReturn); }
+			else if(ident_name == "unreachable") { this->create_token(Token::Kind::KeywordUnreachable); }
 			else if(ident_name == "if") { this->create_token(Token::Kind::KeywordIf); }
 			else if(ident_name == "else") { this->create_token(Token::Kind::KeywordElse); }
 

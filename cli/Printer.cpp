@@ -291,6 +291,11 @@ namespace panther{
 
 				break; case AST::Kind::FuncCall: this->print_expr(source, node);
 
+				case AST::Kind::Unreachable: {
+					this->indenter_print();
+					this->info("[UNREACHABLE]\n");
+				} break;
+
 				break; default: EVO_FATAL_BREAK("Unknown stmt type");
 			};
 		};

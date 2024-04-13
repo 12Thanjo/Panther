@@ -29,6 +29,7 @@ namespace llvm{
 	class ReturnInst;
 	class CallInst;
 	class BranchInst;
+	class UnreachableInst;
 
 	class ExecutionEngine;
 };

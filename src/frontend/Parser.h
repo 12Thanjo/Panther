@@ -63,6 +63,7 @@ namespace panther{
 			EVO_NODISCARD auto parse_conditional() noexcept -> Result;
 			EVO_NODISCARD auto parse_return() noexcept -> Result;
 			EVO_NODISCARD auto parse_assignment() noexcept -> Result;
+			EVO_NODISCARD auto parse_unreachable() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_type() noexcept -> Result;
 			EVO_NODISCARD auto parse_block() noexcept -> Result;

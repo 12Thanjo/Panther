@@ -106,17 +106,11 @@ namespace panther{
 			};
 
 			// TODO: better way of doing this?
-			EVO_NODISCARD inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
-			EVO_NODISCARD inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
-
-
+			EVO_NODISCARD static inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
+			EVO_NODISCARD static inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
 
 
 			EVO_NODISCARD auto printType(PIR::Type::ID id) const noexcept -> std::string;
-
-
-
-
 
 
 			EVO_NODISCARD auto addEntry(Source::ID src_id, PIR::Func::ID func_id) noexcept -> void;

@@ -159,6 +159,14 @@ namespace panther{
 		return this->getToken(node.token);
 	};
 
+	auto Source::getUnreachable(AST::Node::ID node_id) const noexcept -> const Token& {
+		return this->getUnreachable(this->getNode(node_id));
+	};
+	auto Source::getUnreachable(const AST::Node& node) const noexcept -> const Token& {
+		evo::debugAssert(node.kind == AST::Kind::Unreachable, "Node is not a Unreachable");
+		return this->getToken(node.token);
+	};
+
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -370,6 +378,11 @@ namespace panther{
 
 			case AST::Kind::Uninit: {
 				const Token& token = this->getUninit(node);
+				return token.location;
+			} break;
+
+			case AST::Kind::Unreachable: {
+				const Token& token = this->getUnreachable(node);
 				return token.location;
 			} break;
 

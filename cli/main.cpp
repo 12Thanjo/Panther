@@ -57,7 +57,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		.name		  = "testing",
 		.print_colors = true,
 		.verbose      = true,
-		.target       = Config::Target::PrintAST,
+		.target       = Config::Target::Run,
 	};
 
 
@@ -70,15 +70,23 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	auto printer = panther::cli::Printer(config.print_colors);
 
 	auto llvm_context = panther::llvmint::Context();
+	auto pir_to_llvmir = panther::PIRToLLVMIR();
 
 
 	auto exit = [&](){
+		if(pir_to_llvmir.isInitialized()){
+			pir_to_llvmir.shutdown();
+		}
+		
 		if(llvm_context.isInitialized()){
 			llvm_context.shutdown();
 		}
 
-		printer.trace("Press Enter to close...\n");
-		std::cin.get();
+
+		#if !defined(PANTHER_BUILD_DIST) && defined(EVO_COMPILER_MSVC)
+			printer.trace("Press Enter to close...\n");
+			std::cin.get();
+		#endif
 	};
 
 
@@ -299,7 +307,6 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	llvm_context.init();
 
 
-	auto pir_to_llvmir = panther::PIRToLLVMIR();
 	pir_to_llvmir.init(config.name, llvm_context);
 	pir_to_llvmir.initLibC();
 
@@ -402,8 +409,6 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		printer.error("Error: Cannot run because no entry point was defined\n");
 		printer.info("\tNote: an entry point is defined by giving a function the attribute \"#entry\"\n");
 
-		pir_to_llvmir.shutdown();
-
 		exit();
 		return 1;
 	}
@@ -418,8 +423,6 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 		printer.info(std::format("Return Code: {}\n", return_code));
 
-
-		pir_to_llvmir.shutdown();
 		exit();
 		return 0;
 
@@ -498,10 +501,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	//////////////////////////////////////////////////////////////////////
 	// done
 
-	pir_to_llvmir.shutdown();
-	
 
 	exit();
-
 	return 0;
 }

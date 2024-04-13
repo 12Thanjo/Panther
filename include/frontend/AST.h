@@ -24,6 +24,7 @@ namespace panther{
 			Literal,
 			Intrinsic,
 			Uninit,
+			Unreachable,
 		};
 
 

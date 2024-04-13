@@ -95,15 +95,17 @@ namespace panther{
 			EVO_NODISCARD auto getUninit(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getUninit(const AST::Node& node) const noexcept -> const Token&;
 
+			EVO_NODISCARD auto getUnreachable(AST::Node::ID node_id) const noexcept -> const Token&;
+			EVO_NODISCARD auto getUnreachable(const AST::Node& node) const noexcept -> const Token&;
+
 
 
 
 			///////////////////////////////////
 			// PIR
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createVar(Args... args) noexcept -> PIR::Var::ID {
-				this->pir.vars.emplace_back(args...);
+			EVO_NODISCARD inline auto createVar(auto&&... args) noexcept -> PIR::Var::ID {
+				this->pir.vars.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Var::ID( uint32_t(this->pir.vars.size() - 1) );
 			};
 
@@ -116,9 +118,8 @@ namespace panther{
 
 
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createFunc(Args... args) noexcept -> PIR::Func::ID {
-				this->pir.funcs.emplace_back(args...);
+			EVO_NODISCARD inline auto createFunc(auto&&... args) noexcept -> PIR::Func::ID {
+				this->pir.funcs.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Func::ID( uint32_t(this->pir.funcs.size() - 1) );
 			};
 
@@ -129,9 +130,8 @@ namespace panther{
 				return this->pir.funcs[size_t(id.id)];
 			};
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createConditional(Args... args) noexcept -> PIR::Conditional::ID {
-				this->pir.conditionals.emplace_back(args...);
+			EVO_NODISCARD inline auto createConditional(auto&&... args) noexcept -> PIR::Conditional::ID {
+				this->pir.conditionals.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Conditional::ID( uint32_t(this->pir.conditionals.size() - 1) );
 			};
 
@@ -144,9 +144,8 @@ namespace panther{
 
 
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createReturn(Args... args) noexcept -> PIR::Return::ID {
-				this->pir.returns.emplace_back(args...);
+			EVO_NODISCARD inline auto createReturn(auto&&... args) noexcept -> PIR::Return::ID {
+				this->pir.returns.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Return::ID( uint32_t(this->pir.returns.size() - 1) );
 			};
 
@@ -159,9 +158,8 @@ namespace panther{
 
 
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createAssignment(Args... args) noexcept -> PIR::Assignment::ID {
-				this->pir.assignments.emplace_back(args...);
+			EVO_NODISCARD inline auto createAssignment(auto&&... args) noexcept -> PIR::Assignment::ID {
+				this->pir.assignments.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Assignment::ID( uint32_t(this->pir.assignments.size() - 1) );
 			};
 
@@ -174,9 +172,8 @@ namespace panther{
 
 
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createFuncCall(Args... args) noexcept -> PIR::FuncCall::ID {
-				this->pir.func_calls.emplace_back(args...);
+			EVO_NODISCARD inline auto createFuncCall(auto&&... args) noexcept -> PIR::FuncCall::ID {
+				this->pir.func_calls.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::FuncCall::ID( uint32_t(this->pir.func_calls.size() - 1) );
 			};
 
@@ -189,9 +186,8 @@ namespace panther{
 
 
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createPrefix(Args... args) noexcept -> PIR::Prefix::ID {
-				this->pir.prefixes.emplace_back(args...);
+			EVO_NODISCARD inline auto createPrefix(auto&&... args) noexcept -> PIR::Prefix::ID {
+				this->pir.prefixes.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Prefix::ID( uint32_t(this->pir.prefixes.size() - 1) );
 			};
 
@@ -203,9 +199,8 @@ namespace panther{
 			};
 
 
-			template<typename... Args>
-			EVO_NODISCARD inline auto createDeref(Args... args) noexcept -> PIR::Deref::ID {
-				this->pir.derefs.emplace_back(args...);
+			EVO_NODISCARD inline auto createDeref(auto&&... args) noexcept -> PIR::Deref::ID {
+				this->pir.derefs.emplace_back(std::forward<decltype(args)>(args)...);
 				return PIR::Deref::ID( uint32_t(this->pir.derefs.size() - 1) );
 			};
 

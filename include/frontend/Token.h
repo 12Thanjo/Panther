@@ -52,6 +52,7 @@ namespace panther{
 			KeywordFunc,
 
 			KeywordReturn,
+			KeywordUnreachable,
 			KeywordIf,
 			KeywordElse,
 
@@ -220,6 +221,7 @@ namespace panther{
 				break; case Kind::KeywordFunc: return "func";
 
 				break; case Kind::KeywordReturn: return "return";
+				break; case Kind::KeywordUnreachable: return "unreachable";
 				break; case Kind::KeywordIf: return "if";
 				break; case Kind::KeywordElse: return "else";
 

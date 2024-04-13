@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.19.0
+- Added `unreachable` statements
+- Added detection for unreachable code after `return` (and `unreachable`) statements inside conditionals
+- Fixed `return` statements in conditionals causing LLVM to error
+- Changed `@__printHelloWorld` from using `printf` to using `puts`
+- Added `puts` to the list of functions that cannot be used as export names
+- CLI now only wait's for user input to exit when compiling with MSVC when not doing a ReleaseDist build
+
 ### v0.18.1
 - Added tokenizing of string and char literals
 	- supports escape characters: `\0`, `\a`, `\b`, `\t`, `\n`, `\v`, `\f`, `\r`, `\'`, `\"`, and `\\`

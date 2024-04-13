@@ -24,9 +24,9 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_stmt(const AST::Node& node) noexcept -> bool {
-		if(this->current_func != nullptr && this->current_func->has_return_stmt){
+		if(this->in_func_scope() && this->scope_is_terminated()){
 			// TODO: better messaging
-			this->source.error("Code after return statement", node);
+			this->source.error("Unreachable code", node);
 			return false;
 		}
 
@@ -37,6 +37,7 @@ namespace panther{
 			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node));
 			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node));
 			break; case AST::Kind::FuncCall: return this->analyze_func_call(this->source.getFuncCall(node));
+			break; case AST::Kind::Unreachable: return this->analyze_unreachable(this->source.getUnreachable(node));
 			break;
 
 			case AST::Kind::Literal: {
@@ -55,7 +56,7 @@ namespace panther{
 			} break;
 		};
 
-		EVO_FATAL_BREAK("This AST Kind is not handled (semantic analysis of stmt)");
+		EVO_FATAL_BREAK("unknown ast kind");
 	};
 
 
@@ -260,7 +261,6 @@ namespace panther{
 			}
 		}
 
-
 		// check typing
 		const AST::Type& return_type = this->source.getType(func.return_type);
 		const Token& return_type_token = this->source.getToken(return_type.token);
@@ -276,17 +276,13 @@ namespace panther{
 		}
 
 
-
-
 		///////////////////////////////////
 		// create base type
 
 		auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-
 		base_type.call_operators.emplace_back(std::vector<PIR::Type::ID>{}, return_type_id);
 
 		const PIR::BaseType::ID base_type_id = this->source.getSourceManager().createBaseType(std::move(base_type));
-
 
 
 		///////////////////////////////////
@@ -296,7 +292,6 @@ namespace panther{
 
 		this->add_func_to_scope(ident.value.string, func_id);
 
-		this->current_func = &this->source.pir.funcs[func_id.id];
 
 
 
@@ -321,21 +316,14 @@ namespace panther{
 		}
 
 
-
-
 		///////////////////////////////////
 		// analyze block
 
-		const AST::Block& block = this->source.getBlock(func.block);
-		if(this->analyze_block(block, this->current_func->stmts) == false){ return false; }
 
-		if(return_type_id.has_value() && this->current_func->has_return_stmt == false){
-			this->source.error("Function with return type does not return", ident);
+		PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
+		if(this->analyze_func_block(pir_func, func) == false){
 			return false;
-		}
-
-		this->current_func = nullptr;
-
+		};
 
 
 		///////////////////////////////////
@@ -346,11 +334,54 @@ namespace panther{
 
 
 
+	auto SemanticAnalyzer::analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func) noexcept -> bool {
+		this->enter_func_scope(pir_func);
+
+			this->enter_scope_level();
+				this->add_scope_level_scope();
+				
+				const AST::Block& block = this->source.getBlock(ast_func.block);
+				if(this->analyze_block(block, pir_func.stmts) == false){ return false; }
+
+			this->leave_scope_level();
+
+			if(pir_func.return_type.has_value()){
+				if(this->scope_is_terminated() == false){
+					this->source.error("Function with return type does not return on all control paths", pir_func.ident);
+					return false;
+				}
+			}else{
+				if(this->scope_is_terminated()){
+					pir_func.stmts.setTerminated();
+				}
+			}
+
+		this->leave_func_scope();
+
+		return true;
+	};
+
+
+
+
+
+
 	auto SemanticAnalyzer::analyze_conditional(const AST::Conditional& cond) noexcept -> bool {
+		this->enter_scope_level();
+
+		const bool analyze_conditional_result = analyze_conditional_recursive(cond);
+
+		this->leave_scope_level();
+
+		return analyze_conditional_result;
+	};
+
+
+	auto SemanticAnalyzer::analyze_conditional_recursive(const AST::Conditional& sub_cond) noexcept -> bool {
 		SourceManager& src_manager = this->source.getSourceManager();
 
-		if(this->current_func == nullptr){
-			this->source.error("Conditional statements can only be inside functions", cond.if_tok);
+		if(this->in_func_scope() == false){
+			this->source.error("Conditional statements can only be inside functions", sub_cond.if_tok);
 			return false;
 		}
 
@@ -358,7 +389,7 @@ namespace panther{
 		///////////////////////////////////
 		// condition
 
-		const AST::Node& cond_expr = this->source.getNode(cond.if_expr);
+		const AST::Node& cond_expr = this->source.getNode(sub_cond.if_expr);
 
 		const std::optional<PIR::Type::ID> cond_type_id = this->analyze_and_get_type_of_expr(cond_expr);
 		if(cond_type_id.has_value() == false){ return false; }
@@ -377,24 +408,27 @@ namespace panther{
 		///////////////////////////////////
 		// setup stmt blocks
 
-		auto then_stmts = std::vector<PIR::Stmt>();
-		auto else_stmts = std::vector<PIR::Stmt>();
+		auto then_stmts = PIR::StmtBlock();
+		auto else_stmts = PIR::StmtBlock();
 
 
 		///////////////////////////////////
 		// then block
 
-		const AST::Block& then_block = this->source.getBlock(cond.then_block);
+		this->add_scope_level_scope();
+		const AST::Block& then_block = this->source.getBlock(sub_cond.then_block);
 		if(this->analyze_block(then_block, then_stmts) == false){ return false; }
 
 
 		///////////////////////////////////
 		// else block
 
-		if(cond.else_block.has_value()){
-			const AST::Node& else_block_node = this->source.getNode(*cond.else_block);
+		if(sub_cond.else_block.has_value()){
+			const AST::Node& else_block_node = this->source.getNode(*sub_cond.else_block);
 
 			if(else_block_node.kind == AST::Kind::Block){
+				this->add_scope_level_scope();
+
 				const AST::Block& else_block = this->source.getBlock(else_block_node);
 				if(this->analyze_block(else_block, else_stmts) == false){ return false; }
 
@@ -402,13 +436,16 @@ namespace panther{
 				this->enter_scope(&else_stmts);
 
 				const AST::Conditional& else_block = this->source.getConditional(else_block_node);
-				if(this->analyze_conditional(else_block) == false){ return false; }		
+				if(this->analyze_conditional_recursive(else_block) == false){ return false; }		
 
 				this->leave_scope();
 
 			}else{
 				EVO_FATAL_BREAK("Unkonwn else block kind");
 			}
+
+		}else{
+			this->add_scope_level_scope();
 		}
 
 
@@ -416,7 +453,7 @@ namespace panther{
 		// create object
 
 		const PIR::Conditional::ID cond_id = this->source.createConditional(
-			this->get_expr_value(cond.if_expr), std::move(then_stmts), std::move(else_stmts)
+			this->get_expr_value(sub_cond.if_expr), std::move(then_stmts), std::move(else_stmts)
 		);
 		this->get_stmts_entry().emplace_back(cond_id);
 
@@ -431,8 +468,11 @@ namespace panther{
 
 
 
+
+
+
 	auto SemanticAnalyzer::analyze_return(const AST::Return& return_stmt) noexcept -> bool {
-		if(this->current_func == nullptr){
+		if(this->in_func_scope() == false){
 			this->source.error("Return statements can only be inside functions", return_stmt.keyword);
 			return false;
 		}
@@ -443,7 +483,7 @@ namespace panther{
 		if(return_stmt.value.has_value()){
 			// "return expr;"
 
-			if(this->current_func->return_type.has_value() == false){
+			if(this->get_current_func().func.return_type.has_value() == false){
 				this->source.error("Return statement has value when function's return type is \"Void\"", return_stmt.keyword);
 				return false;	
 			}
@@ -453,7 +493,7 @@ namespace panther{
 			const std::optional<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
 			if(expr_type_id.has_value() == false){ return false; }
 
-			if(*expr_type_id != *this->current_func->return_type){
+			if(*expr_type_id != *this->get_current_func().func.return_type){
 				SourceManager& src_manager = this->source.getSourceManager();
 
 				evo::breakpoint();
@@ -462,7 +502,7 @@ namespace panther{
 					expr_node,
 
 					std::vector<Message::Info>{
-						{std::string("Function return is type: ") + src_manager.printType(*this->current_func->return_type)},
+						{std::string("Function return is type: ") + src_manager.printType(*this->get_current_func().func.return_type)},
 						{std::string("Return value is of type: ") + src_manager.printType(*expr_type_id)}
 					}
 				);
@@ -476,7 +516,7 @@ namespace panther{
 		}else{
 			// "return;"
 			
-			if(this->current_func->return_type.has_value()){
+			if(this->get_current_func().func.return_type.has_value()){
 				this->source.error("Return statement has no value when function's return type is not \"Void\"", return_stmt.keyword);
 				return false;
 			}
@@ -486,8 +526,14 @@ namespace panther{
 
 		const PIR::Return::ID ret_id = this->source.createReturn(return_value);
 		this->get_stmts_entry().emplace_back(ret_id);
+		this->get_stmts_entry().setTerminated();
+		if(this->is_in_func_base_scope()){
+			this->get_current_func().func.terminates_in_base_scope = true;
+		}
 
-		this->current_func->has_return_stmt = true;
+		this->set_scope_terminated();
+		this->add_scope_level_terminated();
+
 
 		return true;
 	};
@@ -641,9 +687,30 @@ namespace panther{
 
 
 
+	auto SemanticAnalyzer::analyze_unreachable(const Token& unreachable) noexcept -> bool {
+		if(this->in_func_scope() == false){
+			// TODO: different / better messaging? Should check if in global scope instead?
+			this->source.error("\"unreachable\" statements are not outside of a function", unreachable);
+			return false;
+		}
+
+		this->add_scope_level_terminated();
+		this->set_scope_terminated();
+
+		this->get_stmts_entry().emplace_back(PIR::Stmt::getUnreachable());
+		this->get_stmts_entry().setTerminated();
+		if(this->is_in_func_base_scope()){
+			this->get_current_func().func.terminates_in_base_scope = true;
+		}
+
+		return true;
+	};
 
 
-	auto SemanticAnalyzer::analyze_block(const AST::Block& block, std::vector<PIR::Stmt>& stmts_entry) noexcept -> bool {
+
+
+
+	auto SemanticAnalyzer::analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry) noexcept -> bool {
 		this->enter_scope(&stmts_entry);
 
 		for(AST::Node::ID node_id : block.nodes){
@@ -957,48 +1024,9 @@ namespace panther{
 	// TODO: check for exported functions in all files (through saving in SourceManager)
 	auto SemanticAnalyzer::is_valid_export_name(std::string_view name) const noexcept -> bool {
 		if(name == "main"){ return false; }
+		if(name == "puts"){ return false; }
 
 		return true;
-	};
-
-
-
-	//////////////////////////////////////////////////////////////////////
-	// scope
-
-	auto SemanticAnalyzer::enter_scope(std::vector<PIR::Stmt>* stmts_entry) noexcept -> void {
-		this->scopes.emplace_back(stmts_entry);
-	};
-
-	auto SemanticAnalyzer::leave_scope() noexcept -> void {
-		this->scopes.pop_back();
-	};
-
-
-	auto SemanticAnalyzer::add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void {
-		this->scopes.back().vars.emplace(str, id);
-	};
-
-	auto SemanticAnalyzer::add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void {
-		this->scopes.back().funcs.emplace(str, id);
-	};
-
-
-	auto SemanticAnalyzer::get_stmts_entry() noexcept -> std::vector<PIR::Stmt>& {
-		Scope& current_scope = this->scopes.back();
-
-		evo::debugAssert(current_scope.stmts_entry != nullptr, "Cannot get stmts entry as it doesn't exist for this scope");
-
-		return *current_scope.stmts_entry;
-	};
-
-	auto SemanticAnalyzer::has_in_scope(std::string_view ident) const noexcept -> bool {
-		for(const Scope& scope : this->scopes){
-			if(scope.vars.contains(ident)){ return true; }
-			if(scope.funcs.contains(ident)){ return true; }
-		}
-
-		return false;
 	};
 
 
@@ -1028,6 +1056,133 @@ namespace panther{
 				{"First defined here:", token.location}
 			}
 		);
+	};
+
+
+
+	//////////////////////////////////////////////////////////////////////
+	// scope
+
+	auto SemanticAnalyzer::enter_scope(PIR::StmtBlock* stmts_entry) noexcept -> void {
+		this->scopes.emplace_back(stmts_entry);
+	};
+
+	auto SemanticAnalyzer::leave_scope() noexcept -> void {
+		this->scopes.pop_back();
+	};
+
+
+	auto SemanticAnalyzer::add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void {
+		this->scopes.back().vars.emplace(str, id);
+	};
+
+	auto SemanticAnalyzer::add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void {
+		this->scopes.back().funcs.emplace(str, id);
+	};
+
+
+	auto SemanticAnalyzer::set_scope_terminated() noexcept -> void {
+		this->scopes.back().is_terminated = true;
+	};
+
+	auto SemanticAnalyzer::scope_is_terminated() const noexcept -> bool {
+		return this->scopes.back().is_terminated;
+	};
+
+
+	auto SemanticAnalyzer::get_stmts_entry() noexcept -> PIR::StmtBlock& {
+		Scope& current_scope = this->scopes.back();
+
+		evo::debugAssert(current_scope.stmts_entry != nullptr, "Cannot get stmts entry as it doesn't exist for this scope");
+
+		return *current_scope.stmts_entry;
+	};
+
+	auto SemanticAnalyzer::has_in_scope(std::string_view ident) const noexcept -> bool {
+		for(const Scope& scope : this->scopes){
+			if(scope.vars.contains(ident)){ return true; }
+			if(scope.funcs.contains(ident)){ return true; }
+		}
+
+		return false;
+	};
+
+
+	auto SemanticAnalyzer::is_in_func_base_scope() const noexcept -> bool {
+		return this->scopes.back().stmts_entry == &this->get_current_func().func.stmts;
+	};
+
+
+	//////////////////////////////////////////////////////////////////////
+	// func scope
+
+	auto SemanticAnalyzer::in_func_scope() const noexcept -> bool {
+		return this->func_scopes.empty() == false;
+	};
+
+	auto SemanticAnalyzer::enter_func_scope(PIR::Func& func) noexcept -> void {
+		this->func_scopes.emplace_back(func);
+	};
+
+	auto SemanticAnalyzer::leave_func_scope() noexcept -> void {
+		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
+		this->func_scopes.pop_back();
+	};
+
+
+	auto SemanticAnalyzer::get_current_func() noexcept -> FuncScope& {
+		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
+		return this->func_scopes.back();
+	};
+
+	auto SemanticAnalyzer::get_current_func() const noexcept -> const FuncScope& {
+		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
+		return this->func_scopes.back();
+	};
+
+
+	// auto SemanticAnalyzer::set_current_func_terminated() noexcept -> void {
+	// 	evo::debugAssert(this->in_func_scope(), "Not in a func scope");
+	// 	this->func_scopes.back().is_terminated = true;
+	// };
+
+	// auto SemanticAnalyzer::current_func_is_terminated() const noexcept -> bool {
+	// 	evo::debugAssert(this->in_func_scope(), "Not in a func scope");
+	// 	return this->func_scopes.back().is_terminated;
+	// };
+
+
+
+	//////////////////////////////////////////////////////////////////////
+	// scope level
+
+	auto SemanticAnalyzer::enter_scope_level() noexcept -> void {
+		this->scope_levels.emplace_back();
+	};
+
+	auto SemanticAnalyzer::leave_scope_level() noexcept -> void {
+		const bool scope_level_terminated = [&]() noexcept {
+			const ScopeLevel& scope_level = this->scope_levels.back();
+			return scope_level.num_scopes == scope_level.num_terminated;
+		}();
+
+		this->scope_levels.pop_back();
+
+		if(scope_level_terminated){
+			if(this->scope_levels.empty() == false){
+				this->add_scope_level_terminated();
+			}
+
+			this->set_scope_terminated();
+		}
+	};
+
+	auto SemanticAnalyzer::add_scope_level_scope() noexcept -> void {
+		this->scope_levels.back().num_scopes += 1;
+	};
+
+	auto SemanticAnalyzer::add_scope_level_terminated() noexcept -> void {
+		this->scope_levels.back().num_terminated += 1;
 	};
 
 	

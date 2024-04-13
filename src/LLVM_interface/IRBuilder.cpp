@@ -68,6 +68,10 @@ namespace panther{
 			return this->builder->CreateRetVoid();
 		};
 
+		auto IRBuilder::createUnreachable() noexcept -> llvm::UnreachableInst* {
+			return this->builder->CreateUnreachable();
+		};
+
 
 		auto IRBuilder::createBranch(llvm::BasicBlock* block) noexcept -> llvm::BranchInst* {
 			return this->builder->CreateBr(block);
@@ -204,8 +208,12 @@ namespace panther{
 		// getters
 
 
-		auto IRBuilder::getContext() const noexcept -> llvm::LLVMContext& {
+		auto IRBuilder::getContext() noexcept -> llvm::LLVMContext& {
 			return this->builder->getContext();
+		};
+
+		auto IRBuilder::getInsertPoint() noexcept -> llvm::BasicBlock* {
+			return this->builder->GetInsertBlock();
 		};
 
 

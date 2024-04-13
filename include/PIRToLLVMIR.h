@@ -84,10 +84,10 @@ namespace panther{
 
 
 			EVO_NODISCARD inline auto initLibC() noexcept -> void {
-				llvm::FunctionType* printf_proto = this->builder->getFuncProto(
-					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, true
+				llvm::FunctionType* puts_proto = this->builder->getFuncProto(
+					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, false
 				);
-				this->libc.printf = this->module->createFunction("printf", printf_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
+				this->libc.puts = this->module->createFunction("puts", puts_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
 			};
 
 
@@ -182,6 +182,7 @@ namespace panther{
 					break; case PIR::Stmt::Kind::Return: this->lower_return(source, source.getReturn(stmt.ret));
 					break; case PIR::Stmt::Kind::Assignment: this->lower_assignment(source, source.getAssignment(stmt.assignment));
 					break; case PIR::Stmt::Kind::FuncCall: this->lower_func_call(source, source.getFuncCall(stmt.func_call));
+					break; case PIR::Stmt::Kind::Unreachable: this->lower_unreachable();
 					break; default: EVO_FATAL_BREAK("Unknown stmt kind");
 				};
 			};
@@ -192,12 +193,15 @@ namespace panther{
 				this->current_func = &func;
 				const std::string mangled_name = PIRToLLVMIR::mangle_name(source, func);
 
-				llvm::Type* return_type = this->builder->getTypeVoid();
-				if(func.return_type.has_value()){
-					const SourceManager& source_manager = source.getSourceManager();
-					const PIR::Type& return_type_obj = source_manager.getType(*func.return_type);
-					return_type = this->get_type(source_manager, return_type_obj);
-				}
+				llvm::Type* return_type = [&]() noexcept {
+					if(func.return_type.has_value()){
+						const SourceManager& source_manager = source.getSourceManager();
+						const PIR::Type& return_type_obj = source_manager.getType(*func.return_type);
+						return this->get_type(source_manager, return_type_obj);
+					}else{
+						return this->builder->getTypeVoid();
+					}
+				}();
 
 
 
@@ -218,9 +222,32 @@ namespace panther{
 				}
 
 
-				if(func.has_return_stmt == false){
-					this->builder->createRet();
+
+				if(func.terminates_in_base_scope){
+					if(func.return_type.has_value() == false && func.stmts.isTerminated() == false){
+						this->builder->createRet();
+					}
+
+				}else{
+					this->builder->createUnreachable();
 				}
+
+
+
+				// if(func.return_type.has_value() == false){
+				// 	if(func.stmts.isTerminated() == false){
+				// 		this->builder->createRet();
+
+				// 	}else if(func.terminates_in_base_scope == false){
+				// 		this->builder->createUnreachable();
+				// 	}
+
+				// }else{
+				// 	if(func.terminates_in_base_scope == false){
+				// 		this->builder->createUnreachable();
+				// 	}
+				// }
+
 
 				this->current_func = nullptr;
 			};
@@ -269,7 +296,11 @@ namespace panther{
 					for(const PIR::Stmt& stmt : cond.then_stmts){
 						this->lower_stmt(source, stmt);
 					}
-					this->builder->createBranch(end_block);
+
+					if(cond.then_stmts.isTerminated() == false){
+						this->builder->setInsertionPoint(then_block);
+						this->builder->createBranch(end_block);
+					}
 
 				}else{
 					llvm::BasicBlock* else_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.else");
@@ -282,6 +313,8 @@ namespace panther{
 						this->lower_stmt(source, stmt);
 					}
 
+					llvm::BasicBlock* then_block_end = this->builder->getInsertPoint();
+
 					// else block
 					this->builder->setInsertionPoint(else_block);
 					for(const PIR::Stmt& stmt : cond.else_stmts){
@@ -290,9 +323,15 @@ namespace panther{
 
 					// end block
 					end_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.end");
-					this->builder->createBranch(end_block);
-					this->builder->setInsertionPoint(then_block);
-					this->builder->createBranch(end_block);
+
+					if(cond.else_stmts.isTerminated() == false){
+						this->builder->createBranch(end_block);
+					}
+
+					if(cond.then_stmts.isTerminated() == false){
+						this->builder->setInsertionPoint(then_block_end);
+						this->builder->createBranch(end_block);
+					}
 				}
 
 				this->builder->setInsertionPoint(end_block);
@@ -338,10 +377,10 @@ namespace panther{
 
 						switch(intrinsic.kind){
 							case PIR::Intrinsic::Kind::__printHelloWorld: {
-								evo::debugAssert(this->libc.printf != nullptr, "libc was not initialized");
+								evo::debugAssert(this->libc.puts != nullptr, "libc was not initialized");
 
-								static llvm::GlobalVariable* hello_world_str = this->builder->valueString("Hello World, I'm Panther!\n", "hello_world_str");
-								this->builder->createCall(this->libc.printf, { llvmint::ptrcast<llvm::Value>(hello_world_str) });
+								static llvm::GlobalVariable* hello_world_str = this->builder->valueString("Hello World, I'm Panther!", "hello_world_str");
+								this->builder->createCall(this->libc.puts, { llvmint::ptrcast<llvm::Value>(hello_world_str) });
 							} break;
 
 							case PIR::Intrinsic::Kind::breakpoint: {
@@ -357,6 +396,11 @@ namespace panther{
 
 					default: EVO_FATAL_BREAK("Unknown func call kind");
 				};
+			};
+
+
+			inline auto lower_unreachable() noexcept -> void {
+				this->builder->createUnreachable();
 			};
 
 
@@ -547,7 +591,7 @@ namespace panther{
 			PIR::Func* current_func = nullptr;
 
 			struct /* libc */ {
-				llvm::Function* printf = nullptr;
+				llvm::Function* puts = nullptr;
 			} libc;
 	};
 

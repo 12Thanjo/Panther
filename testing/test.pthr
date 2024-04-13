@@ -1,30 +1,53 @@
 
+func void_func_test = () -> Void {}
 
-var global: Bool = true;
+func void_func_test_partial_return = () -> Void {
+	if(true){
+		return;
+	}
+}
 
-func get_global_ptr = () -> Bool^ {
-	return (addr global);
+func void_func_test_terminated_return = () -> Void {
+	if(true){
+		return;
+	}else{
+		return;
+	}
+}
+
+func void_func_test_base_return = () -> Void {
+	return;
+}
+
+func get_false = () -> Bool {
+	return false;
 }
 
 
-func entry = () #entry -> Int {
-	var foo: Int = 0;
 
-	var bar: Int = "asdf";
-	
 
-	if(get_global_ptr().^){
-		@__printHelloWorld();
-		foo = 12;
+func main = () #entry -> Int {
+	void_func_test();
+	void_func_test_partial_return();
+	void_func_test_terminated_return();
+	void_func_test_base_return();
 
+	var false_cond: Bool = false;
+
+	if(get_false()){
+		return 1;
+		
 	}else if(true){
-		foo = 18;
-
+		if(false_cond){
+			return 2;
+		}else{
+			@__printHelloWorld();
+			return 3;
+		}
 	}else{
-		@__printHelloWorld();
-		@__printHelloWorld();
+		return 4;
 	}
 
-	return foo;
+	// return 4;
 }
 

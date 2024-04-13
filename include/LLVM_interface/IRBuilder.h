@@ -38,6 +38,8 @@ namespace panther{
 				auto createRet(llvm::Value* value) noexcept -> llvm::ReturnInst*;
 				auto createRet() noexcept -> llvm::ReturnInst*;
 
+				auto createUnreachable() noexcept -> llvm::UnreachableInst*;
+
 				auto createBranch(llvm::BasicBlock* block) noexcept -> llvm::BranchInst*;
 				auto createCondBranch(llvm::Value* cond, llvm::BasicBlock* then_block, llvm::BasicBlock* else_block) noexcept -> llvm::BranchInst*;
 
@@ -98,8 +100,10 @@ namespace panther{
 				// getters
 
 
-				EVO_NODISCARD inline auto getBuilder() const noexcept -> llvm::IRBuilderBase& { return *this->builder; };
-				EVO_NODISCARD auto getContext() const noexcept -> llvm::LLVMContext&;
+				EVO_NODISCARD inline auto getBuilder() noexcept -> llvm::IRBuilderBase& { return *this->builder; };
+				EVO_NODISCARD auto getContext() noexcept -> llvm::LLVMContext&;
+
+				EVO_NODISCARD auto getInsertPoint() noexcept -> llvm::BasicBlock*;
 
 
 		
