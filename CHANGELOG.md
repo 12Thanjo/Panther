@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.20.1
+- Fixed assert firing when using a function as a value
+- Fixed breakpoint firing when funciton marked with `#entry` does not return `Int`
+
 ### v0.20.0
 - Added `def` variable declaration
 - Fixed local variables being initialized with the value `uninit`

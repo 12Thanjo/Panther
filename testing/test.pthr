@@ -1,18 +1,8 @@
 
-var global: Int = 12;
-var global_copy: Int = copy global;
-
-var global_ptr: Int^ = addr global_copy;
-
-// var global_ptr_val: Int = copy global_ptr.^;
 
 
 func main = () #entry -> Int {
-	def foo: Int = copy global_ptr.^;
-	var foo_ptr: Int^| = addr foo;
-	def foo_ptr_ptr: Int^|^ = addr foo_ptr;
+	def foo: Int^ = addr main;
 
-	foo_ptr_ptr.^ = addr foo;
-
-	return foo_ptr_ptr.^.^;
+	return 0;
 }

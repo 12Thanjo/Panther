@@ -126,7 +126,6 @@ namespace panther{
 		const AST::Node& expr_node = this->source.getNode(var_decl.expr);
 		if(expr_node.kind != AST::Kind::Uninit){
 			const std::optional<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-
 			if(expr_type_id.has_value() == false){ return false; }
 
 			if(var_type_id != *expr_type_id){
@@ -286,7 +285,6 @@ namespace panther{
 			// check is valid return type
 			if(return_type_id.has_value() == false || *return_type_id != src_manager.getTypeInt()){
 				this->source.error("Function with attribute \"#entry\" must return type Int", ident);
-				evo::breakpoint();
 				return false;
 			}
 
@@ -1127,6 +1125,10 @@ namespace panther{
 						const PIR::Var::ID var_id = scope.vars.at(value_ident_str);
 						const PIR::Var& var = this->source.getVar(var_id);
 						return !var.is_def;
+					}
+
+					if(scope.funcs.contains(value_ident_str)){
+						return false;
 					}
 				}
 
