@@ -129,17 +129,22 @@ namespace panther{
 			if(expr_type_id.has_value() == false){ return false; }
 
 			if(var_type_id != *expr_type_id){
-				this->source.error(
-					"Variable cannot be assigned a value of a different type", 
-					var_decl.expr,
+				const PIR::Type& var_type = src_manager.getType(var_type_id);
+				const PIR::Type& expr_type = src_manager.getType(*expr_type_id);
 
-					std::vector<Message::Info>{
-						{std::string("Variable is of type:   ") + src_manager.printType(var_type_id)},
-						{std::string("Expression is of type: ") + src_manager.printType(*expr_type_id)}
-					}
-				);
+				if(expr_type.isImplicitlyConvertableTo(var_type) == false){
+					this->source.error(
+						"Variable cannot be assigned a value of a different type, and cannot be implicitly converted", 
+						var_decl.expr,
 
-				return false;
+						std::vector<Message::Info>{
+							{std::string("Variable is of type:   ") + src_manager.printType(var_type_id)},
+							{std::string("Expression is of type: ") + src_manager.printType(*expr_type_id)}
+						}
+					);
+					return false;
+				}
+
 			}
 		}
 
@@ -548,8 +553,8 @@ namespace panther{
 			return false;
 		}
 
-		const std::optional<PIR::Type::ID> dst_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-		if(dst_type.has_value() == false){ return false; }
+		const std::optional<PIR::Type::ID> dst_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
+		if(dst_type_id.has_value() == false){ return false; }
 
 		if(this->is_expr_mutable(infix.lhs) == false){
 			this->source.error("Only mutable values may be assigned to", infix.lhs);
@@ -566,25 +571,30 @@ namespace panther{
 			return false;
 		}
 
-		const std::optional<PIR::Type::ID> expr_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
-		if(expr_type.has_value() == false){ return false; }
+		const std::optional<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
+		if(expr_type_id.has_value() == false){ return false; }
 
 
 		///////////////////////////////////
 		// type checking
 
-		if(*dst_type != *expr_type){
+		if(*dst_type_id != *expr_type_id){
 			SourceManager& src_manager = this->source.getSourceManager();
 
-			this->source.error(
-				"The types of the left-hand-side and right-hand-side of an assignment statement do not match",
-				infix.rhs,
+			const PIR::Type& dst_type = src_manager.getType(*dst_type_id);
+			const PIR::Type& expr_type = src_manager.getType(*expr_type_id);
 
-				std::vector<Message::Info>{
-					{std::string("left-hand-side is of type:  ") + src_manager.printType(*dst_type)},
-					{std::string("right-hand-side is of type: ") + src_manager.printType(*expr_type)}
-				}
-			);
+			if(expr_type.isImplicitlyConvertableTo(dst_type) == false){
+				this->source.error(
+					"The types of the left-hand-side and right-hand-side of an assignment statement do not match, and cannot be implicitly converted",
+					infix.rhs,
+
+					std::vector<Message::Info>{
+						{std::string("left-hand-side is of type:  ") + src_manager.printType(*dst_type_id)},
+						{std::string("right-hand-side is of type: ") + src_manager.printType(*expr_type_id)}
+					}
+				);
+			}
 		}
 
 

@@ -2,7 +2,10 @@
 
 
 func main = () #entry -> Int {
-	def foo: Int^ = addr main;
+	var foo: Int = 12;
+	var bar: Int^| = addr foo;
+
+	bar = addr foo;
 
 	return 0;
 }

@@ -101,6 +101,7 @@ namespace panther{
 
 
 			EVO_NODISCARD auto operator==(const Type& rhs) const noexcept -> bool;
+			EVO_NODISCARD auto isImplicitlyConvertableTo(const Type& rhs) const noexcept -> bool;
 		};
 
 

@@ -54,6 +54,23 @@ namespace panther{
 		};
 
 
+		auto Type::isImplicitlyConvertableTo(const Type& rhs) const noexcept -> bool {
+			if(this->base_type.id != rhs.base_type.id){ return false; }
+
+			if(this->qualifiers.size() != rhs.qualifiers.size()){ return false; }
+
+			for(size_t i = 0; i < this->qualifiers.size(); i+=1){
+				const AST::Type::Qualifier& this_qualifiers = this->qualifiers[i];
+				const AST::Type::Qualifier& rhs_qualifiers = rhs.qualifiers[i];
+
+				if(this_qualifiers.is_ptr != rhs_qualifiers.is_ptr){ return false; }
+				if(this_qualifiers.is_const && rhs_qualifiers.is_const == false){ return false; }
+			}
+
+			return true;
+		};
+
+
 
 	};
 };

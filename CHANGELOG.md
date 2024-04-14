@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.20.2
+- Added implicit conversion from a non-const-pointer to a const-pointer
+
 ### v0.20.1
 - Fixed assert firing when using a function as a value
 - Fixed breakpoint firing when funciton marked with `#entry` does not return `Int`
