@@ -213,6 +213,15 @@ namespace panther{
 
 
 
+			EVO_NODISCARD inline auto getGlobalVar(PIR::Var::ID id) const noexcept -> const PIR::Var& {
+				return this->pir.vars[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getGlobalVar(PIR::Var::ID id) noexcept -> PIR::Var& {
+				return this->pir.vars[size_t(id.id)];
+			};
+
+
+
 			//////////////////////////////////////////////////////////////////////
 			// messaging / errors
 

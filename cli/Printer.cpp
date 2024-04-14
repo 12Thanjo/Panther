@@ -312,6 +312,14 @@ namespace panther{
 			this->info("Ident: ");
 			this->debug( std::format("{}\n", source.getToken(source.getNode(var_decl.ident).token).value.string) );
 
+			this->indenter_set_arrow();
+			this->indenter_print();
+			this->info("Decl Type: ");
+			if(var_decl.is_def){
+				this->debug("def\n");
+			}else{
+				this->debug("var\n");
+			}
 
 			this->indenter_set_arrow();
 			this->indenter_print();
@@ -503,10 +511,17 @@ namespace panther{
 			this->indenter_print();
 
 			auto print_str = std::string( Token::printKind(source.getToken(type.token).kind) );
+			bool is_first_qualifer = true;
 			for(const AST::Type::Qualifier& qualifier : type.qualifiers){
-				if(qualifier.is_ptr){
-					print_str += '^';
+				if(type.qualifiers.size() > 1){
+					if(is_first_qualifer){
+						is_first_qualifer = false;
+					}else{
+						print_str += ' ';
+					}
 				}
+				if(qualifier.is_ptr){ print_str += '^'; }
+				if(qualifier.is_const){ print_str += '|'; }
 			}
 
 			this->debug(print_str);

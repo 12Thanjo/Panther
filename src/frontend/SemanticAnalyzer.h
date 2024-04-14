@@ -42,11 +42,18 @@ namespace panther{
 			// Not for use in global variables
 			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> PIR::Expr;
 
+			EVO_NODISCARD auto get_const_expr_value(AST::Node::ID node_id) const noexcept -> std::optional<PIR::Expr>;
+			EVO_NODISCARD auto get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> std::optional<PIR::Expr>;
+
+
 			enum class ExprValueType{
 				Concrete,
 				Ephemeral,
 			};
 			EVO_NODISCARD auto get_expr_value_type(AST::Node::ID node_id) const noexcept -> ExprValueType;
+
+			// must be given a concrete value
+			EVO_NODISCARD auto is_expr_mutable(AST::Node::ID node_id) const noexcept -> bool;
 
 
 			EVO_NODISCARD auto is_valid_export_name(std::string_view name) const noexcept -> bool;

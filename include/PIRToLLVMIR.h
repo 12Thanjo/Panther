@@ -157,20 +157,13 @@ namespace panther{
 				const PIR::Type& type = source_manager.getType(var.type);
 
 				llvm::Type* llvm_type = this->get_type(source_manager, type);
-				llvm::Constant* value = nullptr;
+				llvm::Constant* value = this->get_const_value(source, var.value);
+				evo::debugAssert(value != nullptr, "invalid const value");
 
-				if(var.value.kind == PIR::Expr::Kind::ASTNode){
-					if(source.getNode(var.value.ast_node).kind != AST::Kind::Uninit){
-						value = this->get_const_value(source, var.value);
-					}
 
-				}else{
-					EVO_DEBUG_ASSERT("Invalid kind of global var value");
-				}
+				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, var.is_def, mangled_name.c_str());
 
-				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, false, mangled_name.c_str());
-
-				var.llvm.value = llvmint::ptrcast<llvm::Value>(global_val);
+				var.llvm.global = global_val;
 			};
 
 
@@ -433,21 +426,46 @@ namespace panther{
 
 
 			EVO_NODISCARD inline auto get_const_value(const Source& source, PIR::Expr value) noexcept -> llvm::Constant* {
-				evo::debugAssert(value.kind == PIR::Expr::Kind::ASTNode, "Value is not constant");
+				switch(value.kind){
+					case PIR::Expr::Kind::ASTNode: {
+						const Token& token = source.getLiteral(value.ast_node);
 
-				const Token& token = source.getLiteral(value.ast_node);
+						switch(token.kind){
+							case Token::LiteralInt: {
+								return llvmint::ptrcast<llvm::Constant>(this->builder->valueUI64(token.value.integer));
+							} break;
 
-				switch(token.kind){
-					case Token::LiteralInt: {
-						return llvmint::ptrcast<llvm::Constant>(this->builder->valueUI64(token.value.integer));
+							case Token::LiteralBool: {
+								return llvmint::ptrcast<llvm::Constant>(this->builder->valueBool(token.value.boolean));
+							} break;
+
+							default: EVO_FATAL_BREAK("Invalid literal value kind");
+						};
 					} break;
 
-					case Token::LiteralBool: {
-						return llvmint::ptrcast<llvm::Constant>(this->builder->valueBool(token.value.boolean));
+
+					case PIR::Expr::Kind::Prefix: {
+						const PIR::Prefix& prefix = source.getPrefix(value.prefix);
+
+						switch(source.getToken(prefix.op).kind){
+							case Token::KeywordCopy: {
+								EVO_FATAL_BREAK("Should have been figured out in semantic analysis");
+							} break;
+
+							case Token::KeywordAddr: {
+								const PIR::Var& var = source.getGlobalVar(prefix.rhs.var);
+								evo::debugAssert(var.isGlobal(), "variable is not global");
+
+								return llvmint::ptrcast<llvm::Constant>(var.llvm.global);
+							} break;
+
+							default: EVO_FATAL_BREAK("Invalid or unknown prefix operator");
+						};
 					} break;
+
+
+					default: EVO_FATAL_BREAK("Invalid value kind");
 				};
-
-				EVO_FATAL_BREAK("Invalid value kind");
 			};
 
 
@@ -486,7 +504,7 @@ namespace panther{
 						}else{
 							const SourceManager& source_manager = source.getSourceManager();
 							llvm::Type* var_type = this->get_type(source_manager, source_manager.getType(var.type));
-							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.value, var_type));
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(llvmint::ptrcast<llvm::Value>(var.llvm.global), var_type));
 						}
 					} break;
 
@@ -510,7 +528,7 @@ namespace panther{
 								if(var.is_alloca){
 									return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
 								}else{
-									return var.llvm.value;
+									return llvmint::ptrcast<llvm::Value>(var.llvm.global);
 								}
 
 							} break;
@@ -545,7 +563,7 @@ namespace panther{
 						if(var.is_alloca){
 							return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
 						}else{
-							return var.llvm.value;
+							return llvmint::ptrcast<llvm::Value>(var.llvm.global);
 						}
 					} break;
 

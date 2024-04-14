@@ -47,6 +47,7 @@ namespace panther{
 				const AST::Type::Qualifier& rhs_qualifiers = rhs.qualifiers[i];
 
 				if(this_qualifiers.is_ptr != rhs_qualifiers.is_ptr){ return false; }
+				if(this_qualifiers.is_const != rhs_qualifiers.is_const){ return false; }
 			}
 
 			return true;

@@ -11,6 +11,10 @@ namespace panther{
 			return static_cast<llvm::Constant*>(from);
 		};
 
+		auto _ptrcast_to_constant(llvm::GlobalVariable* from) noexcept -> llvm::Constant* {
+			return static_cast<llvm::Constant*>(from);
+		};
+
 
 
 

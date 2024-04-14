@@ -163,6 +163,7 @@ namespace panther{
 			// keywords
 
 			else if(ident_name == "var") { this->create_token(Token::Kind::KeywordVar); }
+			else if(ident_name == "def") { this->create_token(Token::Kind::KeywordDef); }
 			else if(ident_name == "func") { this->create_token(Token::Kind::KeywordFunc); }
 
 			else if(ident_name == "return") { this->create_token(Token::Kind::KeywordReturn); }
@@ -205,6 +206,8 @@ namespace panther{
 			break; case ',': tok_kind = Token::Comma;
 			break; case ';': tok_kind = Token::SemiColon;
 			break; case ':': tok_kind = Token::Colon;
+
+			break; case '|': tok_kind = Token::Pipe;
 		};
 
 		if(tok_kind == Token::None){ return false; }

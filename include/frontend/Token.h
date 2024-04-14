@@ -49,6 +49,7 @@ namespace panther{
 			// keywords
 
 			KeywordVar,
+			KeywordDef,
 			KeywordFunc,
 
 			KeywordReturn,
@@ -77,16 +78,18 @@ namespace panther{
 			///////////////////////////////////
 			// punctuation
 
-			OpenParen,
-			CloseParen,
-			OpenBracket,
-			CloseBracket,
-			OpenBrace,
-			CloseBrace,
+			OpenParen, // (
+			CloseParen, // )
+			OpenBracket, // [
+			CloseBracket, // ]
+			OpenBrace, // {
+			CloseBrace, // }
 
-			Comma,
-			SemiColon,
-			Colon,
+			Comma, // ,
+			SemiColon, // ;
+			Colon, // :
+
+			Pipe, // |
 		};
 
 		using enum class Kind;
@@ -176,6 +179,8 @@ namespace panther{
 			if(is_token(";")){ return Token::SemiColon; }
 			if(is_token(":")){ return Token::Colon; }
 
+			if(is_token("|")){ return Token::Pipe; }
+
 
 			EVO_FATAL_BREAK(std::format("Unknown token kind ({}) => {}", token_str, __FUNCTION__));
 		};
@@ -218,6 +223,7 @@ namespace panther{
 				// keywords
 
 				break; case Kind::KeywordVar: return "var";
+				break; case Kind::KeywordDef: return "def";
 				break; case Kind::KeywordFunc: return "func";
 
 				break; case Kind::KeywordReturn: return "return";
@@ -256,6 +262,8 @@ namespace panther{
 				break; case Kind::Comma: return ",";
 				break; case Kind::SemiColon: return ";";
 				break; case Kind::Colon: return ":";
+
+				break; case Kind::Pipe: return "|";
 				
 			};
 

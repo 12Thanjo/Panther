@@ -48,6 +48,7 @@ namespace panther{
 
 
 		struct VarDecl{
+			bool is_def;
 			Node::ID ident;
 			Node::ID type;
 			Node::ID expr;
@@ -79,7 +80,8 @@ namespace panther{
 			Token::ID token;
 
 			struct Qualifier{
-				bool is_ptr;	
+				bool is_ptr;
+				bool is_const;
 			};
 			std::vector<Qualifier> qualifiers;
 		};

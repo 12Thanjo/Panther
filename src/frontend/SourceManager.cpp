@@ -232,8 +232,19 @@ namespace panther{
 		}();
 		
 
+
+		bool is_first_qualifer = true;
 		for(const AST::Type::Qualifier& qualifier : type.qualifiers){
-			if(qualifier.is_ptr){ base_type_str += "^"; }
+			if(type.qualifiers.size() > 1){
+				if(is_first_qualifer){
+					is_first_qualifer = false;
+				}else{
+					base_type_str += ' ';
+				}
+			}
+
+			if(qualifier.is_ptr){ base_type_str += '^'; }
+			if(qualifier.is_const){ base_type_str += '|'; }
 		}
 
 

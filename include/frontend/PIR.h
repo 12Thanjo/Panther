@@ -213,9 +213,10 @@ namespace panther{
 			Token::ID ident;
 			Type::ID type;
 			Expr value;
+			bool is_def;
 
 			union {
-				llvm::Value* value = nullptr;
+				llvm::GlobalVariable* global = nullptr;
 				llvm::AllocaInst* alloca;
 			} llvm;
 			bool is_alloca = false;

@@ -69,6 +69,7 @@ namespace panther{
 
 
 		EVO_NODISCARD auto _ptrcast_to_constant(llvm::ConstantInt* from) noexcept -> llvm::Constant*;
+		EVO_NODISCARD auto _ptrcast_to_constant(llvm::GlobalVariable* from) noexcept -> llvm::Constant*;
 
 		EVO_NODISCARD auto _ptrcast_to_value(llvm::LoadInst* from) noexcept -> llvm::Value*;
 		EVO_NODISCARD auto _ptrcast_to_value(llvm::GlobalVariable* from) noexcept -> llvm::Value*;
@@ -82,6 +83,7 @@ namespace panther{
 
 
 		template<> inline auto ptrcast(llvm::ConstantInt* from) noexcept -> llvm::Constant* { return _ptrcast_to_constant(from); };
+		template<> inline auto ptrcast(llvm::GlobalVariable* from) noexcept -> llvm::Constant* { return _ptrcast_to_constant(from); };
 
 		template<> inline auto ptrcast(llvm::LoadInst* from) noexcept -> llvm::Value* { return _ptrcast_to_value(from); };
 		template<> inline auto ptrcast(llvm::GlobalVariable* from) noexcept -> llvm::Value* { return _ptrcast_to_value(from); };

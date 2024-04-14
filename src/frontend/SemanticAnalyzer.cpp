@@ -85,15 +85,35 @@ namespace panther{
 		}
 
 
-
 		const AST::Type& type = this->source.getType(var_decl.type);
 		const Token& type_token = this->source.getToken(type.token);
 
 
 		SourceManager& src_manager = this->source.getSourceManager();
 
+		std::vector<AST::Type::Qualifier> type_qualifiers = type.qualifiers;
+
+		{
+			// checking const-ness of type levels
+			bool type_qualifiers_has_a_const = false;
+			bool has_warned = false;
+			for(auto i = type_qualifiers.rbegin(); i != type_qualifiers.rend(); ++i){
+				if(type_qualifiers_has_a_const){
+					if(i->is_const == false && has_warned == false){
+						has_warned = true;
+						this->source.warning("If one type level is const, all previous levels will automatically be made const as well", var_decl.type);
+					}
+
+					i->is_const = true;
+
+				}else if(i->is_const){
+					type_qualifiers_has_a_const = true;
+				}
+			}
+		}
+
 		const PIR::Type::ID var_type_id = src_manager.getTypeID(
-			PIR::Type(src_manager.getBaseTypeID(type_token.kind), type.qualifiers)
+			PIR::Type(src_manager.getBaseTypeID(type_token.kind), type_qualifiers)
 		);
 
 		
@@ -101,104 +121,70 @@ namespace panther{
 			this->source.error("Variable cannot be of type Void", type.token);
 			return false;
 
-		}else{
-			const AST::Node& expr_node = this->source.getNode(var_decl.expr);
-
-			if(expr_node.kind != AST::Kind::Uninit){
-				const std::optional<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-
-				if(expr_type_id.has_value() == false){ return false; }
-
-				if(var_type_id != *expr_type_id){
-					this->source.error(
-						"Variable cannot be assigned a value of a different type", 
-						var_decl.expr,
-
-						std::vector<Message::Info>{
-							{std::string("Variable is of type:   ") + src_manager.printType(var_type_id)},
-							{std::string("Expression is of type: ") + src_manager.printType(*expr_type_id)}
-						}
-					);
-
-					return false;
-				}
-			}
-
 		}
+
+		const AST::Node& expr_node = this->source.getNode(var_decl.expr);
+		if(expr_node.kind != AST::Kind::Uninit){
+			const std::optional<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
+
+			if(expr_type_id.has_value() == false){ return false; }
+
+			if(var_type_id != *expr_type_id){
+				this->source.error(
+					"Variable cannot be assigned a value of a different type", 
+					var_decl.expr,
+
+					std::vector<Message::Info>{
+						{std::string("Variable is of type:   ") + src_manager.printType(var_type_id)},
+						{std::string("Expression is of type: ") + src_manager.printType(*expr_type_id)}
+					}
+				);
+
+				return false;
+			}
+		}
+
 
 
 		///////////////////////////////////
 		// get / check value
 
-		auto var_value = [&]() noexcept {
+		const std::optional<PIR::Expr> var_value = [&]() noexcept {
 			if(this->is_global_scope()){
-				const AST::Node& value_node = [&]() noexcept {
-					const AST::Node& value_node_value = this->source.getNode(var_decl.expr);
-
-					if(value_node_value.kind == AST::Kind::Prefix){
-						const AST::Prefix& prefix = this->source.getPrefix(value_node_value);
-
-						switch(this->source.getToken(prefix.op).kind){
-							case Token::KeywordCopy: {					
-								return this->source.getNode(prefix.rhs);
-							} break;
-
-							default: EVO_FATAL_BREAK("Unknown prefix kind");
-						};
-					}
-
-					return value_node_value;
-				}();
-
-
-				// get ident value / pointer
-				if(value_node.kind == AST::Kind::Ident){
-					const Token& value_ident = this->source.getIdent(value_node);
-					std::string_view value_ident_str = value_ident.value.string;
-
-					// find the var
-					for(const Scope& scope : this->scopes){
-						if(scope.vars.contains(value_ident_str)){
-							const PIR::Var::ID value_var_id = scope.vars.at(value_ident_str);
-
-							const PIR::Var& value_var = this->source.getVar(value_var_id);
-
-							// check if value var is uninit
-							if(
-								value_var.value.kind == PIR::Expr::Kind::ASTNode &&
-								this->source.getNode(value_var.value.ast_node).kind == AST::Kind::Uninit
-							){
-								const Token& value_var_token = this->source.getToken(value_var.ident);
-
-								this->source.warning(
-									"declaring global variable with value of another global variable that's has the value of \"uninit\"", value_ident,
-									std::vector<Message::Info>{
-										{std::format("global variable \"{}\" defined here", value_ident_str), value_var_token.location},
-									}
-								);
-							}
-
-							return value_var.value;					
-						}
-					}
-				}
-
-
-				// literal
-				return PIR::Expr(var_decl.expr);
+				return this->get_const_expr_value(var_decl.expr);
 
 			}else{
-				return this->get_expr_value(var_decl.expr);
+				return std::optional<PIR::Expr>(this->get_expr_value(var_decl.expr));
 			}
 		}();
 
+		if(var_value.has_value() == false){ return false; }
 
+
+
+		if(var_value->kind == PIR::Expr::Kind::ASTNode){
+			const AST::Node& var_value_node = this->source.getNode(var_value->ast_node);
+
+			if(var_value_node.kind == AST::Kind::Uninit){
+				if(this->is_global_scope()){
+					this->source.error("Global variables cannot be initialized with the value \"uninit\"", var_decl.expr);
+					return false;
+				}
+
+				if(var_decl.is_def){
+					this->source.warning(
+						"Declared a def variable with the value \"uninit\"", var_decl.expr,
+						std::vector<Message::Info>{ {"Any use of this variable would be undefined behavior"} }
+					);
+				}
+			}
+		}
 		
 
 		///////////////////////////////////
 		// create object
 
-		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id, var_value);
+		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id, *var_value, var_decl.is_def);
 
 		this->add_var_to_scope(ident.value.string, var_id);
 
@@ -207,7 +193,6 @@ namespace panther{
 		}else{
 			this->get_stmts_entry().emplace_back(var_id);
 		}
-
 
 
 		///////////////////////////////////
@@ -568,6 +553,11 @@ namespace panther{
 		const std::optional<PIR::Type::ID> dst_type = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
 		if(dst_type.has_value() == false){ return false; }
 
+		if(this->is_expr_mutable(infix.lhs) == false){
+			this->source.error("Only mutable values may be assigned to", infix.lhs);
+			return false;
+		}
+
 
 		///////////////////////////////////
 		// checking of rhs
@@ -851,7 +841,7 @@ namespace panther{
 
 
 						// make the type pointer of the type of rhs
-						rhs_type_copy.qualifiers.emplace_back(true);
+						rhs_type_copy.qualifiers.emplace_back(true, !this->is_expr_mutable(prefix.rhs));
 
 						return this->source.getSourceManager().getTypeID(rhs_type_copy);
 					} break;
@@ -933,11 +923,11 @@ namespace panther{
 
 			case AST::Kind::FuncCall: {
 				const AST::FuncCall& func_call = this->source.getFuncCall(node_id);
-
+				const std::string_view ident = this->source.getIdent(func_call.target).value.string;
 
 				const PIR::Func::ID func_id = [&]() noexcept {
 					for(const Scope& scope : this->scopes){
-						auto find = scope.funcs.find(this->source.getIdent(func_call.target).value.string);
+						auto find = scope.funcs.find(ident);
 						if(find != scope.funcs.end()){
 							return find->second;
 						}
@@ -982,10 +972,96 @@ namespace panther{
 				return PIR::Expr(node_id);
 			} break;
 
+			case AST::Kind::Uninit: {
+				return PIR::Expr(node_id);
+			} break;
+
+
 			default: EVO_FATAL_BREAK("Unknown node value kind");
 		};
 
 	};
+
+
+
+	auto SemanticAnalyzer::get_const_expr_value(AST::Node::ID node_id) const noexcept -> std::optional<PIR::Expr> {
+		const std::optional<PIR::Expr> recursive_value = this->get_const_expr_value_recursive(node_id);
+		if(recursive_value.has_value() == false){ return std::nullopt; }
+
+		if(recursive_value->kind == PIR::Expr::Kind::Var){
+			const PIR::Var& value_var = this->source.getVar(recursive_value->var);
+			return value_var.value;
+		}
+
+		return recursive_value;
+	};
+
+
+
+	auto SemanticAnalyzer::get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> std::optional<PIR::Expr> {
+		const AST::Node& node = this->source.getNode(node_id);
+
+		switch(node.kind){
+			case AST::Kind::Ident: {
+				const Token& value_ident = this->source.getIdent(node);
+				std::string_view value_ident_str = value_ident.value.string;
+
+				// find the var
+				for(const Scope& scope : this->scopes){
+					if(scope.vars.contains(value_ident_str)){
+						return PIR::Expr(scope.vars.at(value_ident_str));
+					}
+				}
+
+				EVO_FATAL_BREAK("Unkown ident");
+			} break;
+
+			case AST::Kind::FuncCall: {
+				this->source.error("At this time, constant values cannot be function calls", node);
+				return std::nullopt;
+			} break;
+
+			case AST::Kind::Prefix: {
+				const AST::Prefix& prefix = this->source.getPrefix(node);
+
+				switch(this->source.getToken(prefix.op).kind){
+					case Token::KeywordCopy: {					
+						return this->get_const_expr_value_recursive(prefix.rhs);
+					} break;
+
+					case Token::KeywordAddr: {
+						const std::optional<PIR::Expr> rhs_value = this->get_const_expr_value_recursive(prefix.rhs);
+						if(rhs_value.has_value() == false){ return std::nullopt; }
+
+						const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_value);
+						return PIR::Expr(prefix_id);
+					} break;
+
+					default: EVO_FATAL_BREAK("Unknown prefix kind");
+				};
+			} break;
+
+			case AST::Kind::Postfix: {
+				this->source.error("At this time, constant values cannot be postfix operations", node);
+				return std::nullopt;
+			} break;
+
+			case AST::Kind::Literal: {
+				return PIR::Expr(node_id);
+			} break;
+
+			case AST::Kind::Uninit: {
+				this->source.error("Constant values cannot be \"uninit\"", node);
+				return std::nullopt;
+			} break;
+
+			default: EVO_FATAL_BREAK("Unknown node value kind");
+		};
+
+	};
+
+
+
 
 
 
@@ -1012,7 +1088,58 @@ namespace panther{
 			break; case AST::Kind::Uninit: return ExprValueType::Ephemeral;
 		};
 
-		EVO_FATAL_BREAK("Unknown AST::Node::Kind");
+		EVO_FATAL_BREAK("Unknown AST node kind");
+	};
+
+
+	auto SemanticAnalyzer::is_expr_mutable(AST::Node::ID node_id) const noexcept -> bool {
+		const AST::Node& value_node = this->source.getNode(node_id);
+
+		switch(value_node.kind){
+			break; case AST::Kind::Prefix: EVO_FATAL_BREAK("Not concreted");
+			break; case AST::Kind::FuncCall: EVO_FATAL_BREAK("Not concreted");
+
+			break; case AST::Kind::Postfix: {
+				const AST::Postfix& postfix = this->source.getPostfix(value_node);
+
+				switch(this->source.getToken(postfix.op).kind){
+					case Token::get(".^"): {
+						const std::optional<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
+						const PIR::Type& lhs_type = this->source.getSourceManager().getType(*lhs_type_id);
+
+						evo::debugAssert(lhs_type.qualifiers.back().is_ptr, "Should have already been checked that this type is a pointer");
+
+						return !lhs_type.qualifiers.back().is_const;
+
+					} break;
+
+					default: EVO_FATAL_BREAK("Unknown postfix kind");
+				};
+			} break;
+
+			break; case AST::Kind::Ident: {
+				const Token& value_ident = this->source.getIdent(value_node);
+				std::string_view value_ident_str = value_ident.value.string;
+
+				// find the var
+				for(const Scope& scope : this->scopes){
+					if(scope.vars.contains(value_ident_str)){
+						const PIR::Var::ID var_id = scope.vars.at(value_ident_str);
+						const PIR::Var& var = this->source.getVar(var_id);
+						return !var.is_def;
+					}
+				}
+
+				EVO_FATAL_BREAK("Didn't find value_ident");
+			} break;
+
+			break; case AST::Kind::Intrinsic: return false;
+
+			break; case AST::Kind::Literal: EVO_FATAL_BREAK("Not concreted");
+			break; case AST::Kind::Uninit: EVO_FATAL_BREAK("Not concreted");
+		};
+
+		EVO_FATAL_BREAK("Unknown AST node kind")
 	};
 
 

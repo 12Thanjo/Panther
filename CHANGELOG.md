@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.20.0
+- Added `def` variable declaration
+- Fixed local variables being initialized with the value `uninit`
+- Global variables can no longer be initialized with the value `uninit`
+- Added const pointers (add `|` to the pointer)
+- Fixed global variables being initialized with an `addr` expression
+- Made it illegal to initialize a global variable with an dereference expression
+
 ### v0.19.0
 - Added `unreachable` statements
 - Added detection for unreachable code after `return` (and `unreachable`) statements inside conditionals

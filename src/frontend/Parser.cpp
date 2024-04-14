@@ -70,9 +70,16 @@ namespace panther{
 	auto Parser::parse_var_decl() noexcept -> Result {
 		const Token& first_token = this->get(this->peek());
 
+		bool is_def = false;
+
 		// keyword var
 		if(first_token.kind == Token::KeywordVar){
 			this->skip(1);
+
+		}else if(first_token.kind == Token::KeywordDef){
+			this->skip(1);
+			is_def = true;
+
 		}else{
 			return Result::WrongType;
 		}
@@ -102,7 +109,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.var_decls, AST::Kind::VarDecl,
-			ident.value(), type.value(), expr.value()
+			is_def, ident.value(), type.value(), expr.value()
 		);
 	};
 
@@ -314,8 +321,15 @@ namespace panther{
 
 		auto qualifiers = std::vector<AST::Type::Qualifier>();
 		while(this->get(this->peek()).kind == Token::get("^")){
-			qualifiers.emplace_back(true);
 			this->skip(1);
+
+			bool is_const = false;
+			if(this->get(this->peek()).kind == Token::get("|")){
+				is_const = true;
+				this->skip(1);
+			}
+
+			qualifiers.emplace_back(true, is_const);
 		};
 
 
@@ -447,7 +461,7 @@ namespace panther{
 			return Result::Error;
 
 		}else if(rhs.code() == Result::WrongType){
-			this->expected_but_got(std::format("expression on right-hand size of [{}] operator", Token::printKind(this->get(op_token).kind)));
+			this->expected_but_got(std::format("valid expression on right-hand size of [{}] operator", Token::printKind(this->get(op_token).kind)));
 			return Result::Error;
 		}
 

@@ -77,11 +77,10 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		if(pir_to_llvmir.isInitialized()){
 			pir_to_llvmir.shutdown();
 		}
-		
+
 		if(llvm_context.isInitialized()){
 			llvm_context.shutdown();
 		}
-
 
 		#if !defined(PANTHER_BUILD_DIST) && defined(EVO_COMPILER_MSVC)
 			printer.trace("Press Enter to close...\n");

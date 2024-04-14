@@ -1,53 +1,18 @@
 
-func void_func_test = () -> Void {}
+var global: Int = 12;
+var global_copy: Int = copy global;
 
-func void_func_test_partial_return = () -> Void {
-	if(true){
-		return;
-	}
-}
+var global_ptr: Int^ = addr global_copy;
 
-func void_func_test_terminated_return = () -> Void {
-	if(true){
-		return;
-	}else{
-		return;
-	}
-}
-
-func void_func_test_base_return = () -> Void {
-	return;
-}
-
-func get_false = () -> Bool {
-	return false;
-}
-
-
+// var global_ptr_val: Int = copy global_ptr.^;
 
 
 func main = () #entry -> Int {
-	void_func_test();
-	void_func_test_partial_return();
-	void_func_test_terminated_return();
-	void_func_test_base_return();
+	def foo: Int = copy global_ptr.^;
+	var foo_ptr: Int^| = addr foo;
+	def foo_ptr_ptr: Int^|^ = addr foo_ptr;
 
-	var false_cond: Bool = false;
+	foo_ptr_ptr.^ = addr foo;
 
-	if(get_false()){
-		return 1;
-		
-	}else if(true){
-		if(false_cond){
-			return 2;
-		}else{
-			@__printHelloWorld();
-			return 3;
-		}
-	}else{
-		return 4;
-	}
-
-	// return 4;
+	return foo_ptr_ptr.^.^;
 }
-
