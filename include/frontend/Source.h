@@ -57,6 +57,9 @@ namespace panther{
 			EVO_NODISCARD auto getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func&;
 			EVO_NODISCARD auto getFunc(const AST::Node& node) const noexcept -> const AST::Func&;
 
+			EVO_NODISCARD auto getFuncParams(AST::Node::ID node_id) const noexcept -> const AST::FuncParams&;
+			EVO_NODISCARD auto getFuncParams(const AST::Node& node) const noexcept -> const AST::FuncParams&;
+
 			EVO_NODISCARD auto getConditional(AST::Node::ID node_id) const noexcept -> const AST::Conditional&;
 			EVO_NODISCARD auto getConditional(const AST::Node& node) const noexcept -> const AST::Conditional&;
 
@@ -114,6 +117,19 @@ namespace panther{
 			};
 			EVO_NODISCARD inline auto getVar(PIR::Var::ID id) noexcept -> PIR::Var& {
 				return this->pir.vars[size_t(id.id)];
+			};
+
+
+			EVO_NODISCARD inline auto createParam(auto&&... args) noexcept -> PIR::Param::ID {
+				this->pir.params.emplace_back(std::forward<decltype(args)>(args)...);
+				return PIR::Param::ID( uint32_t(this->pir.params.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getParam(PIR::Param::ID id) const noexcept -> const PIR::Param& {
+				return this->pir.params[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getParam(PIR::Param::ID id) noexcept -> PIR::Param& {
+				return this->pir.params[size_t(id.id)];
 			};
 
 
@@ -256,6 +272,7 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
+			std::vector<AST::FuncParams> func_params{};
 			std::vector<AST::Conditional> conditionals{};
 			std::vector<AST::Return> returns{};
 			std::vector<AST::Prefix> prefixes{};
@@ -269,6 +286,7 @@ namespace panther{
 
 			struct /* pir */ {
 				std::vector<PIR::Var> vars{};
+				std::vector<PIR::Param> params{};
 				std::vector<PIR::Func> funcs{};
 				std::vector<PIR::Conditional> conditionals{};
 				std::vector<PIR::Return> returns{};

@@ -114,7 +114,7 @@ namespace panther{
 		
 		{ // __printHelloWorld()
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.call_operators.emplace_back(std::vector<PIR::Type::ID>{}, std::nullopt);
+			base_type.call_operator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
 
 			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printHelloWorld, "__printHelloWorld", base_type_id);
@@ -123,7 +123,7 @@ namespace panther{
 
 		{ // breakpoint()
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.call_operators.emplace_back(std::vector<PIR::Type::ID>{}, std::nullopt);
+			base_type.call_operator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
 
 			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::breakpoint, "breakpoint", base_type_id);

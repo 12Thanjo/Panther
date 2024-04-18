@@ -175,6 +175,10 @@ namespace panther{
 			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
 			else if(ident_name == "addr") { this->create_token(Token::Kind::KeywordAddr); }
 
+			else if(ident_name == "read") { this->create_token(Token::Kind::KeywordRead); }
+			else if(ident_name == "write") { this->create_token(Token::Kind::KeywordWrite); }
+			else if(ident_name == "in") { this->create_token(Token::Kind::KeywordIn); }
+
 
 			///////////////////////////////////
 			// else

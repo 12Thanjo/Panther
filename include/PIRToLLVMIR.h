@@ -16,6 +16,7 @@
 #include "./LLVM_interface/IRBuilder.h"
 #include "./LLVM_interface/Module.h"
 #include "./LLVM_interface/ExecutionEngine.h"
+#include "./LLVM_interface/misc.h"
 
 
 namespace panther{
@@ -88,6 +89,8 @@ namespace panther{
 					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, false
 				);
 				this->libc.puts = this->module->createFunction("puts", puts_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
+
+				llvmint::setupFuncParams(this->libc.puts, { llvmint::ParamInfo("str") });
 			};
 
 
@@ -100,11 +103,11 @@ namespace panther{
 				llvm::FunctionType* prototype = this->builder->getFuncProto(llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64()), {}, false);
 				llvm::Function* main_func = this->module->createFunction("main", prototype, llvmint::LinkageTypes::ExternalLinkage, true, false);
 
-				llvm::BasicBlock* entry_block = this->builder->createBasicBlock(main_func, "entry");
-				this->builder->setInsertionPoint(entry_block);
+				llvm::BasicBlock* begin_block = this->builder->createBasicBlock(main_func, "begin");
+				this->builder->setInsertionPoint(begin_block);
 
-				llvm::Value* entry_ret = llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
-				this->builder->createRet(entry_ret);
+				llvm::Value* begin_ret = llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
+				this->builder->createRet(begin_ret);
 			};
 
 
@@ -183,31 +186,64 @@ namespace panther{
 
 
 			inline auto lower_func(Source& source, PIR::Func& func) noexcept -> void {
+				const SourceManager& source_manager = source.getSourceManager();
+
 				this->current_func = &func;
 				const std::string mangled_name = PIRToLLVMIR::mangle_name(source, func);
 
 				llvm::Type* return_type = [&]() noexcept {
-					if(func.return_type.has_value()){
-						const SourceManager& source_manager = source.getSourceManager();
-						const PIR::Type& return_type_obj = source_manager.getType(*func.return_type);
-						return this->get_type(source_manager, return_type_obj);
-					}else{
+					if(func.return_type.isVoid()){
 						return this->builder->getTypeVoid();
+					}else{
+						const PIR::Type& return_type_obj = source_manager.getType(func.return_type.typeID());
+						return this->get_type(source_manager, return_type_obj);
 					}
 				}();
 
 
+				auto param_types = std::vector<llvm::Type*>();
+				auto param_infos = std::vector<llvmint::ParamInfo>();
+				for(PIR::Param::ID param_id : func.params){
+					const PIR::Param& param = source.getParam(param_id);
 
-				llvm::FunctionType* prototype = this->builder->getFuncProto(return_type, {}, false);
+					// param_types.emplace_back(this->get_type(source_manager, source_manager.getType(param.type)));
+					param_types.emplace_back(llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()));
+					param_infos.emplace_back(source.getToken(param.ident).value.string);
+				}
+
+
+				llvm::FunctionType* prototype = this->builder->getFuncProto(return_type, param_types, false);
 				const auto linkage = func.is_export ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::InternalLinkage;
 				const bool fast_call_conv = !func.is_export;
 				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, linkage, true, fast_call_conv);
-
 				func.llvm_func = llvm_func;
 
 
-				llvm::BasicBlock* entry = this->builder->createBasicBlock(llvm_func, "entry");
-				this->builder->setInsertionPoint(entry);
+
+				if(func.params.empty()){
+					llvm::BasicBlock* begin = this->builder->createBasicBlock(llvm_func, "begin");
+					this->builder->setInsertionPoint(begin);
+					
+				}else{
+					llvmint::setupFuncParams(llvm_func, param_infos);
+
+					llvm::BasicBlock* setup = this->builder->createBasicBlock(llvm_func, "setup");
+					llvm::BasicBlock* begin = this->builder->createBasicBlock(llvm_func, "begin");
+
+					this->builder->setInsertionPoint(setup);
+
+					const std::vector<llvm::Argument*> arguments = llvmint::getFuncArguments(llvm_func);
+					for(size_t i = 0; i < arguments.size(); i+=1){
+						llvm::AllocaInst* arg_alloca = this->builder->createAlloca(param_types[i], std::format("{}.addr", param_infos[i].name));
+						source.getParam(func.params[i]).alloca = arg_alloca;
+
+						this->builder->createStore(arg_alloca, llvmint::ptrcast<llvm::Value>(arguments[i]), false);
+					}
+
+					this->builder->createBranch(begin);
+
+					this->builder->setInsertionPoint(begin);
+				}
 
 
 				for(const PIR::Stmt& stmt : func.stmts){
@@ -216,30 +252,19 @@ namespace panther{
 
 
 
-				if(func.terminates_in_base_scope){
-					if(func.return_type.has_value() == false && func.stmts.isTerminated() == false){
+				if(func.return_type.isVoid()){
+					if(func.stmts.isTerminated()){
+						if(func.terminates_in_base_scope == false){
+							this->builder->createUnreachable();
+						}
+					}else{						
 						this->builder->createRet();
 					}
-
-				}else{
+				}else if(func.terminates_in_base_scope == false){
 					this->builder->createUnreachable();
 				}
 
 
-
-				// if(func.return_type.has_value() == false){
-				// 	if(func.stmts.isTerminated() == false){
-				// 		this->builder->createRet();
-
-				// 	}else if(func.terminates_in_base_scope == false){
-				// 		this->builder->createUnreachable();
-				// 	}
-
-				// }else{
-				// 	if(func.terminates_in_base_scope == false){
-				// 		this->builder->createUnreachable();
-				// 	}
-				// }
 
 
 				this->current_func = nullptr;
@@ -331,7 +356,7 @@ namespace panther{
 			};
 
 
-			inline auto lower_return(Source& source, PIR::Return& ret) noexcept -> void {
+			inline auto lower_return(const Source& source, const PIR::Return& ret) noexcept -> void {
 				if(ret.value.has_value()){
 					this->builder->createRet(this->get_value(source, *ret.value));
 
@@ -342,7 +367,7 @@ namespace panther{
 
 
 
-			inline auto lower_assignment(Source& source, PIR::Assignment& assignment) noexcept -> void {
+			inline auto lower_assignment(const Source& source, const PIR::Assignment& assignment) noexcept -> void {
 				evo::debugAssert(
 					source.getToken(assignment.op).kind == Token::get("="),
 					"Only normal assignment (=) is supported for lowering at the moment"
@@ -357,11 +382,34 @@ namespace panther{
 
 
 
-			inline auto lower_func_call(Source& source, PIR::FuncCall& func_call) noexcept -> void {
+
+
+
+
+
+			inline auto create_func_call_args(const Source& source, const PIR::FuncCall& func_call) noexcept -> std::vector<llvm::Value*> {
+				auto args = std::vector<llvm::Value*>();
+
+				const PIR::Func& func = source.getFunc(func_call.func);
+
+				for(size_t i = 0; i < func_call.args.size(); i+=1){
+					const PIR::Expr& arg = func_call.args[i];
+
+					args.emplace_back(this->get_arg_value(source, arg, func.params[i]));
+				}
+
+				return args;
+			};
+
+
+			inline auto lower_func_call(const Source& source, const PIR::FuncCall& func_call) noexcept -> void {
 				switch(func_call.kind){
 					case PIR::FuncCall::Kind::Func: {
 						const PIR::Func& func = source.getFunc(func_call.func);
-						this->builder->createCall(func.llvm_func, {}, '\0');
+
+						const std::vector<llvm::Value*> args = this->create_func_call_args(source, func_call);
+
+						this->builder->createCall(func.llvm_func, args, '\0');
 					} break;
 
 
@@ -499,20 +547,42 @@ namespace panther{
 
 					case PIR::Expr::Kind::Var: {
 						const PIR::Var& var = source.getVar(value.var);
+
+						std::string load_name = std::format("{}.load", source.getToken(var.ident).value.string);
 						if(var.is_alloca){
-							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca));
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca, load_name));
 						}else{
 							const SourceManager& source_manager = source.getSourceManager();
 							llvm::Type* var_type = this->get_type(source_manager, source_manager.getType(var.type));
-							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(llvmint::ptrcast<llvm::Value>(var.llvm.global), var_type));
+							return llvmint::ptrcast<llvm::Value>(
+								this->builder->createLoad(llvmint::ptrcast<llvm::Value>(var.llvm.global), var_type, load_name)
+							);
 						}
+					} break;
+
+					case PIR::Expr::Kind::Param: {
+						const PIR::Param& param = source.getParam(value.param);
+
+						const SourceManager& source_manager = source.getSourceManager();
+						llvm::Type* param_type = this->get_type(source_manager, source_manager.getType(param.type));
+
+
+						std::string load_addr_name = std::format("{}.loadAddr", source.getToken(param.ident).value.string);
+						llvm::LoadInst* load_addr = this->builder->createLoad(param.alloca, load_addr_name);
+
+						std::string load_val_name = std::format("{}.loadVal", source.getToken(param.ident).value.string);
+						llvm::LoadInst* load_value = this->builder->createLoad(llvmint::ptrcast<llvm::Value>(load_addr), param_type, load_val_name);
+
+						return llvmint::ptrcast<llvm::Value>(load_value);
 					} break;
 
 					case PIR::Expr::Kind::FuncCall: {
 						const PIR::FuncCall& func_call = source.getFuncCall(value.func_call);
 						const PIR::Func& func = source.getFunc(func_call.func);
 
-						return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
+						const std::vector<llvm::Value*> args = this->create_func_call_args(source, func_call);
+
+						return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, args, '\0'));
 					} break;
 
 					case PIR::Expr::Kind::Prefix: {
@@ -524,17 +594,30 @@ namespace panther{
 							} break;
 
 							case Token::KeywordAddr: {
-								const PIR::Var& var = source.getVar(prefix.rhs.var);
-								if(var.is_alloca){
-									return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+								if(prefix.rhs.kind == PIR::Expr::Kind::Var){
+									const PIR::Var& var = source.getVar(prefix.rhs.var);
+									if(var.is_alloca){
+										return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+									}else{
+										return llvmint::ptrcast<llvm::Value>(var.llvm.global);
+									}
+									
 								}else{
-									return llvmint::ptrcast<llvm::Value>(var.llvm.global);
+									evo::debugAssert(prefix.rhs.kind == PIR::Expr::Kind::Param, "unknown rhs of addr stmt");
+
+									const PIR::Param& param = source.getParam(prefix.rhs.param);
+
+									std::string load_addr_name = std::format("{}.loadAddr", source.getToken(param.ident).value.string);
+									llvm::LoadInst* load_addr = this->builder->createLoad(param.alloca, load_addr_name);
+
+									return llvmint::ptrcast<llvm::Value>(load_addr);
 								}
 
 							} break;
 
-							default: EVO_FATAL_BREAK("Invalid or unknown prefix operator");
 						};
+
+						EVO_FATAL_BREAK("Invalid or unknown prefix operator");
 					} break;
 
 
@@ -545,7 +628,7 @@ namespace panther{
 
 						const SourceManager& source_manager = source.getSourceManager();
 						llvm::Type* deref_type = this->get_type(source_manager, source_manager.getType(deref.type));
-						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type));
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type, ".deref"));
 					} break;
 
 				};
@@ -567,6 +650,12 @@ namespace panther{
 						}
 					} break;
 
+					case PIR::Expr::Kind::Param: {
+						const PIR::Param& param = source.getParam(expr.param);
+						const std::string load_name = std::format("{}.load", source.getToken(param.ident).value.string);
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(param.alloca, load_name));
+					} break;
+
 
 					case PIR::Expr::Kind::Deref: {
 						const PIR::Deref& deref = source.getDeref(expr.deref);
@@ -577,6 +666,93 @@ namespace panther{
 					default: EVO_FATAL_BREAK("Unknown or unsupported concrete expr kind");
 				};
 			};
+
+
+			EVO_NODISCARD inline auto get_arg_value(const Source& source, const PIR::Expr& arg, PIR::Param::ID param_id) noexcept -> llvm::Value* {
+
+				switch(arg.kind){
+					case PIR::Expr::Kind::Var: {
+						const PIR::Var& var = source.getVar(arg.var);
+						if(var.is_alloca){
+							return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+						}else{
+							return llvmint::ptrcast<llvm::Value>(var.llvm.global);
+						}
+					} break;
+
+					case PIR::Expr::Kind::Param: {
+						const PIR::Param& param = source.getParam(arg.param);
+						const std::string load_name = std::format("{}.load", source.getToken(param.ident).value.string);
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(param.alloca));
+					} break;
+
+					case PIR::Expr::Kind::ASTNode: {
+						llvm::Value* temporary = this->get_value(source, arg);
+
+						const SourceManager& source_manager = source.getSourceManager();
+
+						const PIR::Param& param = source.getParam(param_id);
+						const PIR::Type& param_type = source_manager.getType(param.type);
+						llvm::Type* arg_type = this->get_type(source_manager, param_type);
+
+						llvm::AllocaInst* temporary_storage = this->builder->createAlloca(arg_type, "temp_storage");
+						this->builder->createStore(temporary_storage, temporary);
+
+						return llvmint::ptrcast<llvm::Value>(temporary_storage);
+					} break;
+
+					case PIR::Expr::Kind::FuncCall: {
+						llvm::Value* temporary = this->get_value(source, arg);
+
+						const SourceManager& source_manager = source.getSourceManager();
+
+						const PIR::Param& param = source.getParam(param_id);
+						const PIR::Type& param_type = source_manager.getType(param.type);
+						llvm::Type* arg_type = this->get_type(source_manager, param_type);
+
+						llvm::AllocaInst* temporary_storage = this->builder->createAlloca(arg_type, "temp_storage");
+						this->builder->createStore(temporary_storage, temporary);
+
+						return llvmint::ptrcast<llvm::Value>(temporary_storage);
+					} break;
+
+					case PIR::Expr::Kind::Prefix: {
+						const PIR::Prefix& prefix = source.getPrefix(arg.prefix);
+
+						switch(source.getToken(prefix.op).kind){
+							case Token::KeywordCopy: {
+								return this->get_arg_value(source, prefix.rhs, param_id);
+							} break;
+
+							case Token::KeywordAddr: {
+								llvm::Value* temporary = this->get_value(source, arg);
+
+								llvm::AllocaInst* temporary_storage = this->builder->createAlloca(
+									llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()), "temp_storage"
+								);
+								this->builder->createStore(temporary_storage, temporary);
+
+								return llvmint::ptrcast<llvm::Value>(temporary_storage);
+							} break;
+
+						};
+
+						EVO_FATAL_BREAK("Invalid or unknown prefix operator");
+					} break;
+
+					case PIR::Expr::Kind::Deref: {
+						const PIR::Deref& deref = source.getDeref(arg.deref);
+						
+						return this->get_value(source, deref.ptr);
+					} break;
+				};
+
+				EVO_FATAL_BREAK("Unknown or unsupported arg valye type");
+			};
+
+
+
+
 
 
 

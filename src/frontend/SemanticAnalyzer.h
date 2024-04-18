@@ -33,17 +33,25 @@ namespace panther{
 			EVO_NODISCARD auto analyze_infix(const AST::Infix& infix) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool;
 			EVO_NODISCARD auto analyze_unreachable(const Token& unreachable) noexcept -> bool;
-			EVO_NODISCARD auto analyze_assignment(const AST::Infix& infix) noexcept -> bool;			
-			EVO_NODISCARD auto analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry) noexcept -> bool;
+			EVO_NODISCARD auto analyze_assignment(const AST::Infix& infix) noexcept -> bool;
+			
+			EVO_NODISCARD auto analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry) noexcept -> bool; // enters a new scope
+			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
 
-			// returns nullopt if error occurs
-			EVO_NODISCARD auto analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> std::optional<PIR::Type::ID>;
+			EVO_NODISCARD auto check_func_call(const AST::FuncCall& func_call, PIR::Type::ID type_id) const noexcept -> bool;
+			EVO_NODISCARD auto get_func_call_args(const AST::FuncCall& func_call) const noexcept -> std::vector<PIR::Expr>;
+
+			
+			EVO_NODISCARD auto analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> evo::Result<PIR::Type::ID>;
+
+			EVO_NODISCARD auto get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID>;
+
 
 			// Not for use in global variables
 			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> PIR::Expr;
 
-			EVO_NODISCARD auto get_const_expr_value(AST::Node::ID node_id) const noexcept -> std::optional<PIR::Expr>;
-			EVO_NODISCARD auto get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> std::optional<PIR::Expr>;
+			EVO_NODISCARD auto get_const_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
+			EVO_NODISCARD auto get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
 
 
 			enum class ExprValueType{
@@ -69,6 +77,7 @@ namespace panther{
 
 			auto add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void;
 			auto add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void;
+			auto add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void;
 
 			auto set_scope_terminated() noexcept -> void;
 			EVO_NODISCARD auto scope_is_terminated() const noexcept -> bool;
@@ -116,6 +125,7 @@ namespace panther{
 
 				std::unordered_map<std::string_view, PIR::Var::ID> vars{};
 				std::unordered_map<std::string_view, PIR::Func::ID> funcs{};
+				std::unordered_map<std::string_view, PIR::Param::ID> params{};
 
 				// all control paths return or are unreachable
 				bool is_terminated = false;

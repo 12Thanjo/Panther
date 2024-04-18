@@ -74,7 +74,9 @@ namespace panther{
 				//////////////////////////////////////////////////////////////////////
 				// types
 
-				EVO_NODISCARD auto getFuncProto(llvm::Type* return_type, evo::ArrayProxy<llvm::Type*> params, bool is_var_args) noexcept -> llvm::FunctionType*;
+				EVO_NODISCARD auto getFuncProto(
+					llvm::Type* return_type, evo::ArrayProxy<llvm::Type*> params, bool is_var_args
+				) noexcept -> llvm::FunctionType*;
 
 
 				EVO_NODISCARD auto getTypeBool() noexcept -> llvm::IntegerType*;

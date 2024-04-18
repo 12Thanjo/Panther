@@ -5,6 +5,11 @@
 namespace panther{
 	namespace PIR{
 
+
+		auto BaseType::Operator::Param::operator==(const Operator::Param& rhs) const noexcept -> bool {
+			return this->type == rhs.type && this->kind == rhs.kind;
+		};
+
 		auto BaseType::Operator::operator==(const Operator& rhs) const noexcept -> bool {
 			return this->params == rhs.params && this->return_type == rhs.return_type;
 		};
@@ -26,7 +31,7 @@ namespace panther{
 				if(this->builtin.kind != rhs.builtin.kind){ return false; }
 
 			}else if(this->kind == BaseType::Kind::Function){
-				if(this->call_operators != rhs.call_operators){ return false; }
+				if(this->call_operator != rhs.call_operator){ return false; }
 				
 			}
 

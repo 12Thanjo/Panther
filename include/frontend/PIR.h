@@ -24,6 +24,38 @@ namespace panther{
 
 
 
+		class TypeVoidableID{
+			public:
+				TypeVoidableID(TypeID type_id) : id(type_id) {};
+				~TypeVoidableID() = default;
+
+				EVO_NODISCARD static inline auto Void() noexcept -> TypeVoidableID { return TypeVoidableID(); };
+
+				EVO_NODISCARD inline auto operator==(const TypeVoidableID& rhs) const noexcept -> bool { return this->id == rhs.id; };
+
+				EVO_NODISCARD inline auto typeID() const noexcept -> const TypeID& {
+					evo::debugAssert(this->isVoid() == false, "type is void");
+					return *this->id;
+				};
+
+				EVO_NODISCARD inline auto typeID() noexcept -> TypeID& {
+					evo::debugAssert(this->isVoid() == false, "type is void");
+					return *this->id;
+				};
+
+
+				EVO_NODISCARD inline auto isVoid() const noexcept -> bool { return !this->id.has_value(); };
+
+
+			private:
+				TypeVoidableID() : id(std::nullopt) {};
+		
+			private:
+				std::optional<TypeID> id;
+		};
+
+
+
 		class BaseType{
 			public:
 				struct ID{ // typesafe identifier
@@ -38,8 +70,15 @@ namespace panther{
 
 
 				struct Operator{
-					std::vector<TypeID> params;
-					std::optional<TypeID> return_type; // nullopt means Void
+					struct Param{
+						TypeID type;
+						AST::FuncParams::Param::Kind kind;
+
+						EVO_NODISCARD auto operator==(const Param& rhs) const noexcept -> bool;
+					};
+
+					std::vector<Param> params;
+					PIR::TypeVoidableID return_type; // nullopt means Void
 
 					EVO_NODISCARD auto operator==(const Operator& rhs) const noexcept -> bool;
 				};
@@ -83,7 +122,7 @@ namespace panther{
 				};
 
 
-				std::vector<Operator> call_operators{};
+				std::optional<Operator> call_operator{};
 
 			private:
 				
@@ -93,6 +132,7 @@ namespace panther{
 
 		struct Type{
 			using ID = TypeID;
+			using VoidableID = TypeVoidableID;
 
 
 			BaseType::ID base_type;
@@ -113,6 +153,11 @@ namespace panther{
 		struct VarID{ // typesafe identifier
 			uint32_t id;
 			explicit VarID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+		struct ParamID{ // typesafe identifier
+			uint32_t id;
+			explicit ParamID(uint32_t _id) noexcept : id(_id) {};
 		};
 
 		struct FuncID{ // typesafe identifier
@@ -136,16 +181,47 @@ namespace panther{
 			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
 		};
 
+		struct FuncCallID{ // typesafe identifier
+			uint32_t id;
+			explicit FuncCallID(uint32_t _id) noexcept : id(_id) {};
+		};
+
 
 
 		///////////////////////////////////
 		// expressions
 
-		struct FuncCall{
-			struct ID{ // typesafe identifier
-				uint32_t id;
-				explicit ID(uint32_t _id) noexcept : id(_id) {};
+
+		struct Expr{
+			enum class Kind{
+				Var,
+				Param,
+				ASTNode,
+				FuncCall,
+				Prefix,
+				Deref,
+			} kind;
+
+			union {
+				VarID var;
+				ParamID param;
+				AST::Node::ID ast_node;
+				FuncCallID func_call;
+				PrefixID prefix;
+				DerefID deref;
 			};
+
+			explicit Expr(VarID id) : kind(Kind::Var), var(id) {};
+			explicit Expr(ParamID id) : kind(Kind::Param), param(id) {};
+			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), ast_node(node) {};
+			explicit Expr(FuncCallID func_call_id) : kind(Kind::FuncCall), func_call(func_call_id) {};
+			explicit Expr(PrefixID prefix_id) : kind(Kind::Prefix), prefix(prefix_id) {};
+			explicit Expr(DerefID deref_id) : kind(Kind::Deref), deref(deref_id) {};
+		};
+
+
+		struct FuncCall{
+			using ID = FuncCallID;
 
 			enum class Kind{
 				Func,
@@ -158,34 +234,10 @@ namespace panther{
 				IntrinsicID intrinsic;
 			};
 
-			explicit FuncCall(FuncID func_id) : kind(Kind::Func), func(func_id) {};
-			explicit FuncCall(IntrinsicID intrinsic_id) : kind(Kind::Intrinsic), intrinsic(intrinsic_id) {};
-		};
+			std::vector<Expr> args;
 
-
-
-		struct Expr{
-			enum class Kind{
-				Var,
-				ASTNode,
-				FuncCall,
-				Prefix,
-				Deref,
-			} kind;
-
-			union {
-				VarID var;
-				AST::Node::ID ast_node;
-				FuncCall::ID func_call;
-				PrefixID prefix;
-				DerefID deref;
-			};
-
-			explicit Expr(VarID id) : kind(Kind::Var), var(id) {};
-			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), ast_node(node) {};
-			explicit Expr(FuncCall::ID func_call_id) : kind(Kind::FuncCall), func_call(func_call_id) {};
-			explicit Expr(PrefixID prefix_id) : kind(Kind::Prefix), prefix(prefix_id) {};
-			explicit Expr(DerefID deref_id) : kind(Kind::Deref), deref(deref_id) {};
+			FuncCall(FuncID func_id, std::vector<Expr> _args) : kind(Kind::Func), func(func_id), args(_args) {};
+			FuncCall(IntrinsicID intrinsic_id, std::vector<Expr> _args) : kind(Kind::Intrinsic), intrinsic(intrinsic_id), args(_args) {};
 		};
 
 
@@ -223,6 +275,16 @@ namespace panther{
 			bool is_alloca = false;
 
 			EVO_NODISCARD inline auto isGlobal() const noexcept -> bool { return !this->is_alloca; };
+		};
+
+		struct Param{
+			using ID = ParamID;
+
+			Token::ID ident;
+			Type::ID type;
+			AST::FuncParams::Param::Kind kind;
+
+			llvm::AllocaInst* alloca = nullptr;
 		};
 
 
@@ -351,7 +413,8 @@ namespace panther{
 			Token::ID ident;
 
 			BaseType::ID base_type;
-			std::optional<Type::ID> return_type; // nullopt means Void
+			std::vector<Param::ID> params;
+			Type::VoidableID return_type; // nullopt means Void
 
 			bool is_export;
 			

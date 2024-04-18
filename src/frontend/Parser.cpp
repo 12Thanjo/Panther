@@ -130,11 +130,10 @@ namespace panther{
 		// =
 		if(this->expect_token(Token::get("="), "in function declaration") == false){ return Result::Error; }
 
-		// (
-		if(this->expect_token(Token::get("("), "in function declaration") == false){ return Result::Error; }
+		
+		const Result func_params = this->parse_func_params();
+		if(this->check_result_fail(func_params, "parameter block in function declaration")){ return Result::Error; }
 
-		// )
-		if(this->expect_token(Token::get(")"), "in function declaration") == false){ return Result::Error; }
 
 		// attributes
 		auto attributes = std::vector<Token::ID>();
@@ -157,7 +156,86 @@ namespace panther{
 
 		return this->create_node(
 			this->source.funcs, AST::Kind::Func,
-			ident.value(), return_type.value(), block.value(), std::move(attributes)
+			ident.value(), func_params.value(), std::move(attributes), return_type.value(), block.value()
+		);
+	};
+
+
+	auto Parser::parse_func_params() noexcept -> Result {
+		// (
+		if(this->get(this->peek()).kind != Token::get("(")){ return Result::WrongType; }
+		this->skip(1);
+
+
+		auto params = std::vector<AST::FuncParams::Param>();
+
+		while(true){
+			if(this->get(this->peek()).kind == Token::get(")")){
+				this->skip(1);
+				break;
+			}
+
+			// ident
+			const Result ident_result = this->parse_ident();
+			if(this->check_result_fail(ident_result, "identifier in function parameter")){ return Result::Error; }
+
+			// :
+			if(this->expect_token(Token::get(":"), "in function parameter") == false){ return Result::Error; }
+
+			// type
+			const Result type_result = this->parse_type();
+			if(this->check_result_fail(type_result, "type inf function parameter")){ return Result::Error; }
+
+			// kind
+			using ParamKind = AST::FuncParams::Param::Kind;
+			const ParamKind param_kind = [&]() noexcept {
+				switch(this->get(this->peek()).kind){
+					case Token::KeywordRead: {
+						this->skip(1);
+						return ParamKind::Read;
+					} break;
+
+					case Token::KeywordWrite: {
+						this->skip(1);
+						return ParamKind::Write;
+					} break;
+
+					case Token::KeywordIn: {
+						this->skip(1);
+						return ParamKind::In;
+					} break;
+
+					default: return ParamKind::Read;
+				};
+			}();
+
+			if(param_kind == ParamKind::In){
+				this->source.error("The parameter qualifier \"in\" is not supported yet", this->peek(-1));
+				return Result::Error;
+			}
+
+
+
+			// create param
+			params.emplace_back(ident_result.value(), type_result.value(), param_kind);
+
+			// check if ending or should continue
+			const Token::ID after_param_peek = this->next();
+			const Token& after_param_peek_tok = this->get(after_param_peek);
+			if(after_param_peek_tok.kind != Token::get(",")){
+				if(after_param_peek_tok.kind != Token::get(")")){
+					this->expected_but_got("\",\" at end of function parameter or \")\" at end of function parameters block", after_param_peek);
+					return Result::Error;
+				}
+
+				break;
+			}
+		};
+
+
+		return this->create_node(
+			this->source.func_params, AST::Kind::FuncParams,
+			std::move(params)
 		);
 	};
 
@@ -497,11 +575,33 @@ namespace panther{
 			}else if(this->get(this->peek()).kind == Token::get("(")){
 				this->skip(1);
 
-				// )
-				if(this->expect_token(Token::get(")"), "at end of function call") == false){ return Result::Error; }
+				auto arguments = std::vector<AST::Node::ID>();
+
+				while(true){
+					if(this->get(this->peek()).kind == Token::get(")")){
+						this->skip(1);
+						break;
+					}
+
+					const Result expr_result = this->parse_expr();
+					if(this->check_result_fail(expr_result, "expression inside function call")){ return Result::Error; }
+
+					arguments.emplace_back(expr_result.value());
+
+					const Token::ID after_param_peek_tok = this->next();
+					const Token& after_param_peek = this->get(after_param_peek_tok);
+					if(after_param_peek.kind != Token::get(",")){
+						if(after_param_peek.kind != Token::get(")")){
+							this->expected_but_got("\",\" at end of function call argument or \")\" at end of function call", after_param_peek_tok);
+							return Result::Error;
+						}
+
+						break;
+					}
+				};
 
 				output = this->create_node(this->source.func_calls, AST::Kind::FuncCall,
-					output.value()
+					output.value(), std::move(arguments)
 				);
 
 			}else{

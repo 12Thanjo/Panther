@@ -57,6 +57,14 @@ namespace panther{
 		return this->funcs[node.index];
 	};
 
+	auto Source::getFuncParams(AST::Node::ID node_id) const noexcept -> const AST::FuncParams& {
+		return this->getFuncParams(this->getNode(node_id));
+	};
+	auto Source::getFuncParams(const AST::Node& node) const noexcept -> const AST::FuncParams& {
+		evo::debugAssert(node.kind == AST::Kind::FuncParams, "Node is not a FuncParams");
+		return this->func_params[node.index];
+	};
+
 	auto Source::getConditional(AST::Node::ID node_id) const noexcept -> const AST::Conditional& {
 		return this->getConditional(this->getNode(node_id));
 	};

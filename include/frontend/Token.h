@@ -61,6 +61,10 @@ namespace panther{
 			KeywordUninit,
 			KeywordAddr,
 
+			KeywordRead,
+			KeywordWrite,
+			KeywordIn,
+
 
 			///////////////////////////////////
 			// operators
@@ -234,6 +238,10 @@ namespace panther{
 				break; case Kind::KeywordCopy: return "copy";
 				break; case Kind::KeywordUninit: return "uninit";
 				break; case Kind::KeywordAddr: return "addr";
+
+				break; case Kind::KeywordRead: return "read";
+				break; case Kind::KeywordWrite: return "write";
+				break; case Kind::KeywordIn: return "in";
 
 
 				///////////////////////////////////

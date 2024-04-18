@@ -354,7 +354,10 @@ namespace panther{
 				this->info("Ident: ");
 				this->debug( std::format("{}\n", source.getToken(source.getNode(func.ident).token).value.string) );
 
+				this->indenter_set_arrow();
+				this->print_func_params(source, source.getNode(func.params));
 
+				this->indenter_set_arrow();
 				this->indenter_print();
 				if(func.attributes.empty()){
 					this->info("Attributes: ");
@@ -388,7 +391,7 @@ namespace panther{
 				this->indenter_pop();
 
 
-					this->indenter_set_end();
+				this->indenter_set_end();
 				this->indenter_print();
 				this->info("Block:\n");
 				this->indenter_push();
@@ -397,6 +400,62 @@ namespace panther{
 				this->indenter_pop();
 
 			this->indenter_pop();
+		};
+
+
+
+		auto Printer::print_func_params(const Source& source, const AST::Node& node) noexcept -> void {
+			const AST::FuncParams& func_params = source.getFuncParams(node);
+			
+			this->indenter_print();
+			if(func_params.params.empty()){
+				this->info("Params: ");
+				this->debug("[None]\n");
+			}else{
+				this->info("Params:\n");
+				this->indenter_push();
+
+				for(size_t i = 0; i < func_params.params.size(); i+=1){
+					const AST::FuncParams::Param& param = func_params.params[i];
+
+					if(i < func_params.params.size() - 1){
+						this->indenter_set_arrow();
+					}else{
+						this->indenter_set_end();
+					}
+
+					this->indenter_print();
+					this->info( std::format("param {}:\n", i) );
+					this->indenter_push();
+
+						this->indenter_set_arrow();
+						this->indenter_print();
+						this->info("Ident: ");
+						this->debug(std::format("{}\n", source.getToken(source.getNode(param.ident).token).value.string));
+
+						this->indenter_set_arrow();
+						this->indenter_print();
+						this->info("Type:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_type(source, source.getNode(param.type));
+						this->indenter_pop();
+
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("Kind: ");
+						switch(param.kind){
+							break; case AST::FuncParams::Param::Kind::Read:  this->debug("read\n");
+							break; case AST::FuncParams::Param::Kind::Write: this->debug("write\n");
+							break; case AST::FuncParams::Param::Kind::In:    this->debug("in\n");
+						};
+
+					this->indenter_pop();
+				}
+
+				this->indenter_pop();
+			}
 		};
 
 
@@ -585,13 +644,39 @@ namespace panther{
 					this->info("Function Call:\n");
 
 					this->indenter_push();
-						this->indenter_set_end();
 						this->indenter_print();
 						this->info("Target:\n");
 						this->indenter_push();
 							this->indenter_set_end();
 							this->print_expr(source, source.getNode(func_call.target));
 						this->indenter_pop();
+
+						this->indenter_set_end();
+						this->indenter_print();
+						if(func_call.args.empty()){
+							this->info("Arguments: ");
+							this->debug("[None]\n");
+
+						}else{
+							this->info("Arguments:\n");
+							this->indenter_push();
+								for(size_t i = 0; i < func_call.args.size(); i+=1){
+									if(i - 1 < func_call.args.size()){
+										this->indenter_set_arrow();
+									}else{
+										this->indenter_set_end();
+									}
+									this->indenter_print();
+
+									this->info(std::format("arg {}:\n", i));
+									this->indenter_push();
+										this->indenter_set_end();
+										this->print_expr(source, source.getNode(func_call.args[i]));
+									this->indenter_pop();
+								}
+							this->indenter_pop();
+						}
+
 					this->indenter_pop();
 				} break;
 

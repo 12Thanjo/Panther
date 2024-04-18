@@ -39,6 +39,10 @@ namespace panther{
 			return static_cast<llvm::Value*>(from);
 		};
 
+		auto _ptrcast_to_value(llvm::Argument* from) noexcept -> llvm::Value* {
+			return static_cast<llvm::Value*>(from);
+		};
+
 
 
 		auto _ptrcast_to_type(llvm::IntegerType* from) noexcept -> llvm::Type* {

@@ -1,5 +1,14 @@
 # Changelog
 
+### v0.21.0
+- Fixed printing of AST not having an arrow for function attributes
+- Added function parameters
+	- `read` and `write` parameters work
+	- `in` is not supported yet
+- Fixed call to breakpoint when type of return expression was incorrect
+- Added implicit const pointer conversion for return statements
+- Fixed incorrect LLVM IR code being generated for functions that return `Void` without an explicit `return` in all control paths
+
 ### v0.20.2
 - Added implicit conversion from a non-const-pointer to a const-pointer
 

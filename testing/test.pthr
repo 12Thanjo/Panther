@@ -1,11 +1,21 @@
 
+func deref_num = (num_to_get: Int^) -> Int {
+	return num_to_get.^;
+}
+
+
+func set_ptr_to_num = (ptr: Int write, num: Int) -> Void {
+	ptr = deref_num(addr num);
+}
+
 
 
 func main = () #entry -> Int {
-	var foo: Int = 12;
-	var bar: Int^| = addr foo;
+	var foo: Int = 16;
+	var bar: Int = 92;
 
-	bar = addr foo;
+	set_ptr_to_num((addr foo).^, (addr bar).^);
 
-	return 0;
+
+	return foo;
 }

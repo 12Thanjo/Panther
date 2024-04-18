@@ -8,6 +8,7 @@ namespace panther{
 
 		enum class Kind{
 			VarDecl,
+			FuncParams,
 			Func,
 			Return,
 			Conditional,
@@ -55,12 +56,27 @@ namespace panther{
 		};
 
 
+		struct FuncParams{
+			struct Param{
+				Node::ID ident;
+				Node::ID type;
+
+				enum class Kind{
+					Read,
+					Write,
+					In,
+				} kind;
+			};
+
+			std::vector<Param> params;
+		};
+
 		struct Func{
 			Node::ID ident;
+			Node::ID params;
+			std::vector<Token::ID> attributes;
 			Node::ID return_type;
 			Node::ID block;
-
-			std::vector<Token::ID> attributes;
 		};
 
 		struct Return{
@@ -111,6 +127,7 @@ namespace panther{
 
 		struct FuncCall{
 			Node::ID target;
+			std::vector<Node::ID> args;
 		};
 
 
