@@ -121,6 +121,18 @@ namespace panther{
 		}
 
 
+		{ // __printInt()
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.call_operator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), AST::FuncParams::Param::Kind::Read} },
+				PIR::Type::VoidableID::Void()
+			);
+
+			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printInt, "__printInt", base_type_id);
+		}
+
+
 		{ // breakpoint()
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 			base_type.call_operator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
@@ -193,7 +205,7 @@ namespace panther{
 
 
 
-	auto SourceManager::getTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID {
+	auto SourceManager::getOrCreateTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID {
 		// find existing type
 		for(size_t i = 0; i < this->types.size(); i+=1){
 			const PIR::Type& type_ref = this->types[i];
@@ -207,6 +219,19 @@ namespace panther{
 		// create new type
 		this->types.emplace_back(type);
 		return PIR::Type::ID( uint32_t(this->types.size() - 1) );
+	};
+
+	auto SourceManager::getTypeID(const PIR::Type& type) const noexcept -> PIR::Type::ID {
+		// find existing type
+		for(size_t i = 0; i < this->types.size(); i+=1){
+			const PIR::Type& type_ref = this->types[i];
+
+			if(type_ref == type){
+				return PIR::Type::ID( uint32_t(i) );
+			}
+		}
+
+		EVO_FATAL_BREAK("Unknown type");
 	};
 
 

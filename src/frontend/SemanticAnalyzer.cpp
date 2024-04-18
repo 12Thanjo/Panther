@@ -367,6 +367,17 @@ namespace panther{
 			this->leave_scope();
 		this->leave_func_scope();
 
+
+		for(PIR::Param::ID param_id : pir_func.params){
+			const PIR::Param& param = this->source.getParam(param_id);
+
+			if(param.kind == AST::FuncParams::Param::Kind::Write && param.mayHaveBeenEdited == false){
+				this->source.warning("write parameter was not written to in any control path", param.ident);
+			}
+		}
+
+
+
 		return true;
 	};
 
@@ -588,6 +599,13 @@ namespace panther{
 			return false;
 		}
 
+		const PIR::Expr lhs_value = this->get_expr_value(infix.lhs);
+
+		if(lhs_value.kind == PIR::Expr::Kind::Param){
+			PIR::Param& param = this->source.getParam(lhs_value.param);
+			param.mayHaveBeenEdited = true;
+		}
+
 
 		///////////////////////////////////
 		// checking of rhs
@@ -600,6 +618,8 @@ namespace panther{
 
 		const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
 		if(expr_type_id.isError()){ return false; }
+
+		const PIR::Expr rhs_value = this->get_expr_value(infix.rhs);
 
 
 		///////////////////////////////////
@@ -628,9 +648,7 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Assignment::ID assignment_id = this->source.createAssignment(
-			this->get_expr_value(infix.lhs), infix.op, this->get_expr_value(infix.rhs)
-		);
+		const PIR::Assignment::ID assignment_id = this->source.createAssignment(lhs_value, infix.op, rhs_value);
 		this->get_stmts_entry().emplace_back(assignment_id);
 
 
@@ -832,6 +850,20 @@ namespace panther{
 					}
 				} break;
 			};
+
+
+			// if param is write and arg is a param, mark it as edited
+			if(arg.kind == AST::Kind::Ident && param.kind == ParamKind::Write){
+				std::string_view param_ident_str = this->source.getIdent(arg).value.string;
+
+				for(const Scope& scope : this->scopes){
+ 					if(scope.params.contains(param_ident_str)){
+						PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
+						pir_param.mayHaveBeenEdited = true;
+					}
+				}
+			}
+
 		}
 
 		return true;
@@ -872,7 +904,7 @@ namespace panther{
 
 
 
-				return src_manager.getTypeID(
+				return src_manager.getOrCreateTypeID(
 					PIR::Type( src_manager.getBaseTypeID(base_type) )
 				);
 			} break;
@@ -889,7 +921,7 @@ namespace panther{
 
 					}else if(scope.funcs.contains(ident_str)){
 						const PIR::Func& func = this->source.getFunc(scope.funcs.at(ident_str));
-						return src_manager.getTypeID(PIR::Type(func.base_type));
+						return src_manager.getOrCreateTypeID(PIR::Type(func.base_type));
 
 					}else if(scope.params.contains(ident_str)){
 						const PIR::Param& param = this->source.getParam(scope.params.at(ident_str));
@@ -908,7 +940,7 @@ namespace panther{
 
 				for(const PIR::Intrinsic& intrinsic : src_manager.getIntrinsics()){
 					if(intrinsic.ident == intrinsic_tok.value.string){
-						return src_manager.getTypeID(PIR::Type(intrinsic.base_type));
+						return src_manager.getOrCreateTypeID(PIR::Type(intrinsic.base_type));
 					}
 				}
 
@@ -976,7 +1008,7 @@ namespace panther{
 						// make the type pointer of the type of rhs
 						rhs_type_copy.qualifiers.emplace_back(true, !this->is_expr_mutable(prefix.rhs));
 
-						return this->source.getSourceManager().getTypeID(rhs_type_copy);
+						return this->source.getSourceManager().getOrCreateTypeID(rhs_type_copy);
 					} break;
 
 					default: EVO_FATAL_BREAK("Unknown prefix operator");
@@ -1010,7 +1042,7 @@ namespace panther{
 						PIR::Type lhs_type_copy = lhs_type;
 						lhs_type_copy.qualifiers.pop_back();
 
-						return this->source.getSourceManager().getTypeID(lhs_type_copy);
+						return this->source.getSourceManager().getOrCreateTypeID(lhs_type_copy);
 					} break;
 
 					default: EVO_FATAL_BREAK("Unknown postfix operator");
@@ -1071,7 +1103,7 @@ namespace panther{
 		SourceManager& src_manager = this->source.getSourceManager();
 
 		return PIR::Type::VoidableID(
-			src_manager.getTypeID(
+			src_manager.getOrCreateTypeID(
 				PIR::Type(src_manager.getBaseTypeID(type_token.kind), type_qualifiers)
 			)
 		);
@@ -1131,7 +1163,13 @@ namespace panther{
 			case AST::Kind::Prefix: {
 				const AST::Prefix& prefix = this->source.getPrefix(node_id);
 
-				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, this->get_expr_value(prefix.rhs));
+				const PIR::Expr rhs_value = this->get_expr_value(prefix.rhs);
+				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, rhs_value);
+
+				if(rhs_value.kind == PIR::Expr::Kind::Param && this->source.getToken(prefix.op).kind == Token::KeywordAddr){
+					this->source.getParam(rhs_value.param).mayHaveBeenEdited = true;
+				}
+
 				return PIR::Expr(prefix_id);
 			} break;
 
@@ -1146,7 +1184,7 @@ namespace panther{
 				const PIR::Type& ptr_type = this->source.getSourceManager().getType(ptr_type_id.value());
 				PIR::Type ptr_type_copy = ptr_type;
 				ptr_type_copy.qualifiers.pop_back();
-				const PIR::Type::ID deref_type_id = this->source.getSourceManager().getTypeID(ptr_type_copy);
+				const PIR::Type::ID deref_type_id = this->source.getSourceManager().getOrCreateTypeID(ptr_type_copy);
 
 				const PIR::Deref::ID deref_id = this->source.createDeref(this->get_expr_value(postfix.lhs), deref_type_id);
 				return PIR::Expr(deref_id);

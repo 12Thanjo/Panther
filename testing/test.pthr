@@ -1,29 +1,13 @@
 
-func deref_num = (num_to_get: Int^| write) -> Int {
-	return num_to_get.^;
+
+
+func test = (foo: Int read) -> Int {
+	def foo_copy: Int = copy foo;
+	return foo_copy;
 }
-
-
-func set_ptr_to_num = (ptr: Int write, num: Int, should_change: Bool) -> Void {
-	if(should_change){
-		var num_ptr: Int^| = addr num;
-		ptr = deref_num(num_ptr);
-	}else{
-		@__printHelloWorld();
-	}
-}
-
-
-func test_bool_sizing = (bool: Bool) -> Void {}
-
 
 
 func main = () #entry -> Int {
-	var foo: Int = 16;
-	var bar: Int = 92;
-
-	set_ptr_to_num((addr foo).^, (addr bar).^, false);
-
-
-	return foo;
+	var num: Int = 15;
+	return test(num);
 }

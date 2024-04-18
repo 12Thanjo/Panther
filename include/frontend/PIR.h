@@ -285,6 +285,7 @@ namespace panther{
 			AST::FuncParams::Param::Kind kind;
 
 			llvm::AllocaInst* alloca = nullptr;
+			bool mayHaveBeenEdited = false; // it's impossible to detech this 100%
 		};
 
 
@@ -432,6 +433,7 @@ namespace panther{
 
 			enum class Kind{
 				__printHelloWorld,
+				__printInt,
 				breakpoint,
 			} kind;
 

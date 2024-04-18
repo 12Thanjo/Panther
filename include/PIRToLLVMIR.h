@@ -89,8 +89,14 @@ namespace panther{
 					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, false
 				);
 				this->libc.puts = this->module->createFunction("puts", puts_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
-
 				llvmint::setupFuncParams(this->libc.puts, { llvmint::ParamInfo("str", false, true, true) });
+
+
+				llvm::FunctionType* printf_proto = this->builder->getFuncProto(
+					this->builder->getTypeVoid(), { llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()) }, true
+				);
+				this->libc.printf = this->module->createFunction("printf", printf_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
+				llvmint::setupFuncParams(this->libc.printf, { llvmint::ParamInfo("str", false, true, true) });
 			};
 
 
@@ -403,7 +409,7 @@ namespace panther{
 				for(size_t i = 0; i < func_call.args.size(); i+=1){
 					const PIR::Expr& arg = func_call.args[i];
 
-					args.emplace_back(this->get_arg_value(source, arg, func.params[i]));
+					args.emplace_back(this->get_arg_value(source, arg, source.getParam(func.params[i]).type));
 				}
 
 				return args;
@@ -422,7 +428,8 @@ namespace panther{
 
 
 					case PIR::FuncCall::Kind::Intrinsic: {
-						const PIR::Intrinsic& intrinsic = source.getSourceManager().getIntrinsic(func_call.intrinsic);
+						const SourceManager& source_manager = source.getSourceManager();
+						const PIR::Intrinsic& intrinsic = source_manager.getIntrinsic(func_call.intrinsic);
 
 						switch(intrinsic.kind){
 							case PIR::Intrinsic::Kind::__printHelloWorld: {
@@ -434,6 +441,16 @@ namespace panther{
 
 							case PIR::Intrinsic::Kind::breakpoint: {
 								this->builder->createIntrinsicCall(llvmint::IRBuilder::IntrinsicID::debugtrap, {});
+							} break;
+
+							case PIR::Intrinsic::Kind::__printInt: {
+								evo::debugAssert(this->libc.printf != nullptr, "libc was not initialized");
+								
+								static llvm::GlobalVariable* print_int_str = this->builder->valueString("num: %lli\n", "print_int_str");
+								
+								this->builder->createCall(
+									this->libc.printf, { llvmint::ptrcast<llvm::Value>(print_int_str), this->get_value(source, func_call.args[0]) }
+								);
 							} break;
 
 							default: {
@@ -676,7 +693,7 @@ namespace panther{
 			};
 
 
-			EVO_NODISCARD inline auto get_arg_value(const Source& source, const PIR::Expr& arg, PIR::Param::ID param_id) noexcept -> llvm::Value* {
+			EVO_NODISCARD inline auto get_arg_value(const Source& source, const PIR::Expr& arg, PIR::Type::ID param_type_id) noexcept -> llvm::Value* {
 
 				switch(arg.kind){
 					case PIR::Expr::Kind::Var: {
@@ -689,9 +706,9 @@ namespace panther{
 					} break;
 
 					case PIR::Expr::Kind::Param: {
-						const PIR::Param& param = source.getParam(arg.param);
-						const std::string load_name = std::format("{}.load", source.getToken(param.ident).value.string);
-						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(param.alloca));
+						const PIR::Param& value_param = source.getParam(arg.param);
+						const std::string load_name = std::format("{}.load", source.getToken(value_param.ident).value.string);
+						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(value_param.alloca));
 					} break;
 
 					case PIR::Expr::Kind::ASTNode: {
@@ -699,8 +716,7 @@ namespace panther{
 
 						const SourceManager& source_manager = source.getSourceManager();
 
-						const PIR::Param& param = source.getParam(param_id);
-						const PIR::Type& param_type = source_manager.getType(param.type);
+						const PIR::Type& param_type = source_manager.getType(param_type_id);
 						llvm::Type* arg_type = this->get_type(source_manager, param_type);
 
 						llvm::AllocaInst* temporary_storage = this->builder->createAlloca(arg_type, "temp_storage");
@@ -714,8 +730,7 @@ namespace panther{
 
 						const SourceManager& source_manager = source.getSourceManager();
 
-						const PIR::Param& param = source.getParam(param_id);
-						const PIR::Type& param_type = source_manager.getType(param.type);
+						const PIR::Type& param_type = source_manager.getType(param_type_id);
 						llvm::Type* arg_type = this->get_type(source_manager, param_type);
 
 						llvm::AllocaInst* temporary_storage = this->builder->createAlloca(arg_type, "temp_storage");
@@ -729,7 +744,7 @@ namespace panther{
 
 						switch(source.getToken(prefix.op).kind){
 							case Token::KeywordCopy: {
-								return this->get_arg_value(source, prefix.rhs, param_id);
+								return this->get_arg_value(source, prefix.rhs, param_type_id);
 							} break;
 
 							case Token::KeywordAddr: {
@@ -794,6 +809,7 @@ namespace panther{
 
 			struct /* libc */ {
 				llvm::Function* puts = nullptr;
+				llvm::Function* printf = nullptr;
 			} libc;
 	};
 

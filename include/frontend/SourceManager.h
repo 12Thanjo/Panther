@@ -99,7 +99,12 @@ namespace panther{
 			// gets type with matching ID
 			// if type doesn't already exist, create a new one
 			// TODO: &&
-			EVO_NODISCARD auto getTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID;
+			EVO_NODISCARD auto getOrCreateTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID;
+
+			// gets type with matching ID
+			// TODO: &&
+			EVO_NODISCARD auto getTypeID(const PIR::Type& type) const noexcept -> PIR::Type::ID;
+
 
 			EVO_NODISCARD inline auto getType(PIR::Type::ID id) const noexcept -> const PIR::Type& {
 				return this->types[id.id];

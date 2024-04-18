@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.21.2
+- Added the intrinsic function `@__printInt(Int read)`
+	- This existance of this is just temporary
+- Added warning if a `write`  parameter is known to never be written to
+
 ### v0.21.1
 - Added a semantic analysis check to make sure that arguments to write parameters are mutable
 - Added more parameter marking in LLVM IR
