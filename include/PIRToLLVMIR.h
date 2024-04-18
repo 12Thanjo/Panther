@@ -90,7 +90,7 @@ namespace panther{
 				);
 				this->libc.puts = this->module->createFunction("puts", puts_proto, llvmint::LinkageTypes::ExternalLinkage, true, false);
 
-				llvmint::setupFuncParams(this->libc.puts, { llvmint::ParamInfo("str") });
+				llvmint::setupFuncParams(this->libc.puts, { llvmint::ParamInfo("str", false, true, true) });
 			};
 
 
@@ -203,12 +203,20 @@ namespace panther{
 
 				auto param_types = std::vector<llvm::Type*>();
 				auto param_infos = std::vector<llvmint::ParamInfo>();
-				for(PIR::Param::ID param_id : func.params){
-					const PIR::Param& param = source.getParam(param_id);
 
-					// param_types.emplace_back(this->get_type(source_manager, source_manager.getType(param.type)));
+				for(size_t i = 0; i < func.params.size(); i+=1){
+					const PIR::Param& param = source.getParam(func.params[i]);
+
+					llvm::Type* param_type = this->get_type(source_manager, source_manager.getType(param.type));
+					// param_types.emplace_back(param_type);
 					param_types.emplace_back(llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()));
-					param_infos.emplace_back(source.getToken(param.ident).value.string);
+
+					using ParamKind = AST::FuncParams::Param::Kind;
+					const bool readonly = param.kind == ParamKind::Read;
+					const bool nonnull = true;
+					const bool noalias = param.kind == ParamKind::Write;
+					const auto deref = llvmint::ParamInfo::Dereferenceable(this->module->getTypeSize(param_type), false);
+					param_infos.emplace_back(source.getToken(param.ident).value.string, readonly, nonnull, noalias, deref);
 				}
 
 

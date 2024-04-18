@@ -15,6 +15,22 @@ namespace panther{
 				arg.setName(param_info.name);
 				arg.addAttr(llvm::Attribute::NoUndef);
 
+				if(param_info.readonly){ arg.addAttr(llvm::Attribute::ReadOnly); }
+				if(param_info.nonnull){ arg.addAttr(llvm::Attribute::NonNull); }
+				if(param_info.noalias){ arg.addAttr(llvm::Attribute::NoAlias); }
+
+				auto attr_builder = llvm::AttrBuilder(func->getContext());
+
+				if(param_info.dereferenceable.bytes != 0){
+					if(param_info.dereferenceable.can_be_null){
+						attr_builder.addDereferenceableOrNullAttr(param_info.dereferenceable.bytes);
+					}else{
+						attr_builder.addDereferenceableAttr(param_info.dereferenceable.bytes);
+					}
+				}
+
+				arg.addAttrs(attr_builder);
+
 				i += 1;
 			}
 		};

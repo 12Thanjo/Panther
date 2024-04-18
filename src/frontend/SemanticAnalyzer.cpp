@@ -230,6 +230,7 @@ namespace panther{
 				return false;
 			}
 
+
 			param_type_ids.emplace_back(param_type_id.value().typeID(), param.kind);
 
 			const PIR::Param::ID param_id = this->source.createParam(param_ident_tok_id, param_type_id.value().typeID(), param.kind);
@@ -785,7 +786,8 @@ namespace panther{
 
 		for(size_t i = 0; i < base_type.call_operator->params.size(); i+=1){
 			const PIR::BaseType::Operator::Param& param = base_type.call_operator->params[i];
-			const AST::Node& arg = this->source.getNode(func_call.args[i]);
+			const AST::Node::ID arg_id = func_call.args[i];
+			const AST::Node& arg = this->source.getNode(arg_id);
 
 			// check types match
 			const evo::Result<PIR::Type::ID> arg_type_id = this->analyze_and_get_type_of_expr(arg);
@@ -803,7 +805,7 @@ namespace panther{
 			}
 
 			// check param kind accepts arg value type
-			const ExprValueType arg_value_type = this->get_expr_value_type(func_call.args[i]);
+			const ExprValueType arg_value_type = this->get_expr_value_type(arg_id);
 
 			using ParamKind = AST::FuncParams::Param::Kind;
 			switch(param.kind){
@@ -813,14 +815,19 @@ namespace panther{
 
 				case ParamKind::Write: {
 					if(arg_value_type != ExprValueType::Concrete){
-						this->source.error("write parameters require concrete expression values", func_call.args[i]);
+						this->source.error("write parameters require concrete expression values", arg_id);
+						return false;
+					}
+
+					if(this->is_expr_mutable(arg_id) == false){
+						this->source.error("write parameters require mutable expression values", arg_id);
 						return false;
 					}
 				} break;
 
 				case ParamKind::In: {
 					if(arg_value_type != ExprValueType::Ephemeral){
-						this->source.error("write parameters require ephemeral expression values", func_call.args[i]);
+						this->source.error("write parameters require ephemeral expression values", arg_id);
 						return false;
 					}
 				} break;
@@ -922,19 +929,8 @@ namespace panther{
 				// check that it's a function type
 				const PIR::Type& type = src_manager.getType(target_type_id.value());
 				const PIR::BaseType& base_type = src_manager.getBaseType(type.base_type);
-				// if(base_type.call_operator.has_value() == false){
-				// 	// TODO: better messaging?
-				// 	this->source.error(
-				// 		"cannot be called like a function", func_call.target,
-				// 		std::vector<Message::Info>{
-				// 			std::format("Type \"{}\" does not have a call operator", src_manager.printType(target_type_id.value()))
-				// 		}
-				// 	);
-				// 	return evo::ResultError;
-				// }
 
 				if(this->check_func_call(func_call, target_type_id.value()) == false){ return evo::ResultError; }
-
 
 				const PIR::Type::VoidableID return_type = base_type.call_operator->return_type;
 				if(return_type.isVoid()){

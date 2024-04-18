@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.21.1
+- Added a semantic analysis check to make sure that arguments to write parameters are mutable
+- Added more parameter marking in LLVM IR
+	- `read` parameters marked as `readonly`
+	- `nonnull`
+	- `write` parameters marked as `noalias`
+	- `dereferenceable`
+
 ### v0.21.0
 - Fixed printing of AST not having an arrow for function attributes
 - Added function parameters
