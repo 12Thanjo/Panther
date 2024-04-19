@@ -218,7 +218,7 @@ namespace panther{
 					param_types.emplace_back(llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()));
 
 					using ParamKind = AST::FuncParams::Param::Kind;
-					const bool readonly = param.kind == ParamKind::Read;
+					const bool readonly = false;
 					const bool nonnull = true;
 					const bool noalias = param.kind == ParamKind::Write;
 					const auto deref = llvmint::ParamInfo::Dereferenceable(this->module->getTypeSize(param_type), false);

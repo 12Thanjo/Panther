@@ -1,13 +1,11 @@
 
 
 
-func test = (foo: Int read) -> Int {
-	def foo_copy: Int = copy foo;
-	return foo_copy;
-}
-
 
 func main = () #entry -> Int {
-	var num: Int = 15;
-	return test(num);
+	var foo: Int = addr @breakpoint;
+
+
+	
+	return 0;
 }

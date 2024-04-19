@@ -981,7 +981,7 @@ namespace panther{
 					case Token::KeywordCopy: {
 						const ExprValueType expr_value_type = this->get_expr_value_type(prefix.rhs);
 						if(expr_value_type != ExprValueType::Concrete){
-							this->source.error("right-hand-side of copy expression must be a concrete expression", prefix.rhs);
+							this->source.error("Only concrete expressions can be copied", prefix.rhs);
 							return evo::ResultError;
 						}
 
@@ -993,9 +993,17 @@ namespace panther{
 						// check value type
 						const ExprValueType expr_value_type = this->get_expr_value_type(prefix.rhs);
 						if(expr_value_type != ExprValueType::Concrete){
-							this->source.error("right-hand-side of addr expression must be a concrete expression", prefix.rhs);
+							this->source.error("Can only take the address of a concrete expression", prefix.rhs);
 							return evo::ResultError;
 						}
+
+
+						// check that it's not an intrinsic
+						if(this->source.getNode(prefix.rhs).kind == AST::Kind::Intrinsic){
+							this->source.error("Cannot take the address of an intrinsic", prefix.rhs);
+							return evo::ResultError;
+						}
+
 
 						// get type of rhs
 						const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));

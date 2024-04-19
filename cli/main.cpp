@@ -57,7 +57,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		.name		  = "testing",
 		.print_colors = true,
 		.verbose      = true,
-		.target       = Config::Target::Run,
+		.target       = Config::Target::LLVMIR,
 	};
 
 

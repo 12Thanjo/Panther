@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.21.3
+- `read` parameters are no longer marked as `readonly` in LLVM IR automatically
+	- The intention is to add this back in some optimization pass
+- Added checking to prevent taking the address of an intrinsic
+
 ### v0.21.2
 - Added the intrinsic function `@__printInt(Int read)`
 	- This existance of this is just temporary

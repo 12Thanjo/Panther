@@ -386,7 +386,7 @@ namespace panther{
 			case Token::TypeVoid:
 			case Token::TypeInt:
 			case Token::TypeBool:
-			// case Token::Ident: 
+			case Token::Ident: 
 				break;
 
 			default:
@@ -645,6 +645,9 @@ namespace panther{
 	auto Parser::parse_term() noexcept -> Result {
 		Result result = this->parse_literal();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
+		// result = this->parse_type();
+		// if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
 		result = this->parse_ident();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
