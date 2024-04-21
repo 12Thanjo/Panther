@@ -181,8 +181,6 @@ namespace panther{
 
 
 	auto SourceManager::getBaseType(Token::Kind tok_kind) noexcept -> PIR::BaseType& {
-		evo::debugAssert(tok_kind != Token::Ident, ("use the ident version of " __FUNCTION__));
-
 		for(PIR::BaseType& base_type : this->base_types){
 			if(base_type == tok_kind){
 				return base_type;
@@ -194,8 +192,6 @@ namespace panther{
 
 
 	auto SourceManager::getBaseTypeID(Token::Kind tok_kind) const noexcept -> PIR::BaseType::ID {
-		evo::debugAssert(tok_kind != Token::Ident, ("use the ident version of " __FUNCTION__));
-
 		for(size_t i = 0; i < this->base_types.size(); i+=1){
 			const PIR::BaseType& base_type = this->base_types[i];
 

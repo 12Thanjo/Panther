@@ -132,6 +132,12 @@ namespace panther{
 			};
 			std::vector<Scope> scopes{};
 
+			struct GlobalFunc{
+				PIR::Func::ID pir_id;
+				const AST::Func& ast;
+			};
+			std::vector<GlobalFunc> global_funcs{};
+
 			
 			std::vector<FuncScope> func_scopes{};
 

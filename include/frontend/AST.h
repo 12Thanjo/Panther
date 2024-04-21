@@ -51,7 +51,7 @@ namespace panther{
 		struct VarDecl{
 			bool is_def;
 			Node::ID ident;
-			Node::ID type;
+			std::optional<Node::ID> type;
 			Node::ID expr;
 		};
 

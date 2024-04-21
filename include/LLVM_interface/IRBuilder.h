@@ -24,7 +24,7 @@ namespace panther{
 				//////////////////////////////////////////////////////////////////////
 				// create
 
-				EVO_NODISCARD auto createBasicBlock(llvm::Function* func, evo::CStrProxy name = '\0') noexcept -> llvm::BasicBlock*;
+				auto createBasicBlock(llvm::Function* func, evo::CStrProxy name = '\0') noexcept -> llvm::BasicBlock*;
 
 				EVO_NODISCARD auto createAlloca(llvm::Type* type, llvm::Value* array_length, evo::CStrProxy name = '\0') noexcept -> llvm::AllocaInst*;
 				EVO_NODISCARD auto createAlloca(llvm::Type* type, evo::CStrProxy name = '\0') noexcept -> llvm::AllocaInst*;
@@ -52,6 +52,8 @@ namespace panther{
 				// set
 
 				auto setInsertionPoint(llvm::BasicBlock* block) noexcept -> void;
+				auto setInsertionPointAtBack(llvm::Function* func) noexcept -> void;
+
 
 
 				//////////////////////////////////////////////////////////////////////

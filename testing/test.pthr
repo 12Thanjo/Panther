@@ -3,9 +3,17 @@
 
 
 func main = () #entry -> Int {
-	var foo: Int = addr @breakpoint;
+	test();
 
-
-	
-	return 0;
+	return inference_global;
 }
+
+var inference_global = 12;
+
+func test = () -> Void {
+	global = 15;
+}
+
+var global: Int = 12;
+
+

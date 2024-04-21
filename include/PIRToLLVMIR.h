@@ -77,6 +77,13 @@ namespace panther{
 
 
 					for(PIR::Func& func : source.pir.funcs){
+						this->lower_func_declaration(source, func);
+					}
+				}
+
+
+				for(Source& source : sources){
+					for(PIR::Func& func : source.pir.funcs){
 						this->lower_func(source, func);
 					}
 				}
@@ -191,7 +198,7 @@ namespace panther{
 
 
 
-			inline auto lower_func(Source& source, PIR::Func& func) noexcept -> void {
+			inline auto lower_func_declaration(Source& source, PIR::Func& func) noexcept -> void {
 				const SourceManager& source_manager = source.getSourceManager();
 
 				this->current_func = &func;
@@ -235,8 +242,7 @@ namespace panther{
 
 
 				if(func.params.empty()){
-					llvm::BasicBlock* begin = this->builder->createBasicBlock(llvm_func, "begin");
-					this->builder->setInsertionPoint(begin);
+					this->builder->createBasicBlock(llvm_func, "begin");
 					
 				}else{
 					llvmint::setupFuncParams(llvm_func, param_infos);
@@ -256,14 +262,18 @@ namespace panther{
 
 					this->builder->createBranch(begin);
 
-					this->builder->setInsertionPoint(begin);
 				}
+			};
 
+
+			inline auto lower_func(Source& source, PIR::Func& func) noexcept -> void {
+				this->current_func = &func;
+
+				this->builder->setInsertionPointAtBack(func.llvm_func);
 
 				for(const PIR::Stmt& stmt : func.stmts){
 					this->lower_stmt(source, stmt);
 				}
-
 
 
 				if(func.return_type.isVoid()){
@@ -283,6 +293,7 @@ namespace panther{
 
 				this->current_func = nullptr;
 			};
+
 
 
 

@@ -66,7 +66,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_var_decl() noexcept -> Result {
 		const Token& first_token = this->get(this->peek());
 
@@ -89,12 +89,16 @@ namespace panther{
 		const Result ident = this->parse_ident();
 		if(this->check_result_fail(ident, "identifier in variable declaration")){ return Result::Error; }
 
-		// :
-		if(this->expect_token(Token::get(":"), "in variable declaration") == false){ return Result::Error; }
-
 		// type
-		const Result type = this->parse_type();
-		if(this->check_result_fail(type, "type in variable declaration")){ return Result::Error; }
+		auto type = std::optional<AST::Node::ID>();
+		if(this->get(this->peek()).kind == Token::get(":")){
+			this->skip(1);
+
+			const Result type_result = this->parse_type();
+			if(this->check_result_fail(type_result, "type in variable declaration after \":\"")){ return Result::Error; }
+
+			type = type_result.value();
+		}
 
 		// =
 		if(this->expect_token(Token::get("="), "in variable declaration") == false){ return Result::Error; }
@@ -109,12 +113,12 @@ namespace panther{
 
 		return this->create_node(
 			this->source.var_decls, AST::Kind::VarDecl,
-			is_def, ident.value(), type.value(), expr.value()
+			is_def, ident.value(), type, expr.value()
 		);
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_func() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::KeywordFunc){
 			return Result::WrongType;
@@ -161,6 +165,7 @@ namespace panther{
 	};
 
 
+	// TODO: add checking for EOF
 	auto Parser::parse_func_params() noexcept -> Result {
 		// (
 		if(this->get(this->peek()).kind != Token::get("(")){ return Result::WrongType; }
@@ -241,7 +246,7 @@ namespace panther{
 
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_conditional() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::KeywordIf){
 			return Result::WrongType;
@@ -293,7 +298,7 @@ namespace panther{
 
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_return() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::KeywordReturn){
 			return Result::WrongType;
@@ -326,7 +331,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_assignment() noexcept -> Result {
 		const Token::ID start = this->peek();
 
@@ -380,13 +385,13 @@ namespace panther{
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_type() noexcept -> Result {
 		switch(this->get(this->peek()).kind){
 			case Token::TypeVoid:
 			case Token::TypeInt:
 			case Token::TypeBool:
-			case Token::Ident: 
+			// case Token::Ident: 
 				break;
 
 			default:
@@ -418,7 +423,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_block() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::get("{")){
 			return Result::WrongType;
@@ -461,7 +466,7 @@ namespace panther{
 		return this->create_token_node(AST::Kind::Uninit, this->next());	
 	};
 
-
+	
 	auto Parser::parse_expr() noexcept -> Result {
 		Result result = this->parse_uninit();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
@@ -471,7 +476,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_infix_expr() noexcept -> Result {
 		const Result lhs_result = this->parse_prefix_expr();
 		if(lhs_result.code() == Result::WrongType || lhs_result.code() == Result::Error){ return lhs_result; }
@@ -613,7 +618,7 @@ namespace panther{
 	};
 
 
-
+	// TODO: add checking for EOF
 	auto Parser::parse_paren_expr() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::get("(")){
 			return this->parse_term();
@@ -645,9 +650,6 @@ namespace panther{
 	auto Parser::parse_term() noexcept -> Result {
 		Result result = this->parse_literal();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
-
-		// result = this->parse_type();
-		// if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
 		result = this->parse_ident();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }

@@ -323,11 +323,16 @@ namespace panther{
 
 			this->indenter_set_arrow();
 			this->indenter_print();
-			this->info("Type:\n");
-			this->indenter_push();
-				this->indenter_set_end();
-				this->print_type(source, source.getNode(var_decl.type));
-			this->indenter_pop();
+			if(var_decl.type.has_value()){
+				this->info("Type:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_type(source, source.getNode(*var_decl.type));
+				this->indenter_pop();
+			}else{
+				this->info("Type: ");
+				this->debug("[INFERENCE]\n");
+			}
 
 			this->indenter_set_end();
 			this->indenter_print();
@@ -361,7 +366,7 @@ namespace panther{
 				this->indenter_print();
 				if(func.attributes.empty()){
 					this->info("Attributes: ");
-					this->debug("[None]\n");
+					this->debug("[NONE]\n");
 				}else{
 					this->info("Attributes:\n");
 
@@ -410,7 +415,7 @@ namespace panther{
 			this->indenter_print();
 			if(func_params.params.empty()){
 				this->info("Params: ");
-				this->debug("[None]\n");
+				this->debug("[NONE]\n");
 			}else{
 				this->info("Params:\n");
 				this->indenter_push();
@@ -655,7 +660,7 @@ namespace panther{
 						this->indenter_print();
 						if(func_call.args.empty()){
 							this->info("Arguments: ");
-							this->debug("[None]\n");
+							this->debug("[NONE]\n");
 
 						}else{
 							this->info("Arguments:\n");

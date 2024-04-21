@@ -112,6 +112,10 @@ namespace panther{
 			this->builder->SetInsertPoint(block);
 		};
 
+		auto IRBuilder::setInsertionPointAtBack(llvm::Function* function) noexcept -> void {
+			this->setInsertionPoint(&function->back());
+		};
+
 
 		//////////////////////////////////////////////////////////////////////
 		// values

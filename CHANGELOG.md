@@ -1,5 +1,11 @@
 # Changelog
 
+### v0.21.4
+- Removed being able to set global variables to be value of another variable
+	- this is only temporary
+- Added order-independant declaration (in global scope)
+- Added variable type inference
+
 ### v0.21.3
 - `read` parameters are no longer marked as `readonly` in LLVM IR automatically
 	- The intention is to add this back in some optimization pass

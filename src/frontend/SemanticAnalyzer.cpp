@@ -8,13 +8,36 @@ namespace panther{
 	auto SemanticAnalyzer::semantic_analysis() noexcept -> bool {
 		this->enter_scope(nullptr);
 
+		// order-independant declaration
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			if(this->analyze_stmt(node) == false){
+			switch(node.kind){
+				case AST::Kind::VarDecl: {
+					if(this->analyze_var(this->source.getVarDecl(node)) == false){ return false; }
+				} break;
+			};
+		}		
+
+
+		for(AST::Node::ID global_stmt : this->source.global_stmts){
+			const AST::Node& node = this->source.getNode(global_stmt);
+
+			if(node.kind != AST::Kind::VarDecl){
+				if(this->analyze_stmt(node) == false){
+					return false;
+				}
+			}
+		}
+
+
+		for(const GlobalFunc& global_func : this->global_funcs){
+			PIR::Func& pir_func = this->source.pir.funcs[global_func.pir_id.id];
+			if(this->analyze_func_block(pir_func, global_func.ast) == false){
 				return false;
 			}
 		}
+
 
 		this->leave_scope();
 
@@ -80,46 +103,63 @@ namespace panther{
 		const ExprValueType expr_value_type = this->get_expr_value_type(var_decl.expr);
 		if(expr_value_type != ExprValueType::Ephemeral){
 			// TODO: better messaging
-			this->source.error("Variables must be assigned with a ephemeral value", var_decl.expr);
+			this->source.error("Variables must be assigned with an ephemeral value", var_decl.expr);
 			return false;
 		}
+		const AST::Node& expr_node = this->source.getNode(var_decl.expr);
 
 
 		SourceManager& src_manager = this->source.getSourceManager();
 
-		const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(var_decl.type);
-		if(var_type_id.isError()){ return false; }
 
-		if(var_type_id.value().isVoid()){
-			this->source.error("Variable cannot be of type Void", var_decl.type);
-			return false;
-		}
+		auto var_type_id = std::optional<PIR::Type::ID>();
+		if(var_decl.type.has_value()){
+			const evo::Result<PIR::Type::VoidableID> var_type_id_result = this->get_type_id(*var_decl.type);
+			if(var_type_id_result.isError()){ return false; }
+
+			if(var_type_id_result.value().isVoid()){
+				this->source.error("Variable cannot be of type Void", *var_decl.type);
+				return false;
+			}
+
+			var_type_id = var_type_id_result.value().typeID();
 
 
-		
-		const AST::Node& expr_node = this->source.getNode(var_decl.expr);
-		if(expr_node.kind != AST::Kind::Uninit){
+			if(expr_node.kind != AST::Kind::Uninit){
+				const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
+				if(expr_type_id.isError()){ return false; }
+
+				if(*var_type_id != expr_type_id.value()){
+					const PIR::Type& var_type = src_manager.getType(*var_type_id);
+					const PIR::Type& expr_type = src_manager.getType(expr_type_id.value());
+
+					if(expr_type.isImplicitlyConvertableTo(var_type) == false){
+						this->source.error(
+							"Variable cannot be assigned a value of a different type, and cannot be implicitly converted", 
+							var_decl.expr,
+
+							std::vector<Message::Info>{
+								{std::string("Variable is of type:   ") + src_manager.printType(*var_type_id)},
+								{std::string("Expression is of type: ") + src_manager.printType(expr_type_id.value())}
+							}
+						);
+						return false;
+					}
+
+				}
+			}
+
+		}else{
+			// type inference
+			if(expr_node.kind == AST::Kind::Uninit){
+				this->source.error("The type of [uninit] cannot be inferenced", expr_node);
+				return false;
+			}
+
 			const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
 			if(expr_type_id.isError()){ return false; }
 
-			if(var_type_id.value().typeID() != expr_type_id.value()){
-				const PIR::Type& var_type = src_manager.getType(var_type_id.value().typeID());
-				const PIR::Type& expr_type = src_manager.getType(expr_type_id.value());
-
-				if(expr_type.isImplicitlyConvertableTo(var_type) == false){
-					this->source.error(
-						"Variable cannot be assigned a value of a different type, and cannot be implicitly converted", 
-						var_decl.expr,
-
-						std::vector<Message::Info>{
-							{std::string("Variable is of type:   ") + src_manager.printType(var_type_id.value().typeID())},
-							{std::string("Expression is of type: ") + src_manager.printType(expr_type_id.value())}
-						}
-					);
-					return false;
-				}
-
-			}
+			var_type_id = expr_type_id.value();
 		}
 
 
@@ -162,7 +202,7 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, var_type_id.value().typeID(), var_value.value(), var_decl.is_def);
+		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, *var_type_id, var_value.value(), var_decl.is_def);
 
 		this->add_var_to_scope(ident.value.string, var_id);
 
@@ -318,11 +358,15 @@ namespace panther{
 		///////////////////////////////////
 		// analyze block
 
+		if(this->is_global_scope() == false){
+			PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
+			if(this->analyze_func_block(pir_func, func) == false){
+				return false;
+			};
 
-		PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
-		if(this->analyze_func_block(pir_func, func) == false){
-			return false;
-		};
+		}else{
+			this->global_funcs.emplace_back(func_id, func);
+		}
 
 
 		///////////////////////////////////
@@ -911,6 +955,11 @@ namespace panther{
 
 
 			case AST::Kind::Ident: {
+				if(this->is_global_scope()){
+					this->source.error("At this time, constant values cannot be the value of a variable", node);
+					return evo::ResultError;
+				}
+
 				const Token& ident = this->source.getIdent(node);
 				std::string_view ident_str = ident.value.string;
 
@@ -1220,10 +1269,10 @@ namespace panther{
 		const evo::Result<PIR::Expr> recursive_value = this->get_const_expr_value_recursive(node_id);
 		if(recursive_value.isError()){ return evo::ResultError; }
 
-		if(recursive_value.value().kind == PIR::Expr::Kind::Var){
-			const PIR::Var& value_var = this->source.getVar(recursive_value.value().var);
-			return value_var.value;
-		}
+		// if(recursive_value.value().kind == PIR::Expr::Kind::Var){
+		// 	const PIR::Var& value_var = this->source.getVar(recursive_value.value().var);
+		// 	return value_var.value;
+		// }
 
 		return recursive_value;
 	};
@@ -1235,21 +1284,25 @@ namespace panther{
 
 		switch(node.kind){
 			case AST::Kind::Ident: {
-				const Token& value_ident = this->source.getIdent(node);
-				std::string_view value_ident_str = value_ident.value.string;
+				// const Token& value_ident = this->source.getIdent(node);
+				// std::string_view value_ident_str = value_ident.value.string;
 
-				// find the var
-				for(const Scope& scope : this->scopes){
-					if(scope.vars.contains(value_ident_str)){
-						return PIR::Expr(scope.vars.at(value_ident_str));
-					}
+				// // find the var
+				// for(const Scope& scope : this->scopes){
+				// 	if(scope.vars.contains(value_ident_str)){
+				// 		return PIR::Expr(scope.vars.at(value_ident_str));
+				// 	}
 
-					if(scope.params.contains(value_ident_str)){
-						return PIR::Expr(scope.params.at(value_ident_str));
-					}
-				}
+				// 	if(scope.params.contains(value_ident_str)){
+				// 		return PIR::Expr(scope.params.at(value_ident_str));
+				// 	}
+				// }
 
-				EVO_FATAL_BREAK("Unkown ident");
+				// EVO_FATAL_BREAK("Unkown ident");
+
+				this->source.error("At this time, constant values cannot be the value of a variable", node);
+				return evo::ResultError;
+
 			} break;
 
 			case AST::Kind::FuncCall: {
