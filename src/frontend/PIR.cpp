@@ -11,7 +11,7 @@ namespace panther{
 		};
 
 		auto BaseType::Operator::operator==(const Operator& rhs) const noexcept -> bool {
-			return this->params == rhs.params && this->return_type == rhs.return_type;
+			return this->params == rhs.params && this->returnType == rhs.returnType;
 		};
 
 		
@@ -31,7 +31,7 @@ namespace panther{
 				if(this->builtin.kind != rhs.builtin.kind){ return false; }
 
 			}else if(this->kind == BaseType::Kind::Function){
-				if(this->call_operator != rhs.call_operator){ return false; }
+				if(this->callOperator != rhs.callOperator){ return false; }
 				
 			}
 
@@ -43,7 +43,7 @@ namespace panther{
 
 
 		auto Type::operator==(const Type& rhs) const noexcept -> bool {
-			if(this->base_type.id != rhs.base_type.id){ return false; }
+			if(this->baseType.id != rhs.baseType.id){ return false; }
 
 			if(this->qualifiers.size() != rhs.qualifiers.size()){ return false; }
 
@@ -51,8 +51,8 @@ namespace panther{
 				const AST::Type::Qualifier& this_qualifiers = this->qualifiers[i];
 				const AST::Type::Qualifier& rhs_qualifiers = rhs.qualifiers[i];
 
-				if(this_qualifiers.is_ptr != rhs_qualifiers.is_ptr){ return false; }
-				if(this_qualifiers.is_const != rhs_qualifiers.is_const){ return false; }
+				if(this_qualifiers.isPtr != rhs_qualifiers.isPtr){ return false; }
+				if(this_qualifiers.isConst != rhs_qualifiers.isConst){ return false; }
 			}
 
 			return true;
@@ -60,7 +60,7 @@ namespace panther{
 
 
 		auto Type::isImplicitlyConvertableTo(const Type& rhs) const noexcept -> bool {
-			if(this->base_type.id != rhs.base_type.id){ return false; }
+			if(this->baseType.id != rhs.baseType.id){ return false; }
 
 			if(this->qualifiers.size() != rhs.qualifiers.size()){ return false; }
 
@@ -68,8 +68,8 @@ namespace panther{
 				const AST::Type::Qualifier& this_qualifiers = this->qualifiers[i];
 				const AST::Type::Qualifier& rhs_qualifiers = rhs.qualifiers[i];
 
-				if(this_qualifiers.is_ptr != rhs_qualifiers.is_ptr){ return false; }
-				if(this_qualifiers.is_const && rhs_qualifiers.is_const == false){ return false; }
+				if(this_qualifiers.isPtr != rhs_qualifiers.isPtr){ return false; }
+				if(this_qualifiers.isConst && rhs_qualifiers.isConst == false){ return false; }
 			}
 
 			return true;

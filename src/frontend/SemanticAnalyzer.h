@@ -19,6 +19,7 @@ namespace panther{
 			~SemanticAnalyzer() = default;
 
 
+			EVO_NODISCARD auto semantic_analysis_declarations() noexcept -> bool;
 			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
 
 
@@ -57,6 +58,7 @@ namespace panther{
 			enum class ExprValueType{
 				Concrete,
 				Ephemeral,
+				Import,
 			};
 			EVO_NODISCARD auto get_expr_value_type(AST::Node::ID node_id) const noexcept -> ExprValueType;
 
@@ -72,12 +74,18 @@ namespace panther{
 			///////////////////////////////////
 			// scope
 
+			struct Import{
+				Source::ID source_id;
+				AST::Node::ID ident;
+			};
+
 			auto enter_scope(PIR::StmtBlock* stmts_entry) noexcept -> void;
 			auto leave_scope() noexcept -> void;
 
 			auto add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void;
 			auto add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void;
 			auto add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void;
+			auto add_import_to_scope(std::string_view str, Import import) noexcept -> void;
 
 			auto set_scope_terminated() noexcept -> void;
 			EVO_NODISCARD auto scope_is_terminated() const noexcept -> bool;
@@ -119,13 +127,14 @@ namespace panther{
 		private:
 			Source& source;
 
-
 			struct Scope{
 				PIR::StmtBlock* stmts_entry;
 
 				std::unordered_map<std::string_view, PIR::Var::ID> vars{};
 				std::unordered_map<std::string_view, PIR::Func::ID> funcs{};
 				std::unordered_map<std::string_view, PIR::Param::ID> params{};
+				std::unordered_map<std::string_view, Import> imports{};
+
 
 				// all control paths return or are unreachable
 				bool is_terminated = false;

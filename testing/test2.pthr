@@ -1,5 +1,24 @@
+def test = @import("test.pthr");
+
+def test3 #pub = @import("test3.pthr");
 
 
-func test = () -> Void {
-	
+
+func print_hello_world = () #pub -> Void {
+	@__printHelloWorld();
 }
+
+func get_val = (num: Int write, should_change: Bool) #pub -> Int {
+	var output: Int = uninit;
+
+	if(should_change){
+		num = test.get_val();
+		output = 1;
+	}else{
+		output = 0;
+	}
+
+	return output;
+}
+
+

@@ -3,8 +3,9 @@
 
 #include <Evo.h>
 
-#include "Token.h"
+#include "frontend/Token.h"
 #include "frontend/AST.h"
+#include "frontend/SourceID.h"
 
 #include "LLVM_interface/llvm_protos.h"
 
@@ -64,6 +65,7 @@ namespace panther{
 				};
 
 				enum class Kind{
+					Import,
 					Builtin,
 					Function,
 				};
@@ -78,7 +80,7 @@ namespace panther{
 					};
 
 					std::vector<Param> params;
-					PIR::TypeVoidableID return_type; // nullopt means Void
+					PIR::TypeVoidableID returnType; // nullopt means Void
 
 					EVO_NODISCARD auto operator==(const Operator& rhs) const noexcept -> bool;
 				};
@@ -92,10 +94,9 @@ namespace panther{
 					this->builtin.kind = builtin_kind;
 				}
 
-
-				// function
+				// function / import
 				explicit BaseType(Kind _kind) : kind(_kind){
-					evo::debugAssert(_kind == Kind::Function, "This constructor must be only used for function kind");
+					evo::debugAssert(_kind == Kind::Function || _kind == Kind::Import, "This constructor must be only used for function or import kind");
 				}
 
 				~BaseType() = default;
@@ -111,10 +112,13 @@ namespace panther{
 
 
 				union {
+					struct /* import */ {
+											
+					} import;
+
 					struct /* builtin */ {
 						Token::Kind kind;
 					} builtin;
-
 
 					struct /* function */ {
 											
@@ -122,7 +126,7 @@ namespace panther{
 				};
 
 
-				std::optional<Operator> call_operator{};
+				std::optional<Operator> callOperator{};
 
 			private:
 				
@@ -135,7 +139,7 @@ namespace panther{
 			using VoidableID = TypeVoidableID;
 
 
-			BaseType::ID base_type;
+			BaseType::ID baseType;
 
 			std::vector<AST::Type::Qualifier> qualifiers;
 
@@ -151,8 +155,9 @@ namespace panther{
 		// statements / expressions
 
 		struct VarID{ // typesafe identifier
+			Source& source;
 			uint32_t id;
-			explicit VarID(uint32_t _id) noexcept : id(_id) {};
+			explicit VarID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
 		};
 
 		struct ParamID{ // typesafe identifier
@@ -161,8 +166,9 @@ namespace panther{
 		};
 
 		struct FuncID{ // typesafe identifier
+			Source& source;
 			uint32_t id;
-			explicit FuncID(uint32_t _id) noexcept : id(_id) {};
+			FuncID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
 		};
 
 		struct IntrinsicID{ // typesafe identifier
@@ -181,9 +187,9 @@ namespace panther{
 			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
 		};
 
-		struct FuncCallID{ // typesafe identifier
+		struct FuncCallID{
 			uint32_t id;
-			explicit FuncCallID(uint32_t _id) noexcept : id(_id) {};
+			explicit FuncCallID(uint32_t _id) noexcept : id(_id){};
 		};
 
 
@@ -200,23 +206,26 @@ namespace panther{
 				FuncCall,
 				Prefix,
 				Deref,
+				Import,
 			} kind;
 
 			union {
 				VarID var;
 				ParamID param;
-				AST::Node::ID ast_node;
-				FuncCallID func_call;
+				AST::Node::ID astNode;
+				FuncCallID funcCall;
 				PrefixID prefix;
 				DerefID deref;
+				SourceID import;
 			};
 
 			explicit Expr(VarID id) : kind(Kind::Var), var(id) {};
 			explicit Expr(ParamID id) : kind(Kind::Param), param(id) {};
-			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), ast_node(node) {};
-			explicit Expr(FuncCallID func_call_id) : kind(Kind::FuncCall), func_call(func_call_id) {};
+			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), astNode(node) {};
+			explicit Expr(FuncCallID func_call_id) : kind(Kind::FuncCall), funcCall(func_call_id) {};
 			explicit Expr(PrefixID prefix_id) : kind(Kind::Prefix), prefix(prefix_id) {};
 			explicit Expr(DerefID deref_id) : kind(Kind::Deref), deref(deref_id) {};
+			explicit Expr(SourceID src_id) : kind(Kind::Import), import(src_id) {};
 		};
 
 
@@ -266,7 +275,7 @@ namespace panther{
 			Token::ID ident;
 			Type::ID type;
 			Expr value;
-			bool is_def;
+			bool isDef;
 
 			union {
 				llvm::GlobalVariable* global = nullptr;
@@ -336,14 +345,14 @@ namespace panther{
 				Var::ID var;
 				Return::ID ret;
 				Assignment::ID assignment;
-				FuncCall::ID func_call;
+				FuncCall::ID funcCall;
 				ConditionalID conditional;
 			};
 
 			explicit Stmt(Var::ID id) : kind(Kind::Var), var(id) {};
 			explicit Stmt(Return::ID id) : kind(Kind::Return), ret(id) {};
 			explicit Stmt(Assignment::ID id) : kind(Kind::Assignment), assignment(id) {};
-			explicit Stmt(FuncCall::ID id) : kind(Kind::FuncCall), func_call(id) {};
+			explicit Stmt(FuncCall::ID id) : kind(Kind::FuncCall), funcCall(id) {};
 			explicit Stmt(ConditionalID id) : kind(Kind::Conditional), conditional(id) {};
 
 			EVO_NODISCARD static inline auto getUnreachable() noexcept -> Stmt { return Stmt(Kind::Unreachable); };
@@ -360,7 +369,7 @@ namespace panther{
 				StmtBlock() noexcept : stmts() {};
 				~StmtBlock() = default;
 
-				// StmtBlock(const StmtBlock& rhs) noexcept : stmts(rhs.stmts) {};
+				StmtBlock(const StmtBlock& rhs) noexcept : stmts(rhs.stmts) {};
 				StmtBlock(StmtBlock&& rhs) noexcept : stmts(std::move(rhs.stmts)), is_terminated(rhs.is_terminated) {
 					rhs.is_terminated = false;
 				};
@@ -400,9 +409,9 @@ namespace panther{
 		struct Conditional{
 			using ID = ConditionalID;
 
-			Expr if_cond;
-			StmtBlock then_stmts;
-			StmtBlock else_stmts;
+			Expr ifCond;
+			StmtBlock thenStmts;
+			StmtBlock elseStmts;
 		};
 
 
@@ -413,16 +422,16 @@ namespace panther{
 
 			Token::ID ident;
 
-			BaseType::ID base_type;
+			BaseType::ID baseType;
 			std::vector<Param::ID> params;
-			Type::VoidableID return_type; // nullopt means Void
+			Type::VoidableID returnType; // nullopt means Void
 
-			bool is_export;
+			bool isExport;
 			
 
-			llvm::Function* llvm_func = nullptr;
+			llvm::Function* llvmFunc = nullptr;
 			StmtBlock stmts{};
-			bool terminates_in_base_scope = false;
+			bool terminatesInBaseScope = false;
 		};
 
 
@@ -432,15 +441,16 @@ namespace panther{
 			using ID = IntrinsicID;
 
 			enum class Kind{
+				import,
+				breakpoint,
 				__printHelloWorld,
 				__printInt,
-				breakpoint,
 			} kind;
 
 
 			std::string_view ident;
 
-			BaseType::ID base_type;
+			BaseType::ID baseType;
 		};
 
 

@@ -89,6 +89,13 @@ namespace panther{
 		const Result ident = this->parse_ident();
 		if(this->check_result_fail(ident, "identifier in variable declaration")){ return Result::Error; }
 
+		// attributes
+		auto attributes = std::vector<Token::ID>();
+		while(this->get(this->peek()).kind == Token::Attribute){
+			attributes.emplace_back(this->next());
+		};
+
+
 		// type
 		auto type = std::optional<AST::Node::ID>();
 		if(this->get(this->peek()).kind == Token::get(":")){
@@ -113,7 +120,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.var_decls, AST::Kind::VarDecl,
-			is_def, ident.value(), type, expr.value()
+			is_def, ident.value(), std::move(attributes), type, expr.value()
 		);
 	};
 
@@ -391,6 +398,7 @@ namespace panther{
 			case Token::TypeVoid:
 			case Token::TypeInt:
 			case Token::TypeBool:
+			case Token::TypeString:
 			// case Token::Ident: 
 				break;
 
@@ -563,21 +571,33 @@ namespace panther{
 	};
 
 
-
+	// TODO: check for EOF
 	auto Parser::parse_accessor_expr() noexcept -> Result {
 		Result output = this->parse_paren_expr();
 		if(output.code() == Result::WrongType || output.code() == Result::Error){ return output; }
 
 
 		while(true){
-			if(this->get(this->peek()).kind == Token::get(".^")){
+			const Token::Kind peeked_kind = this->get(this->peek()).kind;
+
+			if(peeked_kind == Token::get(".")){
+				const Token::ID accessor_op_token = this->next();
+
+				const Result rhs_result = this->parse_ident();
+				if(this->check_result_fail(rhs_result, "identifier on right-hand side of accessor operator (\".\")")){ return Result::Error; }
+
+				output = this->create_node(this->source.infixes, AST::Kind::Infix,
+					output.value(), accessor_op_token, rhs_result.value()
+				);
+				
+			}else if(peeked_kind == Token::get(".^")){
 				const Token::ID op_token = this->next();
 
 				output = this->create_node(this->source.postfixes, AST::Kind::Postfix,
 					output.value(), op_token
 				);
 
-			}else if(this->get(this->peek()).kind == Token::get("(")){
+			}else if(peeked_kind == Token::get("(")){
 				this->skip(1);
 
 				auto arguments = std::vector<AST::Node::ID>();
@@ -670,6 +690,7 @@ namespace panther{
 			case Token::LiteralBool:
 			case Token::LiteralInt:
 			case Token::LiteralFloat:
+			case Token::LiteralString:
 				break;
 
 			default:

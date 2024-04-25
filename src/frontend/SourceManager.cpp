@@ -5,12 +5,12 @@
 namespace panther{
 
 
-	auto SourceManager::addSource(const std::string& location, std::string&& data) noexcept -> Source::ID {
+	auto SourceManager::addSource(std::filesystem::path&& location, std::string&& data) noexcept -> Source::ID {
 		evo::debugAssert(this->isLocked() == false, "Can only add sources to SourceManager when it is locked");
 
 		const auto src_id = Source::ID( uint32_t(this->sources.size()) );
 
-		this->sources.emplace_back(location, std::move(data), *this, src_id);
+		this->sources.emplace_back(std::move(location), std::move(data), *this, src_id);
 
 		return src_id;
 	};
@@ -43,6 +43,56 @@ namespace panther{
 		evo::debugAssert(this->isLocked(), "Can only get sources when locked");
 
 		return this->sources[id.id];
+	};
+
+
+	auto SourceManager::getSourceID(const std::filesystem::path& file_location, std::string_view src_path) const noexcept
+		-> evo::Expected<Source::ID, GetSourceIDError>
+	{
+		// check is valid path
+		if(src_path.empty()){ return evo::Unexpected(GetSourceIDError::EmptyPath); }
+
+		std::filesystem::path relative_dir = file_location;
+		relative_dir.remove_filename();
+
+		// generate path
+		const std::filesystem::path lookup_path = [&]() noexcept {
+			if(src_path.starts_with("./")){
+				return relative_dir / std::filesystem::path(src_path.substr(2));
+
+			}else if(src_path.starts_with(".\\")){
+				return relative_dir / std::filesystem::path(src_path.substr(3));
+
+			// }else if(src_path.starts_with("/") || src_path.starts_with("\\")){
+			// 	return relative_dir / std::filesystem::path(src_path.substr(1));
+
+			}else if(src_path.starts_with("../") || src_path.starts_with("..\\")){
+				return relative_dir / std::filesystem::path(src_path);
+
+			}else{
+				return this->config.basePath / std::filesystem::path(src_path);
+			}
+		}().lexically_normal();
+
+		if(file_location == lookup_path){
+			return evo::Unexpected(GetSourceIDError::SameAsCaller);
+		}
+
+		// look for path
+		for(size_t i = 0; i < this->sources.size(); i+=1){
+			const Source& source = this->sources[i];
+
+			if(source.getLocation() == lookup_path){
+				return Source::ID(uint32_t(i));
+			}
+		}
+
+
+		if(evo::fs::exists(lookup_path.string())){
+			return evo::Unexpected(GetSourceIDError::NotOneOfSources);			
+		}
+
+		return evo::Unexpected(GetSourceIDError::DoesntExist);
 	};
 
 
@@ -98,13 +148,21 @@ namespace panther{
 	auto SourceManager::initBuiltinTypes() noexcept -> void {
 		evo::debugAssert(this->isLocked(), "Can only initialize builtin types when locked");
 
-		// Int (0)
-		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeInt);
+		// Import (0)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Import);
 		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(0)) );
 
-		// Bool (1)
-		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
+		// Int (1)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeInt);
 		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(1)) );
+
+		// Bool (2)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
+		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(2)) );
+
+		// String (3)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeString);
+		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(3)) );
 	};
 
 
@@ -112,9 +170,30 @@ namespace panther{
 	auto SourceManager::initIntrinsics() noexcept -> void {
 		evo::debugAssert(this->isLocked(), "Can only initialize intrinsics when locked");
 		
+
+		{ // import()
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeString(), AST::FuncParams::Param::Kind::Read} },
+				this->getTypeImport()
+			);
+
+			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::import, "import", base_type_id);
+		}
+
+		{ // breakpoint()
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
+
+			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::breakpoint, "breakpoint", base_type_id);
+		}
+
+
 		{ // __printHelloWorld()
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.call_operator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
+			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
 
 			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printHelloWorld, "__printHelloWorld", base_type_id);
@@ -123,22 +202,13 @@ namespace panther{
 
 		{ // __printInt()
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.call_operator = PIR::BaseType::Operator(
+			base_type.callOperator = PIR::BaseType::Operator(
 				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), AST::FuncParams::Param::Kind::Read} },
 				PIR::Type::VoidableID::Void()
 			);
 
 			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printInt, "__printInt", base_type_id);
-		}
-
-
-		{ // breakpoint()
-			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.call_operator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
-
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
-			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::breakpoint, "breakpoint", base_type_id);
 		}
 
 	};
@@ -153,11 +223,18 @@ namespace panther{
 		evo::uint total_fails = 0;
 
 		for(Source& source : this->sources){
-			if(source.semantic_analysis() == false){
+			if(source.semantic_analysis_declarations() == false){
 				total_fails += 1;
 			}
 		}
 
+		if(total_fails != 0){ return total_fails; }
+
+		for(Source& source : this->sources){
+			if(source.semantic_analysis() == false){
+				total_fails += 1;
+			}
+		}
 
 		return total_fails;
 	};
@@ -238,11 +315,15 @@ namespace panther{
 
 	auto SourceManager::printType(PIR::Type::ID id) const noexcept -> std::string {
 		const PIR::Type& type = this->getType(id);
-		const PIR::BaseType& base_type = this->base_types[type.base_type.id];
+		const PIR::BaseType& base_type = this->base_types[type.baseType.id];
 
 
 		std::string base_type_str = [&]() noexcept {
 			switch(base_type.kind){
+				case PIR::BaseType::Kind::Import: {
+					return std::string("[[IMPORT]]");
+				} break;
+
 				case PIR::BaseType::Kind::Builtin: {
 					return std::string( Token::printKind(base_type.builtin.kind) );
 				} break;
@@ -252,7 +333,7 @@ namespace panther{
 					return std::string("[[FUNCTION]]");
 				} break;
 
-				default: EVO_FATAL_BREAK("Unknown base-type kind - SourceManager::printType()");
+				default: EVO_FATAL_BREAK("Unknown base-type kind");
 			};
 		}();
 		
@@ -268,8 +349,8 @@ namespace panther{
 				}
 			}
 
-			if(qualifier.is_ptr){ base_type_str += '^'; }
-			if(qualifier.is_const){ base_type_str += '|'; }
+			if(qualifier.isPtr){ base_type_str += '^'; }
+			if(qualifier.isConst){ base_type_str += '|'; }
 		}
 
 
@@ -283,7 +364,7 @@ namespace panther{
 		evo::debugAssert(this->isLocked(), "Can only do add entry when locked");
 		evo::debugAssert(this->hasEntry() == false, "Already has an entry function");
 
-		this->entry = Entry(src_id, func_id);
+		this->entry.emplace(src_id, func_id);
 	};
 
 

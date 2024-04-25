@@ -79,7 +79,7 @@ namespace panther{
 			};
 
 			if(msg.source != nullptr){
-				this->trace( std::format("\t{}:{}:{}\n", msg.source->getLocation(), msg.location.line_start, msg.location.collumn_start) );
+				this->trace( std::format("\t{}:{}:{}\n", msg.source->getLocation().string(), msg.location.line_start, msg.location.collumn_start) );
 				this->print_location(*msg.source, msg.location, msg.type);
 			}else{
 				this->trace("\t[BUILTIN]\n");
@@ -104,7 +104,7 @@ namespace panther{
 
 
 		auto Printer::print_tokens(const Source& source) const noexcept -> void {
-			this->info( std::format("Tokens: {}\n", source.getLocation()) );
+			this->info( std::format("Tokens: {}\n", source.getLocation().string()) );
 			if(source.tokens.size() == 0){
 				this->trace("(NONE)\n");
 			}else if(source.tokens.size() == 1){
@@ -260,7 +260,7 @@ namespace panther{
 
 
 		auto Printer::print_ast(const Source& source) noexcept -> void {
-			this->info( std::format("AST: {}\n", source.getLocation()) );
+			this->info( std::format("AST: {}\n", source.getLocation().string()) );
 			if(source.global_stmts.size() == 0){
 				this->trace("(NONE)\n");
 			}else if(source.global_stmts.size() == 1){
@@ -291,7 +291,7 @@ namespace panther{
 
 				break; case AST::Kind::FuncCall: this->print_expr(source, node);
 
-				case AST::Kind::Unreachable: {
+				break; case AST::Kind::Unreachable: {
 					this->indenter_print();
 					this->info("[UNREACHABLE]\n");
 				} break;
@@ -314,8 +314,31 @@ namespace panther{
 
 			this->indenter_set_arrow();
 			this->indenter_print();
+			if(var_decl.attributes.empty()){
+				this->info("Attributes: ");
+				this->debug("[NONE]\n");
+			}else{
+				this->info("Attributes:\n");
+
+				this->indenter_push();
+				for(size_t i = 0; i < var_decl.attributes.size(); i+=1){
+					if(i < var_decl.attributes.size() - 1){
+						this->indenter_set_arrow();
+					}else{
+						this->indenter_set_end();
+					}
+
+					this->indenter_print();
+
+					this->debug( std::format("#{}\n", source.getToken(var_decl.attributes[i]).value.string) );
+				}
+				this->indenter_pop();
+			}
+
+			this->indenter_set_arrow();
+			this->indenter_print();
 			this->info("Decl Type: ");
-			if(var_decl.is_def){
+			if(var_decl.isDef){
 				this->debug("def\n");
 			}else{
 				this->debug("var\n");
@@ -385,14 +408,12 @@ namespace panther{
 					this->indenter_pop();
 				}
 
-
-
 				this->indenter_set_arrow();
 				this->indenter_print();
 				this->info("Return Type:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_type(source, source.getNode(func.return_type));
+					this->print_type(source, source.getNode(func.returnType));
 				this->indenter_pop();
 
 
@@ -475,7 +496,7 @@ namespace panther{
 				this->info("If:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_expr(source, source.getNode(conditional.if_expr));
+					this->print_expr(source, source.getNode(conditional.ifExpr));
 				this->indenter_pop();
 
 
@@ -484,18 +505,18 @@ namespace panther{
 				this->info("Then:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_block(source, source.getNode(conditional.then_block));
+					this->print_block(source, source.getNode(conditional.thenBlock));
 				this->indenter_pop();
 
 
 				this->indenter_set_end();
 				this->indenter_print();
-				if(conditional.else_block.has_value()){
+				if(conditional.elseBlock.has_value()){
 					this->info("Else:\n");
 					this->indenter_push();
 						this->indenter_set_end();
 
-						const AST::Node& else_block = source.getNode(*conditional.else_block);
+						const AST::Node& else_block = source.getNode(*conditional.elseBlock);
 						if(else_block.kind == AST::Kind::Block){
 							this->print_block(source, else_block);
 
@@ -584,8 +605,8 @@ namespace panther{
 						print_str += ' ';
 					}
 				}
-				if(qualifier.is_ptr){ print_str += '^'; }
-				if(qualifier.is_const){ print_str += '|'; }
+				if(qualifier.isPtr){ print_str += '^'; }
+				if(qualifier.isConst){ print_str += '|'; }
 			}
 
 			this->debug(print_str);
@@ -711,6 +732,38 @@ namespace panther{
 				} break;
 
 
+				case AST::Kind::Infix: {
+					const AST::Infix& infix = source.getInfix(node);
+
+					this->indenter_print();
+					this->info("Infix Op:\n");
+
+					this->indenter_push();
+
+						this->indenter_print();
+						this->info("Op: ");
+						this->debug( std::format("{}\n", Token::printKind(source.getToken(infix.op).kind)) );
+
+						this->indenter_set_arrow();
+						this->indenter_print();
+						this->info("LHS:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(source, source.getNode(infix.lhs));
+						this->indenter_pop();
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("RHS:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(source, source.getNode(infix.rhs));
+						this->indenter_pop();
+
+					this->indenter_pop();
+				} break;
+
+
 				case AST::Kind::Postfix: {
 					const AST::Postfix& postfix = source.getPostfix(node);
 
@@ -751,6 +804,9 @@ namespace panther{
 				break; case Token::LiteralInt: this->debug(std::to_string(token.value.integer)); this->trace(" [LiteralInt]");
 				break; case Token::LiteralFloat: this->debug(std::to_string(token.value.floating_point)); this->trace(" [LiteralFloat]");
 				break; case Token::LiteralBool: this->debug(evo::boolStr(token.value.boolean)); this->trace(" [LiteralBool]");
+				break; case Token::LiteralString: this->debug(std::format("\"{}\"", token.value.string)); this->trace(" [LiteralString]");
+				break; case Token::LiteralChar: this->debug(std::format("'{}'", token.value.string)); this->trace(" [LiteralChar]");
+				break; default: EVO_FATAL_BREAK("Unknown token kind");
 			};
 
 			this->print('\n');

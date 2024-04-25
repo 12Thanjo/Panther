@@ -1,19 +1,21 @@
+def test2 = @import("test2.pthr").test3;
 
+
+func get_val = () #pub -> Int {
+	return test2.test3.global_num;
+}
 
 
 
 func main = () #entry -> Int {
-	test();
+	test2.print_hello_world();
 
-	return inference_global;
+	test2.test3.global_num = 19;
+
+	var foo: Int = 9;
+	var output: Int = test2.get_val(foo, true);
+
+	@__printInt(foo);
+
+	return output;
 }
-
-var inference_global = 12;
-
-func test = () -> Void {
-	global = 15;
-}
-
-var global: Int = 12;
-
-

@@ -57,7 +57,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		.name		  = "testing",
 		.print_colors = true,
 		.verbose      = true,
-		.target       = Config::Target::PrintLLVMIR,
+		.target       = Config::Target::Run,
 	};
 
 
@@ -152,9 +152,14 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	}
 
 
-	auto source_manager = panther::SourceManager([&](const panther::Message& message){
-		printer.print_message(message);
-	});
+	auto source_manager = panther::SourceManager(
+		panther::SourceManager::Config(
+			config.relative_directory.string()
+		),
+		[&](const panther::Message& message){
+			printer.print_message(message);
+		}
+	);
 
 
 
@@ -162,22 +167,19 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	//////////////////////////////////////////////////////////////////////
 	// get code
 
-
-	auto file_paths = std::vector<std::string>{
-		(config.relative_directory / "test.pthr").make_preferred().string(),
-		// (config.relative_directory / "test2.pthr").make_preferred().string(),
+	auto file_paths = std::vector<std::filesystem::path>{
+		(config.relative_directory / "test.pthr").make_preferred(),
+		(config.relative_directory / "test2.pthr").make_preferred(),
+		(config.relative_directory / "test3.pthr").make_preferred(),
 	};
-
-	auto source_ids = std::vector<panther::Source::ID>();
-
 
 
 	auto file = evo::fs::File{};
-
-	for(const std::string& file_path : file_paths){
-		const bool opened_successfully = file.open(file_path, evo::fs::FileMode::Read);
+	auto source_ids = std::vector<panther::Source::ID>();
+	for(std::filesystem::path& file_path : file_paths){
+		const bool opened_successfully = file.open(file_path.string(), evo::fs::FileMode::Read);
 		if(opened_successfully == false){
-			printer.error(std::format("Failed to open file: {}\n", file_path));
+			printer.error(std::format("Failed to open file: {}\n", file_path.string()));
 			exit();
 			return 1;
 		}
@@ -186,27 +188,30 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 		file.close();
 
-		source_ids.emplace_back(source_manager.addSource(file_path, std::move(file_data)));
+		source_ids.emplace_back(source_manager.addSource(std::move(file_path), std::move(file_data)));
 	}
-
-
-
-	source_manager.lock();
 
 
 
 	//////////////////////////////////////////////////////////////////////
 	// frontend
 
+	source_manager.lock();
+
 	#if defined(PANTHER_BUILD_DEBUG)
 		printer.trace("source manager locked\n");
 	#endif
 
+
 	if(config.verbose){
 		if(source_manager.numSources() > 1){
-			printer.trace( std::format("Compiling {} files\n", source_manager.numSources()) );
+			printer.trace(std::format("Compiling {} files\n", source_manager.numSources()));
 		}else{
-			printer.trace( std::format("Compiling 1 file\n") );
+			printer.trace(std::format("Compiling 1 file\n"));
+		}
+
+		for(const panther::Source& source : source_manager.getSources()){
+			printer.trace(std::format("  - \"{}\"\n", source.getLocation().string()));
 		}
 	}
 	
@@ -316,7 +321,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	if(source_manager.hasEntry()){
-		pir_to_llvmir.addRuntime(source_manager, source_manager.getEntry());
+		pir_to_llvmir.addRuntime(source_manager.getEntry());
 
 		if(config.verbose){ printer.success("Added Panther runtime to LLVM IR\n"); }
 	}
@@ -366,8 +371,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		return 0;
 
 	}else if(config.target == Config::Target::Object){
-		const std::optional< std::vector<evo::byte> > output = pir_to_llvmir.compileToObjectFile();
-		if(output.has_value() == false){
+		const evo::Result<std::vector<evo::byte>> output = pir_to_llvmir.compileToObjectFile();
+		if(output.isError()){
 			printer.fatal("Target machine cannot output object file");
 			exit();
 			return 1;
@@ -384,7 +389,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 			return 1;
 		}
 
-		if(output_file.write(*output) == false){
+		if(output_file.write(output.value()) == false){
 			printer.error( std::format("Failed to write to file: \"{}\"\n", path_str) );
 			exit();
 			return 1;
@@ -430,8 +435,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		///////////////////////////////////
 		// create object file
 
-		const std::optional< std::vector<evo::byte> > output = pir_to_llvmir.compileToObjectFile();
-		if(output.has_value() == false){
+		const evo::Result<std::vector<evo::byte>> output = pir_to_llvmir.compileToObjectFile();
+		if(output.isError()){
 			printer.fatal("Target machine cannot output object file");
 			exit();
 			return 1;
@@ -455,7 +460,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 			return 1;
 		}
 
-		if(output_file.write(*output) == false){
+		if(output_file.write(output.value()) == false){
 			printer.error( std::format("Failed to write to file: \"{}\"\n", obj_path_str) );
 			exit();
 			return 1;

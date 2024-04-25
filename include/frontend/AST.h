@@ -49,8 +49,9 @@ namespace panther{
 
 
 		struct VarDecl{
-			bool is_def;
+			bool isDef;
 			Node::ID ident;
+			std::vector<Token::ID> attributes;
 			std::optional<Node::ID> type;
 			Node::ID expr;
 		};
@@ -75,7 +76,7 @@ namespace panther{
 			Node::ID ident;
 			Node::ID params;
 			std::vector<Token::ID> attributes;
-			Node::ID return_type;
+			Node::ID returnType;
 			Node::ID block;
 		};
 
@@ -85,10 +86,10 @@ namespace panther{
 		};
 
 		struct Conditional{
-			Token::ID if_tok;
-			Node::ID if_expr;
-			Node::ID then_block;
-			std::optional<Node::ID> else_block;
+			Token::ID ifTok;
+			Node::ID ifExpr;
+			Node::ID thenBlock;
+			std::optional<Node::ID> elseBlock;
 		};
 
 
@@ -96,8 +97,8 @@ namespace panther{
 			Token::ID token;
 
 			struct Qualifier{
-				bool is_ptr;
-				bool is_const;
+				bool isPtr;
+				bool isConst;
 			};
 			std::vector<Qualifier> qualifiers;
 		};

@@ -41,8 +41,9 @@ namespace panther{
 
 			TypeVoid,
 
-			TypeInt,
 			TypeBool,
+			TypeInt,
+			TypeString,
 
 
 			///////////////////////////////////
@@ -77,6 +78,7 @@ namespace panther{
 
 			Pointer, // ^
 			Dereference, // .^
+			Accessor, // .
 
 
 			///////////////////////////////////
@@ -157,7 +159,7 @@ namespace panther{
 
 		EVO_NODISCARD static constexpr auto get(const char* token_str) noexcept -> Kind {
 			auto is_token = [&](std::string_view str){
-				return *evo::stringsEqual(token_str, str.data(), str.size());
+				return evo::stringsEqual(token_str, str.data(), str.size()).value();
 			};
 
 
@@ -172,6 +174,9 @@ namespace panther{
 			// length 1
 			if(is_token("=")){ return Token::Equal; }
 			if(is_token("^")){ return Token::Pointer; }
+
+			if(is_token(".")){ return Token::Accessor; }
+
 			if(is_token("(")){ return Token::OpenParen; }
 			if(is_token(")")){ return Token::CloseParen; }
 			if(is_token("[")){ return Token::OpenBracket; }
@@ -221,6 +226,7 @@ namespace panther{
 
 				break; case Kind::TypeInt: return "Int";
 				break; case Kind::TypeBool: return "Bool";
+				break; case Kind::TypeString: return "String";
 
 
 				///////////////////////////////////
@@ -255,6 +261,8 @@ namespace panther{
 
 				break; case Kind::Pointer: return "^";
 				break; case Kind::Dereference: return ".^";
+
+				break; case Kind::Accessor: return ".";
 
 
 				///////////////////////////////////

@@ -146,8 +146,8 @@ namespace panther{
 			///////////////////////////////////
 			// literals
 
-				 if(ident_name == "true"){  this->create_token(Token::Kind::LiteralBool, true);  }
-			else if(ident_name == "false"){ this->create_token(Token::Kind::LiteralBool, false); }
+			     if(ident_name == "true")  { this->create_token(Token::Kind::LiteralBool, true);  }
+			else if(ident_name == "false") { this->create_token(Token::Kind::LiteralBool, false); }
 
 
 			///////////////////////////////////
@@ -155,29 +155,30 @@ namespace panther{
 
 			else if(ident_name == "Void") { this->create_token(Token::Kind::TypeVoid); }
 
-			else if(ident_name == "Bool") { this->create_token(Token::Kind::TypeBool); }
-			else if(ident_name == "Int") { this->create_token(Token::Kind::TypeInt); }
+			else if(ident_name == "Int")    { this->create_token(Token::Kind::TypeInt); }
+			else if(ident_name == "Bool")   { this->create_token(Token::Kind::TypeBool); }
+			else if(ident_name == "String") { this->create_token(Token::Kind::TypeString); }
 
 
 			///////////////////////////////////
 			// keywords
 
-			else if(ident_name == "var") { this->create_token(Token::Kind::KeywordVar); }
-			else if(ident_name == "def") { this->create_token(Token::Kind::KeywordDef); }
+			else if(ident_name == "var")  { this->create_token(Token::Kind::KeywordVar); }
+			else if(ident_name == "def")  { this->create_token(Token::Kind::KeywordDef); }
 			else if(ident_name == "func") { this->create_token(Token::Kind::KeywordFunc); }
 
-			else if(ident_name == "return") { this->create_token(Token::Kind::KeywordReturn); }
+			else if(ident_name == "return")      { this->create_token(Token::Kind::KeywordReturn); }
 			else if(ident_name == "unreachable") { this->create_token(Token::Kind::KeywordUnreachable); }
-			else if(ident_name == "if") { this->create_token(Token::Kind::KeywordIf); }
-			else if(ident_name == "else") { this->create_token(Token::Kind::KeywordElse); }
+			else if(ident_name == "if")          { this->create_token(Token::Kind::KeywordIf); }
+			else if(ident_name == "else")        { this->create_token(Token::Kind::KeywordElse); }
 
-			else if(ident_name == "copy") { this->create_token(Token::Kind::KeywordCopy); }
+			else if(ident_name == "copy")   { this->create_token(Token::Kind::KeywordCopy); }
 			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
-			else if(ident_name == "addr") { this->create_token(Token::Kind::KeywordAddr); }
+			else if(ident_name == "addr")   { this->create_token(Token::Kind::KeywordAddr); }
 
-			else if(ident_name == "read") { this->create_token(Token::Kind::KeywordRead); }
+			else if(ident_name == "read")  { this->create_token(Token::Kind::KeywordRead); }
 			else if(ident_name == "write") { this->create_token(Token::Kind::KeywordWrite); }
-			else if(ident_name == "in") { this->create_token(Token::Kind::KeywordIn); }
+			else if(ident_name == "in")    { this->create_token(Token::Kind::KeywordIn); }
 
 
 			///////////////////////////////////
@@ -253,6 +254,8 @@ namespace panther{
 		// length 1
 		if(is_op("=")){ set_op("="); return true; }
 		if(is_op("^")){ set_op("^"); return true; }
+
+		if(is_op(".")){ set_op("."); return true; }
 
 
 		return false;
@@ -584,7 +587,7 @@ namespace panther{
 
 		auto literal_value = std::string();
 
-		do{
+		while(this->char_stream.peek() != delimiter){
 			bool unexpected_eof = false;
 
 			if(this->char_stream.eof()){
@@ -602,7 +605,7 @@ namespace panther{
 					break; case 'r': literal_value += '\r';
 
 					break; case '\'': literal_value += '\'';
-					break; case '"': literal_value += '"';
+					break; case '"':  literal_value += '"';
 					break; case '\\': literal_value += '\\';
 
 					break; default: {
@@ -636,6 +639,8 @@ namespace panther{
 					evo::unreachable();
 				}();
 
+				evo::breakpoint();
+
 				this->source.error(
 					std::format("Unterminated {} literal", string_type_name),
 					this->line_start, this->collumn_start,
@@ -648,13 +653,13 @@ namespace panther{
 				return true;	
 			}
 
-		}while(this->char_stream.peek() != delimiter);
+		};
 
 
 		this->char_stream.skip(1);
 
-		const std::unique_ptr<std::string>& string_literal_value = this->source.string_literal_values.emplace_back(
-			std::make_unique<std::string>(std::move(literal_value))
+		const std::string* string_literal_value = this->source.string_literal_values.emplace_back(
+			new std::string(std::move(literal_value))
 		);
 
 

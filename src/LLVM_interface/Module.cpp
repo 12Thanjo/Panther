@@ -84,7 +84,7 @@ namespace panther{
 
 
 
-		auto Module::compileToObjectFile() noexcept -> std::optional<std::vector<evo::byte>> {
+		auto Module::compileToObjectFile() noexcept -> evo::Result<std::vector<evo::byte>> {
 			auto data = llvm::SmallVector<char>();
 			auto stream = llvm::raw_svector_ostream(data);
 
@@ -92,7 +92,7 @@ namespace panther{
 			auto file_type = llvm::CodeGenFileType::ObjectFile;
 
 			if(this->target_machine->addPassesToEmitFile(pass, stream, nullptr, file_type)){
-				return std::nullopt;
+				return evo::resultError;
 			}
 
 			pass.run(*this->module);

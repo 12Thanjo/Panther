@@ -1,5 +1,18 @@
 # Changelog
 
+### v0.22.0
+- Added tokenizing and parsing of type `String`
+- Fixed literal strings and literal chars not being printed correctly in the `PrintAST` output target
+- Added checking if type is a literal float or literal char
+	- (not supported yet, so it errors)
+- Fixed intrinsic function calls as expressions causing a fatal error
+- Fixed AST printer adding `[UNREACHABLE]` after a function call
+- Added the `#pub` intrinsic
+- Added the intrinsic function `@import(String read)`
+- Fixed empty string / char literals causing a fatal error
+- Added attributes for variable declarations
+- Added error if discarding the return value of a function
+
 ### v0.21.4
 - Removed being able to set global variables to be value of another variable
 	- this is only temporary
@@ -74,7 +87,7 @@
 ### v0.16.0
 - Reorganized part of the build system
 - Changed debug working directory to `/testing`
-- Added output to executable
+- Added output to Executable
 - Added default file output naming
 
 ### v0.15.0

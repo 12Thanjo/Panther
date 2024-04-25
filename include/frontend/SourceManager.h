@@ -9,6 +9,7 @@
 #include "Message.h"
 
 #include <functional>
+#include <filesystem>
 
 namespace panther{
 
@@ -22,9 +23,20 @@ namespace panther{
 				PIR::Func::ID func_id;
 			};
 
+			struct Config{
+				std::string basePath;
+			};
+
+			enum class GetSourceIDError{
+				EmptyPath,
+				SameAsCaller,
+				NotOneOfSources,
+				DoesntExist,
+			};
+
 		public:
 
-			SourceManager(MessageCallback msg_callback) : message_callback(msg_callback) {};
+			SourceManager(Config&& config_data, MessageCallback msg_callback) : config(std::move(config_data)), message_callback(msg_callback) {};
 			~SourceManager() = default;
 
 
@@ -47,7 +59,7 @@ namespace panther{
 			// funcs that require it is unlocked
 
 			// TODO: other permutations of refs
-			EVO_NODISCARD auto addSource(const std::string& location, std::string&& data) noexcept -> Source::ID;
+			EVO_NODISCARD auto addSource(std::filesystem::path&& location, std::string&& data) noexcept -> Source::ID;
 
 
 
@@ -60,6 +72,10 @@ namespace panther{
 
 			// EVO_NODISCARD auto getSource(Source::ID id)       noexcept ->       Source&;
 			EVO_NODISCARD auto getSource(Source::ID id) const noexcept -> const Source&;
+
+			// file_location is the file that has the @import(), and src_path is the value inside the @import()
+			EVO_NODISCARD auto getSourceID(const std::filesystem::path& file_location, std::string_view src_path) const noexcept
+				-> evo::Expected<Source::ID, GetSourceIDError>;
 
 			EVO_NODISCARD auto getSources() noexcept -> std::vector<Source>&;
 			EVO_NODISCARD auto getSources() const noexcept -> const std::vector<Source>&;
@@ -111,8 +127,10 @@ namespace panther{
 			};
 
 			// TODO: better way of doing this?
-			EVO_NODISCARD static inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
-			EVO_NODISCARD static inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
+			EVO_NODISCARD static inline auto getTypeImport() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
+			EVO_NODISCARD static inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
+			EVO_NODISCARD static inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(2); };
+			EVO_NODISCARD static inline auto getTypeString() noexcept -> PIR::Type::ID { return PIR::Type::ID(3); };
 
 
 			EVO_NODISCARD auto printType(PIR::Type::ID id) const noexcept -> std::string;
@@ -127,8 +145,11 @@ namespace panther{
 
 			EVO_NODISCARD auto getIntrinsics() const noexcept -> const std::vector<PIR::Intrinsic>&;
 			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::ID id) const noexcept -> const PIR::Intrinsic&;
+			EVO_NODISCARD static inline auto getIntrinsicIDImport() noexcept -> PIR::Intrinsic::ID { return PIR::Intrinsic::ID(0); };
 
 		private:
+			Config config;
+
 			std::vector<Source> sources{};
 			bool is_locked = false;
 

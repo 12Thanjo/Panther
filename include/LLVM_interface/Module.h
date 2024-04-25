@@ -35,7 +35,7 @@ namespace panther{
 
 
 				// return nullopt means target machine cannot output object file
-				EVO_NODISCARD auto compileToObjectFile() noexcept -> std::optional<std::vector<evo::byte>>;
+				EVO_NODISCARD auto compileToObjectFile() noexcept -> evo::Result<std::vector<evo::byte>>;
 
 
 

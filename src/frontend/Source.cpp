@@ -21,9 +21,19 @@ namespace panther{
 	};
 
 
+	auto Source::semantic_analysis_declarations() noexcept -> bool {
+		this->semantic_analyzer = new SemanticAnalyzer(*this);
+		
+		return this->semantic_analyzer->semantic_analysis_declarations();
+	};
+
 	auto Source::semantic_analysis() noexcept -> bool {
-		auto semantic_analizer = SemanticAnalyzer(*this);
-		return semantic_analizer.semantic_analysis();
+		const bool result = this->semantic_analyzer->semantic_analysis();
+
+		delete this->semantic_analyzer;
+		this->semantic_analyzer = nullptr;
+
+		return result;
 	};
 
 
@@ -323,7 +333,7 @@ namespace panther{
 
 			case AST::Kind::Conditional: {
 				const AST::Conditional& conditional = this->getConditional(node);
-				const Token& token = this->getToken(conditional.if_tok);
+				const Token& token = this->getToken(conditional.ifTok);
 				return token.location;
 			} break;
 
@@ -353,7 +363,13 @@ namespace panther{
 			case AST::Kind::Infix: {
 				const AST::Infix& infix = this->getInfix(node);
 				const Token& op_token = this->getToken(infix.op);
-				return op_token.location;
+
+				if(op_token.kind == Token::get(".")){
+					return this->get_node_location(infix.rhs);
+				}else{
+					return op_token.location;
+				}
+
 			} break;
 
 			case AST::Kind::Postfix: {

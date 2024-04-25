@@ -70,7 +70,7 @@ namespace panther{
 
 				for(Source& source : sources){
 					for(PIR::Var::ID global_var_id : source.pir.global_vars){
-						PIR::Var& var = source.getVar(global_var_id);
+						PIR::Var& var = Source::getVar(global_var_id);
 
 						this->lower_global_var(source, var);
 					}
@@ -109,9 +109,8 @@ namespace panther{
 
 
 
-			EVO_NODISCARD inline auto addRuntime(SourceManager& source_manager, const SourceManager::Entry& entry_func) noexcept -> void {
-				const Source& source = source_manager.getSource(entry_func.src_id);
-				const PIR::Func& func = source.getFunc(entry_func.func_id);
+			EVO_NODISCARD inline auto addRuntime(const SourceManager::Entry& entry_func) noexcept -> void {
+				const PIR::Func& func = Source::getFunc(entry_func.func_id);
 
 				llvm::FunctionType* prototype = this->builder->getFuncProto(llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64()), {}, false);
 				llvm::Function* main_func = this->module->createFunction("main", prototype, llvmint::LinkageTypes::ExternalLinkage, true, false);
@@ -119,7 +118,7 @@ namespace panther{
 				llvm::BasicBlock* begin_block = this->builder->createBasicBlock(main_func, "begin");
 				this->builder->setInsertionPoint(begin_block);
 
-				llvm::Value* begin_ret = llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, {}, '\0'));
+				llvm::Value* begin_ret = llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvmFunc, {}, '\0'));
 				this->builder->createRet(begin_ret);
 			};
 
@@ -132,7 +131,7 @@ namespace panther{
 
 
 			// return nullopt means target machine cannot output object file
-			EVO_NODISCARD auto compileToObjectFile() noexcept -> std::optional< std::vector<evo::byte> > {
+			EVO_NODISCARD auto compileToObjectFile() noexcept -> evo::Result<std::vector<evo::byte>> {
 				return this->module->compileToObjectFile();
 			};
 
@@ -177,7 +176,7 @@ namespace panther{
 				evo::debugAssert(value != nullptr, "invalid const value");
 
 
-				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, var.is_def, mangled_name.c_str());
+				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, var.isDef, mangled_name.c_str());
 
 				var.llvm.global = global_val;
 			};
@@ -186,11 +185,11 @@ namespace panther{
 
 			inline auto lower_stmt(Source& source, const PIR::Stmt& stmt) noexcept -> void {
 				switch(stmt.kind){
-					break; case PIR::Stmt::Kind::Var: this->lower_var(source, source.getVar(stmt.var));
+					break; case PIR::Stmt::Kind::Var: this->lower_var(source, Source::getVar(stmt.var));
 					break; case PIR::Stmt::Kind::Conditional: this->lower_conditional(source, source.getConditional(stmt.conditional));
 					break; case PIR::Stmt::Kind::Return: this->lower_return(source, source.getReturn(stmt.ret));
 					break; case PIR::Stmt::Kind::Assignment: this->lower_assignment(source, source.getAssignment(stmt.assignment));
-					break; case PIR::Stmt::Kind::FuncCall: this->lower_func_call(source, source.getFuncCall(stmt.func_call));
+					break; case PIR::Stmt::Kind::FuncCall: this->lower_func_call(source, source.getFuncCall(stmt.funcCall));
 					break; case PIR::Stmt::Kind::Unreachable: this->lower_unreachable();
 					break; default: EVO_FATAL_BREAK("Unknown stmt kind");
 				};
@@ -205,10 +204,10 @@ namespace panther{
 				const std::string mangled_name = PIRToLLVMIR::mangle_name(source, func);
 
 				llvm::Type* return_type = [&]() noexcept {
-					if(func.return_type.isVoid()){
+					if(func.returnType.isVoid()){
 						return this->builder->getTypeVoid();
 					}else{
-						const PIR::Type& return_type_obj = source_manager.getType(func.return_type.typeID());
+						const PIR::Type& return_type_obj = source_manager.getType(func.returnType.typeID());
 						return this->get_type(source_manager, return_type_obj);
 					}
 				}();
@@ -234,10 +233,10 @@ namespace panther{
 
 
 				llvm::FunctionType* prototype = this->builder->getFuncProto(return_type, param_types, false);
-				const auto linkage = func.is_export ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::InternalLinkage;
-				const bool fast_call_conv = !func.is_export;
+				const auto linkage = func.isExport ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::InternalLinkage;
+				const bool fast_call_conv = !func.isExport;
 				llvm::Function* llvm_func = this->module->createFunction(mangled_name, prototype, linkage, true, fast_call_conv);
-				func.llvm_func = llvm_func;
+				func.llvmFunc = llvm_func;
 
 
 
@@ -269,22 +268,22 @@ namespace panther{
 			inline auto lower_func(Source& source, PIR::Func& func) noexcept -> void {
 				this->current_func = &func;
 
-				this->builder->setInsertionPointAtBack(func.llvm_func);
+				this->builder->setInsertionPointAtBack(func.llvmFunc);
 
 				for(const PIR::Stmt& stmt : func.stmts){
 					this->lower_stmt(source, stmt);
 				}
 
 
-				if(func.return_type.isVoid()){
+				if(func.returnType.isVoid()){
 					if(func.stmts.isTerminated()){
-						if(func.terminates_in_base_scope == false){
+						if(func.terminatesInBaseScope == false){
 							this->builder->createUnreachable();
 						}
 					}else{						
 						this->builder->createRet();
 					}
-				}else if(func.terminates_in_base_scope == false){
+				}else if(func.terminatesInBaseScope == false){
 					this->builder->createUnreachable();
 				}
 
@@ -312,7 +311,7 @@ namespace panther{
 
 
 				if(var.value.kind == PIR::Expr::Kind::ASTNode){
-					const AST::Node& var_value_node = source.getNode(var.value.ast_node);
+					const AST::Node& var_value_node = source.getNode(var.value.astNode);
 					if(var_value_node.kind != AST::Kind::Uninit){
 						this->builder->createStore(alloca_val, this->get_value(source, var.value), false);
 					}
@@ -325,34 +324,34 @@ namespace panther{
 
 
 			inline auto lower_conditional(Source& source, PIR::Conditional& cond) noexcept -> void {
-				llvm::BasicBlock* then_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.then");
+				llvm::BasicBlock* then_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "if.then");
 				llvm::BasicBlock* end_block = nullptr;
 
-				llvm::Value* cond_value = this->get_value(source, cond.if_cond);
+				llvm::Value* cond_value = this->get_value(source, cond.ifCond);
 
-				if(cond.else_stmts.empty()){
-					end_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.end");
+				if(cond.elseStmts.empty()){
+					end_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "if.end");
 
 					this->builder->createCondBranch(cond_value, then_block, end_block);
 
 					this->builder->setInsertionPoint(then_block);
-					for(const PIR::Stmt& stmt : cond.then_stmts){
+					for(const PIR::Stmt& stmt : cond.thenStmts){
 						this->lower_stmt(source, stmt);
 					}
 
-					if(cond.then_stmts.isTerminated() == false){
+					if(cond.thenStmts.isTerminated() == false){
 						this->builder->setInsertionPoint(then_block);
 						this->builder->createBranch(end_block);
 					}
 
 				}else{
-					llvm::BasicBlock* else_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.else");
+					llvm::BasicBlock* else_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "if.else");
 
 					this->builder->createCondBranch(cond_value, then_block, else_block);
 
 					// then block
 					this->builder->setInsertionPoint(then_block);
-					for(const PIR::Stmt& stmt : cond.then_stmts){
+					for(const PIR::Stmt& stmt : cond.thenStmts){
 						this->lower_stmt(source, stmt);
 					}
 
@@ -360,18 +359,18 @@ namespace panther{
 
 					// else block
 					this->builder->setInsertionPoint(else_block);
-					for(const PIR::Stmt& stmt : cond.else_stmts){
+					for(const PIR::Stmt& stmt : cond.elseStmts){
 						this->lower_stmt(source, stmt);
 					}
 
 					// end block
-					end_block = this->builder->createBasicBlock(this->current_func->llvm_func, "if.end");
+					end_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "if.end");
 
-					if(cond.else_stmts.isTerminated() == false){
+					if(cond.elseStmts.isTerminated() == false){
 						this->builder->createBranch(end_block);
 					}
 
-					if(cond.then_stmts.isTerminated() == false){
+					if(cond.thenStmts.isTerminated() == false){
 						this->builder->setInsertionPoint(then_block_end);
 						this->builder->createBranch(end_block);
 					}
@@ -415,12 +414,12 @@ namespace panther{
 			inline auto create_func_call_args(const Source& source, const PIR::FuncCall& func_call) noexcept -> std::vector<llvm::Value*> {
 				auto args = std::vector<llvm::Value*>();
 
-				const PIR::Func& func = source.getFunc(func_call.func);
+				const PIR::Func& func = Source::getFunc(func_call.func);
 
 				for(size_t i = 0; i < func_call.args.size(); i+=1){
 					const PIR::Expr& arg = func_call.args[i];
 
-					args.emplace_back(this->get_arg_value(source, arg, source.getParam(func.params[i]).type));
+					args.emplace_back(this->get_arg_value(source, arg, func_call.func.source.getParam(func.params[i]).type));
 				}
 
 				return args;
@@ -430,11 +429,11 @@ namespace panther{
 			inline auto lower_func_call(const Source& source, const PIR::FuncCall& func_call) noexcept -> void {
 				switch(func_call.kind){
 					case PIR::FuncCall::Kind::Func: {
-						const PIR::Func& func = source.getFunc(func_call.func);
+						const PIR::Func& func = Source::getFunc(func_call.func);
 
 						const std::vector<llvm::Value*> args = this->create_func_call_args(source, func_call);
 
-						this->builder->createCall(func.llvm_func, args, '\0');
+						this->builder->createCall(func.llvmFunc, args, '\0');
 					} break;
 
 
@@ -486,14 +485,14 @@ namespace panther{
 
 			EVO_NODISCARD inline auto get_type(const SourceManager& source_manager, const PIR::Type& type) noexcept -> llvm::Type* {
 				if(type.qualifiers.empty() == false){
-					if(type.qualifiers.back().is_ptr){
+					if(type.qualifiers.back().isPtr){
 						return llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr());
 					}else{
 						EVO_FATAL_BREAK("Unsupported qualifiers");
 					}
 				}
 
-				const PIR::BaseType& base_type = source_manager.getBaseType(type.base_type);
+				const PIR::BaseType& base_type = source_manager.getBaseType(type.baseType);
 
 
 				if(base_type.builtin.kind == Token::TypeInt){
@@ -512,7 +511,7 @@ namespace panther{
 			EVO_NODISCARD inline auto get_const_value(const Source& source, PIR::Expr value) noexcept -> llvm::Constant* {
 				switch(value.kind){
 					case PIR::Expr::Kind::ASTNode: {
-						const Token& token = source.getLiteral(value.ast_node);
+						const Token& token = source.getLiteral(value.astNode);
 
 						switch(token.kind){
 							case Token::LiteralInt: {
@@ -557,11 +556,11 @@ namespace panther{
 			EVO_NODISCARD inline auto get_value(const Source& source, PIR::Expr value) noexcept -> llvm::Value* {
 				switch(value.kind){
 					case PIR::Expr::Kind::ASTNode: {
-						const AST::Node& node = source.getNode(value.ast_node);
+						const AST::Node& node = source.getNode(value.astNode);
 
 						switch(node.kind){
 							case AST::Kind::Literal: {
-								const Token& token = source.getLiteral(value.ast_node);
+								const Token& token = source.getLiteral(value.astNode);
 
 								switch(token.kind){
 									case Token::LiteralInt: {
@@ -582,9 +581,9 @@ namespace panther{
 					} break;
 
 					case PIR::Expr::Kind::Var: {
-						const PIR::Var& var = source.getVar(value.var);
+						const PIR::Var& var = Source::getVar(value.var);
 
-						std::string load_name = std::format("{}.load", source.getToken(var.ident).value.string);
+						std::string load_name = std::format("{}.load", value.var.source.getToken(var.ident).value.string);
 						if(var.is_alloca){
 							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca, load_name));
 						}else{
@@ -613,12 +612,12 @@ namespace panther{
 					} break;
 
 					case PIR::Expr::Kind::FuncCall: {
-						const PIR::FuncCall& func_call = source.getFuncCall(value.func_call);
-						const PIR::Func& func = source.getFunc(func_call.func);
+						const PIR::FuncCall& func_call = source.getFuncCall(value.funcCall);
+						const PIR::Func& func = Source::getFunc(func_call.func);
 
 						const std::vector<llvm::Value*> args = this->create_func_call_args(source, func_call);
 
-						return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvm_func, args, '\0'));
+						return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvmFunc, args, '\0'));
 					} break;
 
 					case PIR::Expr::Kind::Prefix: {
@@ -631,7 +630,7 @@ namespace panther{
 
 							case Token::KeywordAddr: {
 								if(prefix.rhs.kind == PIR::Expr::Kind::Var){
-									const PIR::Var& var = source.getVar(prefix.rhs.var);
+									const PIR::Var& var = Source::getVar(prefix.rhs.var);
 									if(var.is_alloca){
 										return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
 									}else{
@@ -677,7 +676,7 @@ namespace panther{
 			EVO_NODISCARD inline auto get_concrete_value(const Source& source, const PIR::Expr& expr) noexcept -> llvm::Value* {
 				switch(expr.kind){
 					case PIR::Expr::Kind::Var: {
-						const PIR::Var& var = source.getVar(expr.var);
+						const PIR::Var& var = Source::getVar(expr.var);
 
 						if(var.is_alloca){
 							return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
@@ -708,7 +707,7 @@ namespace panther{
 
 				switch(arg.kind){
 					case PIR::Expr::Kind::Var: {
-						const PIR::Var& var = source.getVar(arg.var);
+						const PIR::Var& var = Source::getVar(arg.var);
 						if(var.is_alloca){
 							return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
 						}else{
@@ -794,7 +793,7 @@ namespace panther{
 			EVO_NODISCARD inline static auto mangle_name(const Source& source, const PIR::Func& func) noexcept -> std::string {
 				const std::string ident = std::string(source.getToken(func.ident).value.string);
 
-				if(func.is_export){
+				if(func.isExport){
 					return ident;
 				}else{
 					return std::format("P.{}.{}", source.getID().id, ident);
@@ -807,7 +806,6 @@ namespace panther{
 				evo::debugAssert(var.isGlobal(), "Variable name mangling should only be used on globals");
 
 				const std::string ident = std::string(source.getToken(var.ident).value.string);
-				
 				return std::format("P.{}.{}", source.getID().id, ident);
 			};
 

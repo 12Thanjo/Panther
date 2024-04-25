@@ -3,29 +3,37 @@
 
 #include <Evo.h>
 
+#include "./SourceID.h"
+
 #include "./Token.h"
 #include "./AST.h"
 #include "Message.h"
 #include "PIR.h"
 
+#include <filesystem>
+#include <unordered_map>
 
 namespace panther{
 
 
 	class Source{
 		public:
-			struct ID{ // typesafe identifier
-				uint32_t id;
-				explicit ID(uint32_t _id) noexcept : id(_id) {};
-			};
+			using ID = SourceID;
 
 		public:
 			// TODO: other permutations of refs
-			Source(const std::string& src_location, std::string&& src_data, class SourceManager& src_manager, ID id)
-				: src_location(src_location), data(std::move(src_data)), source_manager(src_manager), src_id(id) {};
+			Source(std::filesystem::path&& src_path, std::string&& src_data, class SourceManager& src_manager, ID id) noexcept
+				: src_location(std::move(src_path)), data(std::move(src_data)), source_manager(src_manager), src_id(id) {};
+
+			~Source() noexcept {
+				for(std::string* str_ptr : this->string_literal_values){
+					delete str_ptr;
+				}
+			};
 
 
-			EVO_NODISCARD inline auto getLocation() const noexcept -> const std::string& { return this->src_location; };
+
+			EVO_NODISCARD inline auto getLocation() const noexcept -> const std::filesystem::path& { return this->src_location; };
 			EVO_NODISCARD inline auto getData() const noexcept -> const std::string& { return this->data; };
 			EVO_NODISCARD inline auto getSourceManager() noexcept -> SourceManager& { return this->source_manager; };
 			EVO_NODISCARD inline auto getSourceManager() const noexcept -> const SourceManager& { return this->source_manager; };
@@ -38,11 +46,12 @@ namespace panther{
 			EVO_NODISCARD auto parse() noexcept -> bool;
 
 			// returns true if successful (no errors)
+			EVO_NODISCARD auto semantic_analysis_declarations() noexcept -> bool;
 			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
 
 
 			//////////////////////////////////////////////////////////////////////
-			// getting
+			// getting / creating
 
 			///////////////////////////////////
 			// AST
@@ -109,15 +118,29 @@ namespace panther{
 
 			EVO_NODISCARD inline auto createVar(auto&&... args) noexcept -> PIR::Var::ID {
 				this->pir.vars.emplace_back(std::forward<decltype(args)>(args)...);
-				return PIR::Var::ID( uint32_t(this->pir.vars.size() - 1) );
+				return PIR::Var::ID(*this, uint32_t(this->pir.vars.size() - 1));
 			};
 
-			EVO_NODISCARD inline auto getVar(PIR::Var::ID id) const noexcept -> const PIR::Var& {
-				return this->pir.vars[size_t(id.id)];
+			// EVO_NODISCARD static inline auto getVar(const PIR::Var::ID& id) noexcept -> const PIR::Var& {
+			// 	return id.source.pir.vars[size_t(id.id)];
+			// };
+			EVO_NODISCARD static inline auto getVar(PIR::Var::ID id) noexcept -> PIR::Var& {
+				return id.source.pir.vars[size_t(id.id)];
 			};
-			EVO_NODISCARD inline auto getVar(PIR::Var::ID id) noexcept -> PIR::Var& {
-				return this->pir.vars[size_t(id.id)];
+
+
+			EVO_NODISCARD inline auto createFunc(auto&&... args) noexcept -> PIR::Func::ID {
+				this->pir.funcs.emplace_back(std::forward<decltype(args)>(args)...);
+				return PIR::Func::ID(*this, uint32_t(this->pir.funcs.size() - 1));
 			};
+
+			// EVO_NODISCARD static inline auto getFunc(const PIR::Func::ID& id) noexcept -> const PIR::Func& {
+			// 	return id.source.pir.funcs[size_t(id.id)];
+			// };
+			EVO_NODISCARD static inline auto getFunc(PIR::Func::ID id) noexcept -> PIR::Func& {
+				return id.source.pir.funcs[size_t(id.id)];
+			};
+
 
 
 			EVO_NODISCARD inline auto createParam(auto&&... args) noexcept -> PIR::Param::ID {
@@ -132,19 +155,6 @@ namespace panther{
 				return this->pir.params[size_t(id.id)];
 			};
 
-
-
-			EVO_NODISCARD inline auto createFunc(auto&&... args) noexcept -> PIR::Func::ID {
-				this->pir.funcs.emplace_back(std::forward<decltype(args)>(args)...);
-				return PIR::Func::ID( uint32_t(this->pir.funcs.size() - 1) );
-			};
-
-			EVO_NODISCARD inline auto getFunc(PIR::Func::ID id) const noexcept -> const PIR::Func& {
-				return this->pir.funcs[size_t(id.id)];
-			};
-			EVO_NODISCARD inline auto getFunc(PIR::Func::ID id) noexcept -> PIR::Func& {
-				return this->pir.funcs[size_t(id.id)];
-			};
 
 			EVO_NODISCARD inline auto createConditional(auto&&... args) noexcept -> PIR::Conditional::ID {
 				this->pir.conditionals.emplace_back(std::forward<decltype(args)>(args)...);
@@ -266,7 +276,7 @@ namespace panther{
 
 		public:
 			std::vector<Token> tokens{};
-			std::vector<std::unique_ptr<std::string>> string_literal_values{};
+			std::vector<std::string*> string_literal_values{}; // using raw pointers because for some reason it causes an error
 
 			std::vector<AST::Node::ID> global_stmts{};
 			std::vector<AST::Node> nodes{};
@@ -296,6 +306,10 @@ namespace panther{
 				std::vector<PIR::Deref> derefs{};
 
 				std::vector<PIR::Var::ID> global_vars{};
+
+				std::unordered_map<std::string_view, PIR::Func::ID> pub_funcs{};
+				std::unordered_map<std::string_view, PIR::Var::ID> pub_vars{};
+				std::unordered_map<std::string_view, Source::ID> pub_imports{};
 			} pir;
 
 
@@ -305,12 +319,14 @@ namespace panther{
 
 
 		private:
-			std::string src_location;
+			std::filesystem::path src_location;
 			std::string data;
 			ID src_id;
 			class SourceManager& source_manager;
 
 			bool has_errored = false;
+
+			class SemanticAnalyzer* semantic_analyzer = nullptr;
 	};
 
 
