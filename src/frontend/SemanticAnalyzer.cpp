@@ -33,7 +33,6 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::semantic_analysis() noexcept -> bool {
-
 		for(const GlobalFunc& global_func : this->global_funcs){
 			PIR::Func& pir_func = this->source.pir.funcs[global_func.pir_id.id];
 			if(this->analyze_func_block(pir_func, global_func.ast) == false){
@@ -41,9 +40,7 @@ namespace panther{
 			}
 		}
 
-
 		this->leave_scope();
-
 		return true;
 	};
 
@@ -127,8 +124,9 @@ namespace panther{
 		///////////////////////////////////
 		// type checking
 
-		const ExprValueType expr_value_type = this->get_expr_value_type(var_decl.expr);
-		if(expr_value_type != ExprValueType::Ephemeral && expr_value_type != ExprValueType::Import){
+		const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(var_decl.expr);
+		if(expr_value_type.isError()){ return false; }
+		if(expr_value_type.value() != ExprValueType::Ephemeral && expr_value_type.value() != ExprValueType::Import){
 			// TODO: better messaging
 			this->source.error("Variables must be assigned with an ephemeral value", var_decl.expr);
 			return false;
@@ -190,11 +188,6 @@ namespace panther{
 				this->source.error("String literal values (outside of calls to `@import()`) are not supported yet", expr_node);
 				return false;
 
-			}else if(expr_type_id.value() == SourceManager::getTypeImport()){
-				if(expr_node.kind == AST::Kind::Infix){
-					this->source.error("Setting variables to the value of imports via an accessor operator is not supported yet", var_decl.expr);
-					return false;
-				}
 			}
 
 			var_type_id = expr_type_id.value();
@@ -210,14 +203,34 @@ namespace panther{
 				return this->get_const_expr_value(var_decl.expr);
 
 			}else{
-				return evo::Result<PIR::Expr>(this->get_expr_value(var_decl.expr));
+				return this->get_expr_value(var_decl.expr);
 			}
 		}();
 
 		if(var_value.isError()){ return false; }
 
 
+		// handle imports differently
+		if(var_type_id == SourceManager::getTypeImport()){
+			evo::debugAssert(var_value.value().kind == PIR::Expr::Kind::Import, "should be import");
 
+			if(var_decl.isDef == false){
+				this->source.error("import variables must be marked [def] not [var]", var_decl.ident);
+				return false;
+			}
+
+			this->add_import_to_scope(ident.value.string, Import(var_value.value().import, var_decl.ident));
+
+			if(is_pub){
+				this->source.pir.pub_imports.emplace(ident.value.string, var_value.value().import);
+			}
+
+			return true;
+		}
+
+
+
+		// check for uninit
 		if(var_value.value().kind == PIR::Expr::Kind::ASTNode){
 			const AST::Node& var_value_node = this->source.getNode(var_value.value().astNode);
 
@@ -234,63 +247,6 @@ namespace panther{
 					);
 				}
 			}
-
-
-		// checking for @import()
-		}else if(var_value.value().kind == PIR::Expr::Kind::FuncCall){
-			const PIR::FuncCall& func_call = this->source.getFuncCall(var_value.value().funcCall);
-			if(func_call.kind == PIR::FuncCall::Kind::Intrinsic){
-				const PIR::Intrinsic& intrinsic = src_manager.getIntrinsic(func_call.intrinsic);
-
-				if(intrinsic.kind == PIR::Intrinsic::Kind::import){
-					if(var_decl.isDef == false){
-						// TODO: better messaging
-						this->source.error("imports must be marked as \"def\" not \"var\"", var_decl.ident);
-						return false;
-					}
-				}
-
-				const std::string_view import_path = this->source.getLiteral(func_call.args[0].astNode).value.string;
-				const std::filesystem::path source_file_path = this->source.getLocation();
-				const evo::Expected<Source::ID, SourceManager::GetSourceIDError> imported_source_id =
-					src_manager.getSourceID(source_file_path, import_path);
-
-				if(imported_source_id.has_value() == false){
-					switch(imported_source_id.error()){
-						case SourceManager::GetSourceIDError::EmptyPath: {
-							this->source.error("Empty path is an invalid lookup location", var_decl.expr);
-							return false;	
-						} break;
-
-						case SourceManager::GetSourceIDError::SameAsCaller: {
-							// TODO: better messaging
-							this->source.error("Cannot import self", var_decl.expr);
-							return false;	
-						} break;
-
-						case SourceManager::GetSourceIDError::NotOneOfSources: {
-							this->source.error(std::format("File \"{}\" is not one of the files being compiled", import_path), var_decl.expr);
-							return false;	
-						} break;
-
-						case SourceManager::GetSourceIDError::DoesntExist: {
-							this->source.error(std::format("Couldn't find file \"{}\"", import_path), var_decl.expr);
-							return false;	
-						} break;
-					};
-
-					EVO_FATAL_BREAK("Unkonwn or unsupported error code");
-				}
-
-				this->add_import_to_scope(ident.value.string, Import(imported_source_id.value(), var_decl.ident));
-
-				if(is_pub){
-					this->source.pir.pub_imports.emplace(ident.value.string, imported_source_id.value());
-				}
-
-				return true;
-			}
-
 		}
 		
 
@@ -630,9 +586,10 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Conditional::ID cond_id = this->source.createConditional(
-			this->get_expr_value(sub_cond.ifExpr), std::move(then_stmts), std::move(else_stmts)
-		);
+		const evo::Result<PIR::Expr> if_expr_value = this->get_expr_value(sub_cond.ifExpr);
+		if(if_expr_value.isError()){ return false; }
+
+		const PIR::Conditional::ID cond_id = this->source.createConditional(if_expr_value.value(), std::move(then_stmts), std::move(else_stmts));
 		this->get_stmts_entry().emplace_back(cond_id);
 
 
@@ -694,8 +651,9 @@ namespace panther{
 				}
 			}
 
-			return_value.emplace(this->get_expr_value(*return_stmt.value));
-
+			const evo::Result<PIR::Expr> return_value_expr = this->get_expr_value(*return_stmt.value);
+			if(return_value_expr.isError()){ return false; }
+			return_value.emplace(return_value_expr.value());
 
 		}else{
 			// "return;"
@@ -743,8 +701,9 @@ namespace panther{
 		///////////////////////////////////
 		// checking of lhs
 
-		const ExprValueType dst_value_type = this->get_expr_value_type(infix.lhs);
-		if(dst_value_type != ExprValueType::Concrete){
+		const evo::Result<ExprValueType> dst_value_type = this->get_expr_value_type(infix.lhs);
+		if(dst_value_type.isError()){ return false; }
+		if(dst_value_type.value() != ExprValueType::Concrete){
 			this->source.error("Only concrete values may be assigned to", infix.lhs);
 			return false;
 		}
@@ -757,10 +716,11 @@ namespace panther{
 			return false;
 		}
 
-		const PIR::Expr lhs_value = this->get_expr_value(infix.lhs);
+		const evo::Result<PIR::Expr> lhs_value = this->get_expr_value(infix.lhs);
+		if(lhs_value.isError()){ return false; }
 
-		if(lhs_value.kind == PIR::Expr::Kind::Param){
-			PIR::Param& param = this->source.getParam(lhs_value.param);
+		if(lhs_value.value().kind == PIR::Expr::Kind::Param){
+			PIR::Param& param = this->source.getParam(lhs_value.value().param);
 			param.mayHaveBeenEdited = true;
 		}
 
@@ -768,8 +728,9 @@ namespace panther{
 		///////////////////////////////////
 		// checking of rhs
 
-		const ExprValueType expr_value_type = this->get_expr_value_type(infix.rhs);
-		if(expr_value_type != ExprValueType::Ephemeral){
+		const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(infix.rhs);
+		if(expr_value_type.isError()){ return false; }
+		if(expr_value_type.value() != ExprValueType::Ephemeral){
 			this->source.error("Only ephemeral values may be assignment values", infix.rhs);
 			return false;
 		}
@@ -777,7 +738,8 @@ namespace panther{
 		const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.rhs));
 		if(expr_type_id.isError()){ return false; }
 
-		const PIR::Expr rhs_value = this->get_expr_value(infix.rhs);
+		const evo::Result<PIR::Expr> rhs_value = this->get_expr_value(infix.rhs);
+		if(rhs_value.isError()){ return false; }
 
 
 		///////////////////////////////////
@@ -806,7 +768,7 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Assignment::ID assignment_id = this->source.createAssignment(lhs_value, infix.op, rhs_value);
+		const PIR::Assignment::ID assignment_id = this->source.createAssignment(lhs_value.value(), infix.op, rhs_value.value());
 		this->get_stmts_entry().emplace_back(assignment_id);
 
 
@@ -1020,7 +982,8 @@ namespace panther{
 			}
 
 			// check param kind accepts arg value type
-			const ExprValueType arg_value_type = this->get_expr_value_type(arg_id);
+			const evo::Result<ExprValueType> arg_value_type = this->get_expr_value_type(arg_id);
+			if(arg_value_type.isError()){ return false; }
 
 			using ParamKind = AST::FuncParams::Param::Kind;
 			switch(param.kind){
@@ -1029,7 +992,7 @@ namespace panther{
 				} break;
 
 				case ParamKind::Write: {
-					if(arg_value_type != ExprValueType::Concrete){
+					if(arg_value_type.value() != ExprValueType::Concrete){
 						this->source.error("write parameters require concrete expression values", arg_id);
 						return false;
 					}
@@ -1041,7 +1004,7 @@ namespace panther{
 				} break;
 
 				case ParamKind::In: {
-					if(arg_value_type != ExprValueType::Ephemeral){
+					if(arg_value_type.value() != ExprValueType::Ephemeral){
 						this->source.error("write parameters require ephemeral expression values", arg_id);
 						return false;
 					}
@@ -1070,14 +1033,10 @@ namespace panther{
 		auto args = std::vector<PIR::Expr>();
 
 		for(AST::Node::ID arg_id : func_call.args){
-			if(this->is_global_scope()){
-				const evo::Result<PIR::Expr> expr = this->get_const_expr_value(arg_id);
-				evo::debugAssert(expr.isSuccess(), "uncaught error");
+			const evo::Result<PIR::Expr> expr = this->is_global_scope() ? this->get_const_expr_value(arg_id) : this->get_expr_value(arg_id);
+			evo::debugAssert(expr.isSuccess(), "uncaught error");
 
-				args.emplace_back(expr.value());
-			}else{
-				args.emplace_back(this->get_expr_value(arg_id));
-			}
+			args.emplace_back(expr.value());
 		}
 
 		return args;
@@ -1123,11 +1082,6 @@ namespace panther{
 
 
 			case AST::Kind::Ident: {
-				if(this->is_global_scope()){
-					this->source.error("At this time, constant values cannot be the value of a variable", node);
-					return evo::resultError;
-				}
-
 				const Token& ident = this->source.getIdent(node);
 				std::string_view ident_str = ident.value.string;
 
@@ -1199,8 +1153,9 @@ namespace panther{
 
 				switch(this->source.getToken(prefix.op).kind){
 					case Token::KeywordCopy: {
-						const ExprValueType expr_value_type = this->get_expr_value_type(prefix.rhs);
-						if(expr_value_type != ExprValueType::Concrete){
+						const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(prefix.rhs);
+						if(expr_value_type.isError()){ return evo::resultError; }
+						if(expr_value_type.value() != ExprValueType::Concrete){
 							this->source.error("Only concrete expressions can be copied", prefix.rhs);
 							return evo::resultError;
 						}
@@ -1211,8 +1166,9 @@ namespace panther{
 
 					case Token::KeywordAddr: {
 						// check value type
-						const ExprValueType expr_value_type = this->get_expr_value_type(prefix.rhs);
-						if(expr_value_type != ExprValueType::Concrete){
+						const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(prefix.rhs);
+						if(expr_value_type.isError()){ return evo::resultError; }
+						if(expr_value_type.value() != ExprValueType::Concrete){
 							this->source.error("Can only take the address of a concrete expression", prefix.rhs);
 							return evo::resultError;
 						}
@@ -1391,7 +1347,7 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::get_expr_value(AST::Node::ID node_id) const noexcept -> PIR::Expr {
+	auto SemanticAnalyzer::get_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr> {
 		evo::debugAssert(this->is_global_scope() == false, "SemanticAnalyzer::get_expr_value() is not for use in global variables");
 
 		const AST::Node& value_node = this->source.getNode(node_id);
@@ -1447,27 +1403,45 @@ namespace panther{
 					return PIR::Expr(func_call_id);
 
 				}else if(target_node.kind == AST::Kind::Intrinsic){
-					const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
+					// get the intrinsic id
+					const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
+						const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
+						const std::vector<PIR::Intrinsic>& intrinsics = this->source.getSourceManager().getIntrinsics();
 
-					const std::vector<PIR::Intrinsic>& intrinsics = this->source.getSourceManager().getIntrinsics();
-					for(size_t i = 0; i < intrinsics.size(); i+=1){
-						const PIR::Intrinsic& intrinsic = intrinsics[i];
+						for(size_t i = 0; i < intrinsics.size(); i+=1){
+							const PIR::Intrinsic& intrinsic = intrinsics[i];
 
-						if(intrinsic.ident == intrinsic_tok.value.string){
-							const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(PIR::Intrinsic::ID(uint32_t(i)), std::move(args));						
-							return PIR::Expr(func_call_id);
+							if(intrinsic.ident == intrinsic_tok.value.string){
+								return PIR::Intrinsic::ID(uint32_t(i));
+							}
 						}
+
+						EVO_FATAL_BREAK("Unknown intrinsic");
+					}();
+
+
+					// imports
+					if(intrinsic_id == SourceManager::getIntrinsicIDImport()){
+						const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args[0], func_call.target);
+						if(import_source_id.isError()){ return evo::resultError; }
+
+						return PIR::Expr(import_source_id.value());
 					}
+
+					// function calls normally
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args));	
+					return PIR::Expr(func_call_id);
 
 				}else if(target_node.kind == AST::Kind::Infix){
 					const AST::Infix& infix = this->source.getInfix(func_call.target);
 
 					switch(this->source.getToken(infix.op).kind){
 						case Token::get("."): {
-							const PIR::Expr value_of_lhs = this->get_expr_value(infix.lhs);
-							evo::debugAssert(value_of_lhs.kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+							const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
+							if(value_of_lhs.isError()){ return evo::resultError; }
+							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-							const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.import);
+							const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.value().import);
 							const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 							evo::debugAssert(
@@ -1495,11 +1469,12 @@ namespace panther{
 			case AST::Kind::Prefix: {
 				const AST::Prefix& prefix = this->source.getPrefix(value_node);
 
-				const PIR::Expr rhs_value = this->get_expr_value(prefix.rhs);
-				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, rhs_value);
+				const evo::Result<PIR::Expr> rhs_value = this->get_expr_value(prefix.rhs);
+				if(rhs_value.isError()){ return evo::resultError; }
+				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, rhs_value.value());
 
-				if(rhs_value.kind == PIR::Expr::Kind::Param && this->source.getToken(prefix.op).kind == Token::KeywordAddr){
-					this->source.getParam(rhs_value.param).mayHaveBeenEdited = true;
+				if(rhs_value.value().kind == PIR::Expr::Kind::Param && this->source.getToken(prefix.op).kind == Token::KeywordAddr){
+					this->source.getParam(rhs_value.value().param).mayHaveBeenEdited = true;
 				}
 
 				return PIR::Expr(prefix_id);
@@ -1511,10 +1486,11 @@ namespace panther{
 
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
-						const PIR::Expr value_of_lhs = this->get_expr_value(infix.lhs);
-						evo::debugAssert(value_of_lhs.kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
+						if(value_of_lhs.isError()){ return evo::resultError; }
+						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-						const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.import);
+						const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.value().import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 
@@ -1539,17 +1515,26 @@ namespace panther{
 			case AST::Kind::Postfix: {
 				const AST::Postfix& postfix = this->source.getPostfix(value_node);
 
-				// get deref type
-				const evo::Result<PIR::Type::ID> ptr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
-				evo::debugAssert(ptr_type_id.isSuccess(), "Failed to get deref type - should have caught error earlier");
+				switch(this->source.getToken(postfix.op).kind){
+					case Token::get(".^"): {
+						// get deref type
+						const evo::Result<PIR::Type::ID> ptr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
+						evo::debugAssert(ptr_type_id.isSuccess(), "Failed to get deref type - should have caught error earlier");
 
-				const PIR::Type& ptr_type = this->source.getSourceManager().getType(ptr_type_id.value());
-				PIR::Type ptr_type_copy = ptr_type;
-				ptr_type_copy.qualifiers.pop_back();
-				const PIR::Type::ID deref_type_id = this->source.getSourceManager().getOrCreateTypeID(ptr_type_copy);
+						const PIR::Type& ptr_type = this->source.getSourceManager().getType(ptr_type_id.value());
+						PIR::Type ptr_type_copy = ptr_type;
+						ptr_type_copy.qualifiers.pop_back();
+						const PIR::Type::ID deref_type_id = this->source.getSourceManager().getOrCreateTypeID(ptr_type_copy);
 
-				const PIR::Deref::ID deref_id = this->source.createDeref(this->get_expr_value(postfix.lhs), deref_type_id);
-				return PIR::Expr(deref_id);
+						const evo::Result<PIR::Expr> lhs_expr_value = this->get_expr_value(postfix.lhs);
+						if(lhs_expr_value.isError()){ return evo::resultError; }
+
+						const PIR::Deref::ID deref_id = this->source.createDeref(lhs_expr_value.value(), deref_type_id);
+						return PIR::Expr(deref_id);
+					} break;
+				};
+
+				EVO_FATAL_BREAK("Unknown or unsupported postfix type");
 			} break;
 
 
@@ -1589,28 +1574,34 @@ namespace panther{
 
 		switch(node.kind){
 			case AST::Kind::Ident: {
-				// const Token& value_ident = this->source.getIdent(node);
-				// std::string_view value_ident_str = value_ident.value.string;
+				const Token& value_ident = this->source.getIdent(node);
+				std::string_view value_ident_str = value_ident.value.string;
 
-				// // find the var
-				// for(const Scope& scope : this->scopes){
-				// 	if(scope.vars.contains(value_ident_str)){
-				// 		return PIR::Expr(scope.vars.at(value_ident_str));
-				// 	}
+				// find the var
+				for(const Scope& scope : this->scopes){
+					if(scope.vars.contains(value_ident_str)){
+						// return PIR::Expr(scope.vars.at(value_ident_str));
 
-				// 	if(scope.params.contains(value_ident_str)){
-				// 		return PIR::Expr(scope.params.at(value_ident_str));
-				// 	}
+						this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
+						return evo::resultError;
+					}
 
-				// 	if(scope.imports.contains(value_ident_str)){
-				// 		// TODO...
-				// 	}
-				// }
+					if(scope.params.contains(value_ident_str)){
+						// return PIR::Expr(scope.params.at(value_ident_str));
 
-				// EVO_FATAL_BREAK("Unkown ident");
+						this->source.error("At this time, constant-evaluated values cannot be the value of a parameter", node);
+						return evo::resultError;
+					}
 
-				this->source.error("At this time, constant values cannot be the value of a variable", node);
-				return evo::resultError;
+					if(scope.imports.contains(value_ident_str)){
+						// return PIR::Expr(scope.imports.at(value_ident_str).source_id);
+
+						this->source.error("At this time, constant-evaluated values cannot be the value of an import", node);
+						return evo::resultError;
+					}
+				}
+
+				EVO_FATAL_BREAK("Unkown ident");
 
 			} break;
 
@@ -1619,12 +1610,12 @@ namespace panther{
 				const AST::Node& target_node = this->source.getNode(func_call.target);
 
 				if(target_node.kind != AST::Kind::Intrinsic){
-					this->source.error("At this time, constant values cannot be function calls", node, {{"calls to intrinsic functions are allowed"}});
+					this->source.error(
+						"At this time, constant-evaluated values cannot be function calls", node,
+						std::vector<Message::Info>{ Message::Info("calls to intrinsic functions are allowed") }
+					);
 					return evo::resultError;
 				}
-
-
-				const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
 
 				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target));
 				if(target_type_id.isError()){ return evo::resultError; }
@@ -1634,18 +1625,33 @@ namespace panther{
 
 				const std::vector<PIR::Expr> args = this->get_func_call_args(func_call);
 
-				const std::vector<PIR::Intrinsic>& intrinsics = this->source.getSourceManager().getIntrinsics();
-				for(size_t i = 0; i < intrinsics.size(); i+=1){
-					const PIR::Intrinsic& intrinsic = intrinsics[i];
+				// get the intrinsic id
+				const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
+					const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
+					const std::vector<PIR::Intrinsic>& intrinsics = this->source.getSourceManager().getIntrinsics();
 
-					if(intrinsic.ident == intrinsic_tok.value.string){
-						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(PIR::Intrinsic::ID(uint32_t(i)), std::move(args));						
-						return PIR::Expr(func_call_id);
+					for(size_t i = 0; i < intrinsics.size(); i+=1){
+						const PIR::Intrinsic& intrinsic = intrinsics[i];
+
+						if(intrinsic.ident == intrinsic_tok.value.string){
+							return PIR::Intrinsic::ID(uint32_t(i));
+						}
 					}
+
+					EVO_FATAL_BREAK("Unknown intrinsic");
+				}();
+
+				// imports
+				if(intrinsic_id == SourceManager::getIntrinsicIDImport()){
+					const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args[0], func_call.target);
+					if(import_source_id.isError()){ return evo::resultError; }
+
+					return PIR::Expr(import_source_id.value());
 				}
 
-				EVO_FATAL_BREAK("Intrinsic not found");
-
+				// function calls normally
+				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args));	
+				return PIR::Expr(func_call_id);
 			} break;
 
 			case AST::Kind::Prefix: {
@@ -1688,11 +1694,50 @@ namespace panther{
 	};
 
 
+	auto SemanticAnalyzer::get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID> {
+		const SourceManager& src_manager = this->source.getSourceManager();
+
+		const std::string_view import_path_str = this->source.getLiteral(import_path.astNode).value.string;
+		const std::filesystem::path source_file_path = this->source.getLocation();
+		const evo::Expected<Source::ID, SourceManager::GetSourceIDError> imported_source_id_result =
+			src_manager.getSourceID(source_file_path, import_path_str);
+
+		if(imported_source_id_result.has_value() == false){
+			switch(imported_source_id_result.error()){
+				case SourceManager::GetSourceIDError::EmptyPath: {
+					this->source.error("Empty path is an invalid lookup location", expr_node);
+					return evo::resultError;
+				} break;
+
+				case SourceManager::GetSourceIDError::SameAsCaller: {
+					// TODO: better messaging
+					this->source.error("Cannot import self", expr_node);
+					return evo::resultError;
+				} break;
+
+				case SourceManager::GetSourceIDError::NotOneOfSources: {
+					this->source.error(std::format("File \"{}\" is not one of the files being compiled", import_path_str), expr_node);
+					return evo::resultError;
+				} break;
+
+				case SourceManager::GetSourceIDError::DoesntExist: {
+					this->source.error(std::format("Couldn't find file \"{}\"", import_path_str), expr_node);
+					return evo::resultError;
+				} break;
+			};
+
+			EVO_FATAL_BREAK("Unkonwn or unsupported error code");
+		}
+
+		return imported_source_id_result.value();
+	};
 
 
 
 
-	auto SemanticAnalyzer::get_expr_value_type(AST::Node::ID node_id) const noexcept -> ExprValueType {
+
+
+	auto SemanticAnalyzer::get_expr_value_type(AST::Node::ID node_id) const noexcept -> evo::Result<ExprValueType> {
 		const AST::Node& value_node = this->source.getNode(node_id);
 
 		switch(value_node.kind){
@@ -1708,8 +1753,10 @@ namespace panther{
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
 						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
 
-						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-						evo::debugAssert(value_of_lhs.isSuccess(), "Should have caught this error already");
+						const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() ? 
+							this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
+						if(value_of_lhs.isError()){ return evo::resultError; } // TODO: make this a debug assert when globals can be variables
+
 
 						if(lhs_type_id.value() == SourceManager::getTypeImport()){
 							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
@@ -1726,6 +1773,9 @@ namespace panther{
 							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
 								return ExprValueType::Import;
 							}
+
+							this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
+							return evo::resultError;
 						}
 
 						EVO_FATAL_BREAK("Invalid lhs type");

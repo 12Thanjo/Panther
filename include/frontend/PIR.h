@@ -174,6 +174,7 @@ namespace panther{
 		struct IntrinsicID{ // typesafe identifier
 			uint32_t id;
 			explicit IntrinsicID(uint32_t _id) noexcept : id(_id) {};
+			EVO_NODISCARD auto operator==(IntrinsicID rhs) const noexcept -> bool { return this->id == rhs.id; };
 		};
 
 

@@ -49,10 +49,12 @@ namespace panther{
 
 
 			// Not for use in global variables
-			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> PIR::Expr;
+			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
 
 			EVO_NODISCARD auto get_const_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
 			EVO_NODISCARD auto get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
+
+			EVO_NODISCARD auto get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID>;
 
 
 			enum class ExprValueType{
@@ -60,7 +62,7 @@ namespace panther{
 				Ephemeral,
 				Import,
 			};
-			EVO_NODISCARD auto get_expr_value_type(AST::Node::ID node_id) const noexcept -> ExprValueType;
+			EVO_NODISCARD auto get_expr_value_type(AST::Node::ID node_id) const noexcept -> evo::Result<ExprValueType>;
 
 			// must be given a concrete value
 			EVO_NODISCARD auto is_expr_mutable(AST::Node::ID node_id) const noexcept -> bool;
@@ -70,6 +72,8 @@ namespace panther{
 
 
 			auto already_defined(const Token& ident) const noexcept -> void;
+
+
 
 			///////////////////////////////////
 			// scope

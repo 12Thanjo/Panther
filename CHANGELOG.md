@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.22.1
+- Added some missing uses of imports
+	- `def sub_import = some_import.sub_import;` at local scope (at global scope will be supported eventually)
+	- `def sub_import = @import("some_import.pthr").sub_import;`
+
 ### v0.22.0
 - Added tokenizing and parsing of type `String`
 - Fixed literal strings and literal chars not being printed correctly in the `PrintAST` output target
