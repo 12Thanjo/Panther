@@ -62,6 +62,7 @@ namespace panther{
 				struct ID{ // typesafe identifier
 					uint32_t id;
 					explicit ID(uint32_t _id) noexcept : id(_id) {};
+					EVO_NODISCARD auto operator==(ID rhs) const noexcept -> bool { return this->id == rhs.id; };
 				};
 
 				enum class Kind{
@@ -277,6 +278,7 @@ namespace panther{
 			Type::ID type;
 			Expr value;
 			bool isDef;
+			bool isExport;
 
 			union {
 				llvm::GlobalVariable* global = nullptr;

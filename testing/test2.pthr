@@ -4,15 +4,20 @@ def test3 #pub = @import("test3.pthr");
 
 
 
-func print_hello_world = () #pub -> Void {
+func print = () #pub -> Void {
 	@__printHelloWorld();
 }
+
+func print = (val: Int) #pub -> Void {
+	@__printInt(val);
+}
+
 
 func get_val = (num: Int write, should_change: Bool) #pub -> Int {
 	var output: Int = uninit;
 
 	if(should_change){
-		num = test.get_val();
+		num = copy test.get_global_num().^;
 		output = 1;
 	}else{
 		output = 0;

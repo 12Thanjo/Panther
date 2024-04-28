@@ -1,7 +1,7 @@
 -- premake5
 
 
-project "CLI"
+project "pthr"
 	kind "ConsoleApp"
 	-- staticruntime "On"
 	

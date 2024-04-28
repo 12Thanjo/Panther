@@ -101,6 +101,7 @@ namespace panther{
 		// checking attributes
 
 		bool is_pub = false;
+		bool is_export = false;
 		for(Token::ID attribute : var_decl.attributes){
 			const Token& token = this->source.getToken(attribute);
 			std::string_view token_str = token.value.string;
@@ -112,6 +113,29 @@ namespace panther{
 					// TODO: maybe this should be an error instead?
 					this->source.warning("Only variables at global scope can be marked with the attribute #pub - ignoring", token);
 				}
+
+			}else if(token_str == "export"){
+				if(this->is_global_scope() == false){
+					this->source.error("Only variables at global scope can be marked with the attribute #export - ignoring", token);
+					return false;
+				}
+
+				if(this->is_valid_export_name(ident.value.string) == false){
+					this->source.error(std::format("Variables with attribute \"#export\" cannot be named \"{}\"", ident.value.string), ident);
+					return false;
+				}
+
+				if(this->src_manager.hasExport(ident.value.string)){
+					// TODO: better messaging
+					this->source.error(
+						std::format("Already exported a identifier named \"{}\"", ident.value.string), ident,
+						std::vector<Message::Info>{ Message::Info("Location information for first export location not supported yet") }
+					);
+					return false;
+				}
+
+				this->src_manager.addExport(ident.value.string);
+				is_export = true;
 
 			}else{
 				// TODO: better messaging
@@ -133,9 +157,6 @@ namespace panther{
 		}
 		const AST::Node& expr_node = this->source.getNode(var_decl.expr);
 
-
-		SourceManager& src_manager = this->source.getSourceManager();
-
 		auto var_type_id = std::optional<PIR::Type::ID>();
 		if(var_decl.type.has_value()){
 			const evo::Result<PIR::Type::VoidableID> var_type_id_result = this->get_type_id(*var_decl.type);
@@ -154,8 +175,8 @@ namespace panther{
 				if(expr_type_id.isError()){ return false; }
 
 				if(*var_type_id != expr_type_id.value()){
-					const PIR::Type& var_type = src_manager.getType(*var_type_id);
-					const PIR::Type& expr_type = src_manager.getType(expr_type_id.value());
+					const PIR::Type& var_type = this->src_manager.getType(*var_type_id);
+					const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
 
 					if(expr_type.isImplicitlyConvertableTo(var_type) == false){
 						this->source.error(
@@ -163,8 +184,8 @@ namespace panther{
 							var_decl.expr,
 
 							std::vector<Message::Info>{
-								{std::string("Variable is of type:   ") + src_manager.printType(*var_type_id)},
-								{std::string("Expression is of type: ") + src_manager.printType(expr_type_id.value())}
+								{std::string("Variable is of type:   ") + this->src_manager.printType(*var_type_id)},
+								{std::string("Expression is of type: ") + this->src_manager.printType(expr_type_id.value())}
 							}
 						);
 						return false;
@@ -222,7 +243,7 @@ namespace panther{
 			this->add_import_to_scope(ident.value.string, Import(var_value.value().import, var_decl.ident));
 
 			if(is_pub){
-				this->source.pir.pub_imports.emplace(ident.value.string, var_value.value().import);
+				this->source.addPublicImport(ident.value.string, var_value.value().import);
 			}
 
 			return true;
@@ -253,7 +274,7 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, *var_type_id, var_value.value(), var_decl.isDef);
+		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, *var_type_id, var_value.value(), var_decl.isDef, is_export);
 
 		this->add_var_to_scope(ident.value.string, var_id);
 
@@ -265,7 +286,7 @@ namespace panther{
 
 
 		if(is_pub){
-			this->source.pir.pub_vars.emplace(ident.value.string, var_id);
+			this->source.addPublicVar(ident.value.string, var_id);
 		}
 
 
@@ -286,13 +307,6 @@ namespace panther{
 		// check function is in global scope
 		if(this->is_global_scope() == false){
 			this->source.error("Functions can only be defined at global scope", ident);
-			return false;
-		}
-
-
-		// check ident is unused
-		if(this->has_in_scope(ident.value.string)){
-			this->already_defined(ident);
 			return false;
 		}
 
@@ -354,6 +368,21 @@ namespace panther{
 					return false;
 				}
 
+				if(params.empty() == false){
+					this->source.error("Function with attribute \"#export\" cannot have arguments yet", ident);
+					return false;
+				}
+
+				if(this->src_manager.hasExport(ident.value.string)){
+					// TODO: better messaging
+					this->source.error(
+						std::format("Already exported an identifier named \"{}\"", ident.value.string), ident,
+						std::vector<Message::Info>{ Message::Info("Location information for first export location not supported yet") }
+					);
+					return false;
+				}
+
+				this->src_manager.addExport(ident.value.string);
 				is_export = true;
 
 			}else if(token_str == "entry"){
@@ -388,7 +417,29 @@ namespace panther{
 		auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 		base_type.callOperator = PIR::BaseType::Operator(std::move(param_type_ids), return_type_id.value());
 
-		const PIR::BaseType::ID base_type_id = this->source.getSourceManager().createBaseType(std::move(base_type));
+		const PIR::BaseType::ID base_type_id = this->src_manager.createBaseType(std::move(base_type));
+
+
+		///////////////////////////////////
+		// check for overload reuse
+
+		for(const Scope& scope : this->scopes){
+			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
+			ConstFuncScopeListIter func_scope_list_iter = scope.funcs.find(ident.value.string);
+			if(func_scope_list_iter == scope.funcs.end()){ continue; }
+
+			for(PIR::Func::ID existing_func_id : func_scope_list_iter->second){
+				const PIR::Func& existing_func = this->source.getFunc(existing_func_id);
+
+				if(existing_func.baseType == base_type_id){
+					this->source.error(
+						"Function with same prototype already defined", ident,
+						std::vector<Message::Info>{ Message::Info("First defined here:", this->source.getToken(existing_func.ident).location) }
+					);
+					return false;
+				}
+			}
+		}
 
 
 		///////////////////////////////////
@@ -402,22 +453,20 @@ namespace panther{
 
 
 		if(is_entry){
-			SourceManager& src_manager = this->source.getSourceManager();
-
 			// check is valid return type
-			if(return_type_id.value().isVoid() || return_type_id.value().typeID() != src_manager.getTypeInt()){
+			if(return_type_id.value().isVoid() || return_type_id.value().typeID() != this->src_manager.getTypeInt()){
 				this->source.error("Function with attribute \"#entry\" must return type Int", ident);
 				return false;
 			}
 
 			// check there isn't already an entry function defined
-			if(src_manager.hasEntry()){
+			if(this->src_manager.hasEntry()){
 				this->source.error("Already has entry function", ident);
 				return false;
 			}
 
 			// create entry
-			src_manager.addEntry(this->source.getID(), func_id);
+			this->src_manager.addEntry(this->source.getID(), func_id);
 		}
 
 
@@ -434,7 +483,7 @@ namespace panther{
 			this->global_funcs.emplace_back(func_id, func);
 
 			if(is_pub){
-				this->source.pir.pub_funcs.emplace(ident.value.string, func_id);
+				this->source.addPublicFunc(ident.value.string, func_id);
 			}
 		}
 
@@ -512,8 +561,6 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_conditional_recursive(const AST::Conditional& sub_cond) noexcept -> bool {
-		SourceManager& src_manager = this->source.getSourceManager();
-
 		if(this->in_func_scope() == false){
 			this->source.error("Conditional statements can only be inside functions", sub_cond.ifTok);
 			return false;
@@ -528,11 +575,11 @@ namespace panther{
 		const evo::Result<PIR::Type::ID> cond_type_id = this->analyze_and_get_type_of_expr(cond_expr);
 		if(cond_type_id.isError()){ return false; }
 
-		if(cond_type_id.value() != src_manager.getTypeBool()){
+		if(cond_type_id.value() != this->src_manager.getTypeBool()){
 			this->source.error(
 				"Conditional expression must be a boolean", cond_expr,
 				std::vector<Message::Info>{
-					{std::string("Conditional expression is of type: ") + src_manager.printType(cond_type_id.value())}
+					{std::string("Conditional expression is of type: ") + this->src_manager.printType(cond_type_id.value())}
 				}
 			);
 			return false;
@@ -631,10 +678,8 @@ namespace panther{
 
 
 			if(expr_type_id.value() != func_return_type_id.typeID()){
-				SourceManager& src_manager = this->source.getSourceManager();
-
-				const PIR::Type& func_return_type = src_manager.getType(func_return_type_id.typeID());
-				const PIR::Type& expr_type = src_manager.getType(expr_type_id.value());
+				const PIR::Type& func_return_type = this->src_manager.getType(func_return_type_id.typeID());
+				const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
 
 				if(expr_type.isImplicitlyConvertableTo(func_return_type) == false){
 					this->source.error(
@@ -642,8 +687,8 @@ namespace panther{
 						expr_node,
 
 						std::vector<Message::Info>{
-							{std::string("Function return is type: ") + src_manager.printType(func_return_type_id.typeID())},
-							{std::string("Return value is of type: ") + src_manager.printType(expr_type_id.value())}
+							{std::string("Function return is type: ") + this->src_manager.printType(func_return_type_id.typeID())},
+							{std::string("Return value is of type: ") + this->src_manager.printType(expr_type_id.value())}
 						}
 					);
 
@@ -746,10 +791,8 @@ namespace panther{
 		// type checking
 
 		if(dst_type_id.value() != expr_type_id.value()){
-			SourceManager& src_manager = this->source.getSourceManager();
-
-			const PIR::Type& dst_type = src_manager.getType(dst_type_id.value());
-			const PIR::Type& expr_type = src_manager.getType(expr_type_id.value());
+			const PIR::Type& dst_type = this->src_manager.getType(dst_type_id.value());
+			const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
 
 			if(expr_type.isImplicitlyConvertableTo(dst_type) == false){
 				this->source.error(
@@ -757,8 +800,8 @@ namespace panther{
 					infix.rhs,
 
 					std::vector<Message::Info>{
-						{std::string("left-hand-side is of type:  ") + src_manager.printType(dst_type_id.value())},
-						{std::string("right-hand-side is of type: ") + src_manager.printType(expr_type_id.value())}
+						{std::string("left-hand-side is of type:  ") + this->src_manager.printType(dst_type_id.value())},
+						{std::string("right-hand-side is of type: ") + this->src_manager.printType(expr_type_id.value())}
 					}
 				);
 			}
@@ -780,44 +823,31 @@ namespace panther{
 
 	auto SemanticAnalyzer::analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool {
 		// analyze and get type of ident
-		const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target));
+		const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target), &func_call);
 		if(target_type_id.isError()){ return false; }
 
-		const SourceManager& src_manager = this->source.getSourceManager();
-
-		if(this->check_func_call(func_call, target_type_id.value()) == false){ return false; }
-
-
 		// check if discarding return value
-		const PIR::Type& target_type = src_manager.getType(target_type_id.value());
-		const PIR::BaseType& target_base_type = src_manager.getBaseType(target_type.baseType);
+		const PIR::Type& target_type = this->src_manager.getType(target_type_id.value());
+		const PIR::BaseType& target_base_type = this->src_manager.getBaseType(target_type.baseType);
 		if(target_base_type.callOperator->returnType.isVoid() == false){
 			this->source.error("Discarding return value of function call", func_call.target);
 			return false;
 		}
 
+		if(this->check_func_call(func_call, target_type_id.value()) == false){ return false; }
 
 		const std::vector<PIR::Expr> args = this->get_func_call_args(func_call);
-
 		switch(this->source.getNode(func_call.target).kind){
 			case AST::Kind::Ident: {
 				const Token& ident_tok = this->source.getIdent(func_call.target);
 
-				// get_func
-				const PIR::Func::ID func_id = [&]() noexcept {
-					for(Scope& scope : this->scopes){
-						auto find = scope.funcs.find(ident_tok.value.string);
-						if(find != scope.funcs.end()){
-							return find->second;
-						}
-					}
-
-					EVO_FATAL_BREAK("Unknown func ident");
-				}();
+				// get func
+				const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident_tok.value.string, func_call);
+				if(func_id.isError()){ return false; }
 
 
 				// create object
-				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id, std::move(args));
+				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args));
 				this->get_stmts_entry().emplace_back(func_call_id);
 
 				return true;
@@ -826,7 +856,7 @@ namespace panther{
 			case AST::Kind::Intrinsic: {
 				const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
 
-				const std::vector<PIR::Intrinsic>& intrinsics = src_manager.getIntrinsics();
+				const std::vector<PIR::Intrinsic>& intrinsics = this->src_manager.getIntrinsics();
 				for(size_t i = 0; i < intrinsics.size(); i+=1){
 					const PIR::Intrinsic& intrinsic = intrinsics[i];
 
@@ -853,19 +883,14 @@ namespace panther{
 						evo::debugAssert(value_of_lhs.isSuccess(), "uncaught error");
 						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-						const Source& import_source = src_manager.getSource(value_of_lhs.value().import);
+						const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
-						if(import_source.pir.pub_funcs.contains(rhs_ident.value.string) == false){
-							// TODO: better messaging
-							this->source.error(std::format("import does not have function \"{}\"", rhs_ident.value.string), infix.rhs);
-							return false;
-						}
-
-						const PIR::Func::ID imported_func_id = import_source.pir.pub_funcs.at(rhs_ident.value.string);
+						const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(rhs_ident.value.string, import_source, func_call);
+						if(imported_func_id.isError()){ return false; }
 						
 						// create object
-						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id, std::move(args));
+						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args));
 						this->get_stmts_entry().emplace_back(func_call_id);
 
 						return true;
@@ -931,24 +956,22 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::check_func_call(const AST::FuncCall& func_call, PIR::Type::ID type_id) const noexcept -> bool {
-		const SourceManager& src_manager = this->source.getSourceManager();
-
-		const PIR::Type& type = src_manager.getType(type_id);
+		const PIR::Type& type = this->src_manager.getType(type_id);
 
 		if(type.qualifiers.empty() == false){
 			this->source.error(
 				"cannot be called like a function", func_call.target,
-				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", src_manager.printType(type_id)) }
+				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(type_id)) }
 			);
 			return false;
 		}
 
-		const PIR::BaseType& base_type = src_manager.getBaseType(type.baseType);
+		const PIR::BaseType& base_type = this->src_manager.getBaseType(type.baseType);
 		if(base_type.callOperator.has_value() == false){
 			// TODO: better messaging?
 			this->source.error(
 				"cannot be called like a function", func_call.target,
-				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", src_manager.printType(type_id)) }
+				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(type_id)) }
 			);
 			return false;
 		}
@@ -971,10 +994,10 @@ namespace panther{
 			if(arg_type_id.isError()){ return false; }
 
 			if(param.type != arg_type_id.value()){
-				const PIR::Type& param_type = src_manager.getType(param.type);
-				const PIR::Type& arg_type = src_manager.getType(arg_type_id.value());
+				const PIR::Type& param_type = this->src_manager.getType(param.type);
+				const PIR::Type& arg_type = this->src_manager.getType(arg_type_id.value());
 
-				if(param_type.isImplicitlyConvertableTo(arg_type) == false){
+				if(arg_type.isImplicitlyConvertableTo(param_type) == false){
 					// TODO: better messaging
 					this->source.error("Function call arguments do not match function", func_call.target);
 					return false;
@@ -1047,9 +1070,8 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> evo::Result<PIR::Type::ID> {
-		SourceManager& src_manager = this->source.getSourceManager();
-
+	auto SemanticAnalyzer::analyze_and_get_type_of_expr(const AST::Node& node, const AST::FuncCall* lookup_func_call) const noexcept 
+	-> evo::Result<PIR::Type::ID> {
 		switch(node.kind){
 			case AST::Kind::Literal: {
 				const Token& literal_value = this->source.getLiteral(node);
@@ -1075,8 +1097,8 @@ namespace panther{
 				}();
 
 
-				return src_manager.getOrCreateTypeID(
-					PIR::Type( src_manager.getBaseTypeID(base_type) )
+				return this->src_manager.getOrCreateTypeID(
+					PIR::Type( this->src_manager.getBaseTypeID(base_type) )
 				);
 			} break;
 
@@ -1091,15 +1113,23 @@ namespace panther{
 						return var.type;
 
 					}else if(scope.funcs.contains(ident_str)){
-						const PIR::Func& func = this->source.getFunc(scope.funcs.at(ident_str));
-						return src_manager.getOrCreateTypeID(PIR::Type(func.baseType));
+						if(lookup_func_call == nullptr){
+							this->source.error("Functions as values are not supported yet", node);
+							return evo::resultError;
+						}
+
+						const evo::Result<PIR::Func::ID> lookup_func_id = this->lookup_func_in_scope(ident_str, *lookup_func_call);
+						if(lookup_func_id.isError()){ return evo::resultError; }
+
+						const PIR::Func& lookup_func = this->source.getFunc(lookup_func_id.value());
+						return this->src_manager.getOrCreateTypeID(PIR::Type(lookup_func.baseType));
 
 					}else if(scope.params.contains(ident_str)){
 						const PIR::Param& param = this->source.getParam(scope.params.at(ident_str));
 						return param.type;
 
 					}else if(scope.imports.contains(ident_str)){
-						return src_manager.getTypeImport();
+						return this->src_manager.getTypeImport();
 					}
 				}
 
@@ -1112,9 +1142,9 @@ namespace panther{
 			case AST::Kind::Intrinsic: {
 				const Token& intrinsic_tok = this->source.getIntrinsic(node);
 
-				for(const PIR::Intrinsic& intrinsic : src_manager.getIntrinsics()){
+				for(const PIR::Intrinsic& intrinsic : this->src_manager.getIntrinsics()){
 					if(intrinsic.ident == intrinsic_tok.value.string){
-						return src_manager.getOrCreateTypeID(PIR::Type(intrinsic.baseType));
+						return this->src_manager.getOrCreateTypeID(PIR::Type(intrinsic.baseType));
 					}
 				}
 
@@ -1128,15 +1158,13 @@ namespace panther{
 				const AST::FuncCall& func_call = this->source.getFuncCall(node);
 
 				// get target type
-				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target));
+				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target), &func_call);
 				if(target_type_id.isError()){ return evo::resultError; }
 
 
 				// check that it's a function type
-				const PIR::Type& type = src_manager.getType(target_type_id.value());
-				const PIR::BaseType& base_type = src_manager.getBaseType(type.baseType);
-
-				if(this->check_func_call(func_call, target_type_id.value()) == false){ return evo::resultError; }
+				const PIR::Type& type = this->src_manager.getType(target_type_id.value());
+				const PIR::BaseType& base_type = this->src_manager.getBaseType(type.baseType);
 
 				const PIR::Type::VoidableID return_type = base_type.callOperator->returnType;
 				if(return_type.isVoid()){
@@ -1185,14 +1213,14 @@ namespace panther{
 						const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
 						if(type_of_rhs.isError()){ return evo::resultError; }
 
-						const PIR::Type& rhs_type = this->source.getSourceManager().getType(type_of_rhs.value());
+						const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
 						PIR::Type rhs_type_copy = rhs_type;
 
 
 						// make the type pointer of the type of rhs
 						rhs_type_copy.qualifiers.emplace_back(true, !this->is_expr_mutable(prefix.rhs));
 
-						return this->source.getSourceManager().getOrCreateTypeID(rhs_type_copy);
+						return this->src_manager.getOrCreateTypeID(rhs_type_copy);
 					} break;
 
 					default: EVO_FATAL_BREAK("Unknown prefix operator");
@@ -1218,16 +1246,35 @@ namespace panther{
 						if(value_of_lhs.isError()){ return evo::resultError; }
 						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-						const Source& import_source = src_manager.getSource(value_of_lhs.value().import);
+						const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 						if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-							const PIR::Func::ID imported_func_id = import_source.pir.pub_funcs.at(rhs_ident.value.string);
-							const PIR::Func& imported_func = Source::getFunc(imported_func_id);
+							const std::vector<PIR::Func::ID>& imported_func_list = import_source.pir.pub_funcs.at(rhs_ident.value.string);
 
-							return src_manager.getOrCreateTypeID(
-								PIR::Type(imported_func.baseType)
-							);
+							if(imported_func_list.size() == 1){
+								const PIR::Func& imported_func = Source::getFunc(imported_func_list[0]);
+
+								return this->src_manager.getOrCreateTypeID(
+									PIR::Type(imported_func.baseType)
+								);
+							}
+
+							if(lookup_func_call != nullptr){
+								const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
+									rhs_ident.value.string, import_source, *lookup_func_call
+								);
+								if(imported_func_id.isError()){ return evo::resultError; }
+
+								const PIR::Func& imported_func = Source::getFunc(imported_func_id.value());
+
+								return this->src_manager.getOrCreateTypeID(
+									PIR::Type(imported_func.baseType)
+								);
+							}
+
+							this->source.error("Cannot get overloaded function", infix.rhs);
+							return evo::resultError;
 
 						}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
 							const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
@@ -1236,7 +1283,7 @@ namespace panther{
 							return imported_var.type;
 
 						}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-							return this->source.getSourceManager().getTypeImport();
+							return this->src_manager.getTypeImport();
 						}
 
 						// TODO: better messaging
@@ -1257,12 +1304,12 @@ namespace panther{
 						if(type_of_lhs.isError()){ return evo::resultError; }
 
 						// check that type of lhs is pointer
-						const PIR::Type& lhs_type = this->source.getSourceManager().getType(type_of_lhs.value());
+						const PIR::Type& lhs_type = this->src_manager.getType(type_of_lhs.value());
 						if(lhs_type.qualifiers.empty() || lhs_type.qualifiers.back().isPtr == false){
 							this->source.error(
 								"left-hand-side of dereference expression must be of a pointer type", postfix.op,
 								std::vector<Message::Info>{
-									{std::string("expression is of type: ") + src_manager.printType(type_of_lhs.value())},
+									{std::string("expression is of type: ") + this->src_manager.printType(type_of_lhs.value())},
 								}
 							);
 							return evo::resultError;
@@ -1272,7 +1319,7 @@ namespace panther{
 						PIR::Type lhs_type_copy = lhs_type;
 						lhs_type_copy.qualifiers.pop_back();
 
-						return this->source.getSourceManager().getOrCreateTypeID(lhs_type_copy);
+						return this->src_manager.getOrCreateTypeID(lhs_type_copy);
 					} break;
 
 					default: EVO_FATAL_BREAK("Unknown postfix operator");
@@ -1335,11 +1382,9 @@ namespace panther{
 		}
 		
 
-		SourceManager& src_manager = this->source.getSourceManager();
-
 		return PIR::Type::VoidableID(
-			src_manager.getOrCreateTypeID(
-				PIR::Type(src_manager.getBaseTypeID(type_token.kind), type_qualifiers)
+			this->src_manager.getOrCreateTypeID(
+				PIR::Type(this->src_manager.getBaseTypeID(type_token.kind), type_qualifiers)
 			)
 		);
 	};
@@ -1387,26 +1432,19 @@ namespace panther{
 				if(target_node.kind == AST::Kind::Ident){
 					const std::string_view ident = this->source.getIdent(func_call.target).value.string;
 
-					const PIR::Func::ID func_id = [&]() noexcept {
-						for(const Scope& scope : this->scopes){
-							auto find = scope.funcs.find(ident);
-							if(find != scope.funcs.end()){
-								return find->second;
-							}
-						}
-
-						EVO_FATAL_BREAK("Unknown func ident");
-					}();
+					// get func
+					const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident, func_call);
+					if(func_id.isError()){ return evo::resultError; }
 
 
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id, std::move(args));
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args));
 					return PIR::Expr(func_call_id);
 
 				}else if(target_node.kind == AST::Kind::Intrinsic){
 					// get the intrinsic id
 					const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
 						const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
-						const std::vector<PIR::Intrinsic>& intrinsics = this->source.getSourceManager().getIntrinsics();
+						const std::vector<PIR::Intrinsic>& intrinsics = this->src_manager.getIntrinsics();
 
 						for(size_t i = 0; i < intrinsics.size(); i+=1){
 							const PIR::Intrinsic& intrinsic = intrinsics[i];
@@ -1441,18 +1479,18 @@ namespace panther{
 							if(value_of_lhs.isError()){ return evo::resultError; }
 							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-							const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.value().import);
+							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 							const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
-							evo::debugAssert(
-								import_source.pir.pub_funcs.contains(rhs_ident.value.string),
-								"should have already caught that it's not existant"
+							// get func
+							const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
+								rhs_ident.value.string, import_source, func_call
 							);
+							if(imported_func_id.isError()){ return evo::resultError; }
 
-							const PIR::Func::ID imported_func_id = import_source.pir.pub_funcs.at(rhs_ident.value.string);
 							
 							// create object
-							const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id, std::move(args));
+							const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args));
 							return PIR::Expr(func_call_id);
 						} break;
 
@@ -1490,7 +1528,7 @@ namespace panther{
 						if(value_of_lhs.isError()){ return evo::resultError; }
 						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-						const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.value().import);
+						const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 
@@ -1498,6 +1536,10 @@ namespace panther{
 							const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
 							return PIR::Expr(imported_var_id);
 
+						}else if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
+							this->source.error("Functions as values are not supported yet", infix.rhs);
+							return evo::resultError;
+							
 						}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
 							const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
 							return PIR::Expr(imported_source_id);
@@ -1521,10 +1563,10 @@ namespace panther{
 						const evo::Result<PIR::Type::ID> ptr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
 						evo::debugAssert(ptr_type_id.isSuccess(), "Failed to get deref type - should have caught error earlier");
 
-						const PIR::Type& ptr_type = this->source.getSourceManager().getType(ptr_type_id.value());
+						const PIR::Type& ptr_type = this->src_manager.getType(ptr_type_id.value());
 						PIR::Type ptr_type_copy = ptr_type;
 						ptr_type_copy.qualifiers.pop_back();
-						const PIR::Type::ID deref_type_id = this->source.getSourceManager().getOrCreateTypeID(ptr_type_copy);
+						const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(ptr_type_copy);
 
 						const evo::Result<PIR::Expr> lhs_expr_value = this->get_expr_value(postfix.lhs);
 						if(lhs_expr_value.isError()){ return evo::resultError; }
@@ -1620,15 +1662,13 @@ namespace panther{
 				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target));
 				if(target_type_id.isError()){ return evo::resultError; }
 
-				if(this->check_func_call(func_call, target_type_id.value()) == false){ return evo::resultError; }
-
 
 				const std::vector<PIR::Expr> args = this->get_func_call_args(func_call);
 
 				// get the intrinsic id
 				const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
 					const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
-					const std::vector<PIR::Intrinsic>& intrinsics = this->source.getSourceManager().getIntrinsics();
+					const std::vector<PIR::Intrinsic>& intrinsics = this->src_manager.getIntrinsics();
 
 					for(size_t i = 0; i < intrinsics.size(); i+=1){
 						const PIR::Intrinsic& intrinsic = intrinsics[i];
@@ -1695,12 +1735,10 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID> {
-		const SourceManager& src_manager = this->source.getSourceManager();
-
 		const std::string_view import_path_str = this->source.getLiteral(import_path.astNode).value.string;
 		const std::filesystem::path source_file_path = this->source.getLocation();
 		const evo::Expected<Source::ID, SourceManager::GetSourceIDError> imported_source_id_result =
-			src_manager.getSourceID(source_file_path, import_path_str);
+			this->src_manager.getSourceID(source_file_path, import_path_str);
 
 		if(imported_source_id_result.has_value() == false){
 			switch(imported_source_id_result.error()){
@@ -1751,7 +1789,7 @@ namespace panther{
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
+						if(lhs_type_id.isError()){ return evo::resultError; }
 
 						const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() ? 
 							this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
@@ -1761,7 +1799,7 @@ namespace panther{
 						if(lhs_type_id.value() == SourceManager::getTypeImport()){
 							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-							const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.value().import);
+							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 							const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
@@ -1825,7 +1863,7 @@ namespace panther{
 						if(lhs_type_id.value() == SourceManager::getTypeImport()){
 							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-							const Source& import_source = this->source.getSourceManager().getSource(value_of_lhs.value().import);
+							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 							const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
@@ -1858,7 +1896,7 @@ namespace panther{
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
 						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
 
-						const PIR::Type& lhs_type = this->source.getSourceManager().getType(lhs_type_id.value());
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
 						evo::debugAssert(lhs_type.qualifiers.back().isPtr, "Should have already been checked that this type is a pointer");
 
 						return !lhs_type.qualifiers.back().isConst;
@@ -1924,6 +1962,7 @@ namespace panther{
 	auto SemanticAnalyzer::is_valid_export_name(std::string_view name) const noexcept -> bool {
 		if(name == "main"){ return false; }
 		if(name == "puts"){ return false; }
+		if(name == "printf"){ return false; }
 
 		return true;
 	};
@@ -1932,39 +1971,51 @@ namespace panther{
 	auto SemanticAnalyzer::already_defined(const Token& ident) const noexcept -> void {
 		const std::string_view ident_str = ident.value.string;
 
-		const Token& token = [&]() noexcept {
-			for(const Scope& scope : this->scopes){
-				if(scope.vars.contains(ident_str)){
-					const PIR::Var& var = this->source.getVar(scope.vars.at(ident_str));
-					return this->source.getToken(var.ident);
-				}
+		for(const Scope& scope : this->scopes){
+			if(scope.vars.contains(ident_str)){
+				const PIR::Var& var = this->source.getVar(scope.vars.at(ident_str));
+				const Location location = this->source.getToken(var.ident).location;
 
-				if(scope.funcs.contains(ident_str)){
-					const PIR::Func& func = this->source.getFunc(scope.funcs.at(ident_str));
-					return this->source.getToken(func.ident);
-				}
-
-				if(scope.params.contains(ident_str)){
-					const PIR::Param& param = this->source.getParam(scope.params.at(ident_str));
-					return this->source.getToken(param.ident);
-				}
-
-				if(scope.imports.contains(ident_str)){
-					const Import& import = scope.imports.at(ident_str);
-					return this->source.getIdent(import.ident);
-				}
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					std::vector<Message::Info>{ Message::Info("First defined here:", location) }
+				);
+				return;
 			}
 
-			EVO_FATAL_BREAK("Didn't find ident");
-		}();
-
-
-		this->source.error(
-			std::format("Identifier \"{}\" already defined", ident.value.string), ident,
-			std::vector<Message::Info>{
-				{"First defined here:", token.location}
+			if(scope.funcs.contains(ident_str)){
+				// TODO: better messaging
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					std::vector<Message::Info>{ Message::Info("First defined as a function") }
+				);
+				return;
 			}
-		);
+
+			if(scope.params.contains(ident_str)){
+				const PIR::Param& param = this->source.getParam(scope.params.at(ident_str));
+				const Location location = this->source.getToken(param.ident).location;
+
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					std::vector<Message::Info>{ Message::Info("First defined here:", location) }
+				);
+				return;
+			}
+
+			if(scope.imports.contains(ident_str)){
+				const Import& import = scope.imports.at(ident_str);
+				const Location location = this->source.getIdent(import.ident).location;
+
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					std::vector<Message::Info>{ Message::Info("First defined here:", location) }
+				);
+				return;
+			}
+		}
+
+		EVO_FATAL_BREAK("Didn't find ident");
 	};
 
 
@@ -1986,7 +2037,18 @@ namespace panther{
 	};
 
 	auto SemanticAnalyzer::add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void {
-		this->scopes.back().funcs.emplace(str, id);
+		Scope& current_scope = this->scopes.back();
+
+		using FuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::iterator;
+		FuncScopeListIter func_scope_list_iter = current_scope.funcs.find(str);
+		if(func_scope_list_iter != current_scope.funcs.end()){
+			// add to existing list
+			func_scope_list_iter->second.emplace_back(id);
+		}else{
+			// create new list
+			auto new_func_list = std::vector<PIR::Func::ID>{id};
+			current_scope.funcs.emplace(str, std::move(new_func_list));
+		}
 	};
 
 	auto SemanticAnalyzer::add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void {
@@ -2030,6 +2092,169 @@ namespace panther{
 	auto SemanticAnalyzer::is_in_func_base_scope() const noexcept -> bool {
 		return this->scopes.back().stmts_entry == &this->get_current_func().func.stmts;
 	};
+
+
+	auto SemanticAnalyzer::lookup_func_in_scope(std::string_view ident, const AST::FuncCall& func_call) const noexcept -> evo::Result<PIR::Func::ID> {
+		auto func_list = std::vector<PIR::Func::ID>();
+		
+		for(const Scope& scope : this->scopes){
+			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
+			ConstFuncScopeListIter func_scope_list_iter = scope.funcs.find(ident);
+			if(func_scope_list_iter == scope.funcs.end()){ continue; }
+
+			for(PIR::Func::ID func : func_scope_list_iter->second){
+				func_list.emplace_back(func);
+			}
+		}
+
+		return this->match_function_to_overloads(ident, func_call, func_list);
+	};
+
+
+	auto SemanticAnalyzer::lookup_func_in_import(std::string_view ident, const Source& import, const AST::FuncCall& func_call) const noexcept
+	-> evo::Result<PIR::Func::ID> {
+		using ConstPubFuncListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
+		ConstPubFuncListIter pub_func_list_iter = import.pir.pub_funcs.find(ident);
+
+		if(pub_func_list_iter != import.pir.pub_funcs.end()){
+			return this->match_function_to_overloads(ident, func_call, pub_func_list_iter->second);
+		}else{
+			return evo::resultError;
+		}
+	};
+
+
+
+
+	auto SemanticAnalyzer::match_function_to_overloads(
+		std::string_view ident, const AST::FuncCall& func_call, const std::vector<PIR::Func::ID>& overload_list
+	) const noexcept -> evo::Result<PIR::Func::ID> {
+		if(overload_list.empty()){
+			this->source.error(std::format("function \"{}\" is undefined", ident), func_call.target);
+			return evo::resultError;
+		}
+
+		// if only has one function, use SemanticAnalyzer::check_func_call() which is able to give better error messages
+		if(overload_list.size() == 1){
+			if(this->check_func_call(func_call, this->src_manager.getOrCreateTypeID(PIR::Type(Source::getFunc(overload_list[0]).baseType))) == false){
+				return evo::resultError;
+			}
+
+			return overload_list[0];
+		}
+
+
+		// find list of candidates
+		auto overload_list_candidates = std::vector<PIR::Func::ID>();
+		for(PIR::Func::ID overload_list_id : overload_list){
+			const PIR::Func& func_candidate = Source::getFunc(overload_list_id);
+
+			const PIR::BaseType& base_type = this->src_manager.getBaseType(func_candidate.baseType);
+
+			if(base_type.callOperator->params.size() != func_call.args.size()){ continue; }
+
+			bool func_is_candidate = true;
+
+			// checking params
+			// TODO: redo this section to not redo work
+			for(size_t i = 0; i < base_type.callOperator->params.size(); i+=1){
+				if(!func_is_candidate){
+					break;
+				}
+
+				const PIR::BaseType::Operator::Param& param = base_type.callOperator->params[i];
+				const AST::Node::ID arg_id = func_call.args[i];
+				const AST::Node& arg = this->source.getNode(arg_id);
+
+				// check types match
+				const evo::Result<PIR::Type::ID> arg_type_id = this->analyze_and_get_type_of_expr(arg);
+				if(arg_type_id.isError()){
+					func_is_candidate = false;
+					break;
+				}
+
+
+				if(param.type != arg_type_id.value()){
+					const PIR::Type& param_type = this->src_manager.getType(param.type);
+					const PIR::Type& arg_type = this->src_manager.getType(arg_type_id.value());
+
+					if(arg_type.isImplicitlyConvertableTo(param_type) == false){
+						func_is_candidate = false;
+						break;
+					}
+				}
+
+
+			
+				// check param kind accepts arg value type
+				const evo::Result<ExprValueType> arg_value_type = this->get_expr_value_type(arg_id);
+				if(arg_value_type.isError()){
+					func_is_candidate = false;
+					break;
+				}
+
+				using ParamKind = AST::FuncParams::Param::Kind;
+				switch(param.kind){
+					case ParamKind::Read: {
+						// accepts any value type
+					} break;
+
+					case ParamKind::Write: {
+						if(arg_value_type.value() != ExprValueType::Concrete){
+							func_is_candidate = false;
+							break;
+						}
+
+						if(this->is_expr_mutable(arg_id) == false){
+							func_is_candidate = false;
+							break;
+						}
+					} break;
+
+					case ParamKind::In: {
+						if(arg_value_type.value() != ExprValueType::Ephemeral){
+							func_is_candidate = false;
+							break;
+						}
+					} break;
+				};
+
+				// if param is write and arg is a param, mark it as edited
+				// if(arg.kind == AST::Kind::Ident && param.kind == ParamKind::Write){
+				// 	std::string_view param_ident_str = this->source.getIdent(arg).value.string;
+
+				// 	for(const Scope& scope : this->scopes){
+	 		// 			if(scope.params.contains(param_ident_str)){
+				// 			PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
+				// 			pir_param.mayHaveBeenEdited = true;
+				// 		}
+				// 	}
+				// }
+			}
+
+			if(func_is_candidate){
+				overload_list_candidates.emplace_back(overload_list_id);
+			}
+		}
+
+
+		if(overload_list_candidates.empty()){
+			// TODO: better messaging
+			this->source.error("No matching function overload found", func_call.target);
+			return evo::resultError;
+		}
+
+		if(overload_list_candidates.size() == 1){
+			return overload_list_candidates[0];
+		}
+
+		// TODO: better messaging
+		// TODO: deal with this better
+		this->source.error("multiple function overload candidates found", func_call.target);
+		return evo::resultError;
+	};
+
+
 
 
 	//////////////////////////////////////////////////////////////////////

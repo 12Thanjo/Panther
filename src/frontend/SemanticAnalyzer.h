@@ -15,7 +15,7 @@ namespace panther{
 
 	class SemanticAnalyzer{
 		public:
-			SemanticAnalyzer(Source& src) : source(src) {};
+			SemanticAnalyzer(Source& src) : source(src), src_manager(src.getSourceManager()) {};
 			~SemanticAnalyzer() = default;
 
 
@@ -42,8 +42,9 @@ namespace panther{
 			EVO_NODISCARD auto check_func_call(const AST::FuncCall& func_call, PIR::Type::ID type_id) const noexcept -> bool;
 			EVO_NODISCARD auto get_func_call_args(const AST::FuncCall& func_call) const noexcept -> std::vector<PIR::Expr>;
 
-			
-			EVO_NODISCARD auto analyze_and_get_type_of_expr(const AST::Node& node) const noexcept -> evo::Result<PIR::Type::ID>;
+			// note: func_call is only used when looking up a function overload
+			EVO_NODISCARD auto analyze_and_get_type_of_expr(const AST::Node& node, const AST::FuncCall* lookup_func_call = nullptr) const noexcept
+				-> evo::Result<PIR::Type::ID>;
 
 			EVO_NODISCARD auto get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID>;
 
@@ -101,6 +102,14 @@ namespace panther{
 			EVO_NODISCARD auto is_in_func_base_scope() const noexcept -> bool;
 
 
+			EVO_NODISCARD auto lookup_func_in_scope(std::string_view ident, const AST::FuncCall& func_call) const noexcept -> evo::Result<PIR::Func::ID>;
+			EVO_NODISCARD auto lookup_func_in_import(std::string_view ident, const Source& import, const AST::FuncCall& func_call) const noexcept
+			-> evo::Result<PIR::Func::ID>;
+			EVO_NODISCARD auto match_function_to_overloads(
+				std::string_view ident, const AST::FuncCall& func_call, const std::vector<PIR::Func::ID>& overload_list
+			) const noexcept -> evo::Result<PIR::Func::ID>;
+
+
 			///////////////////////////////////
 			// func scope
 
@@ -130,12 +139,13 @@ namespace panther{
 
 		private:
 			Source& source;
+			SourceManager& src_manager;
 
 			struct Scope{
 				PIR::StmtBlock* stmts_entry;
 
 				std::unordered_map<std::string_view, PIR::Var::ID> vars{};
-				std::unordered_map<std::string_view, PIR::Func::ID> funcs{};
+				std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> funcs{};
 				std::unordered_map<std::string_view, PIR::Param::ID> params{};
 				std::unordered_map<std::string_view, Import> imports{};
 

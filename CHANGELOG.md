@@ -1,5 +1,17 @@
 # Changelog
 
+### v0.23.0
+- Added function overloading
+- Fixed fatal errors with using functions by explicitly disallowing it (only temporary)
+- Fixed implicit conversions for function arguments
+- Added checking for multiple functions with the attribute `#export` with the same name
+- Temporarily disallowed functions with the attribute `#export` from having parameters
+- Organized build-system
+	- renamed CLI to pthr
+	- added groupings
+	- made the compiler the default start project
+- Added the `#export` attribute for variables
+
 ### v0.22.1
 - Added some missing uses of imports
 	- `def sub_import = some_import.sub_import;` at local scope (at global scope will be supported eventually)
@@ -135,7 +147,7 @@
 
 ### v0.9.0
 - Added return statements
-- Added `#extern` function attribute
+- Added `#export` function attribute
 - Added tokenizing of intrinsics
 
 ### v0.8.0

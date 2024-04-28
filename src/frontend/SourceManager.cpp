@@ -361,7 +361,7 @@ namespace panther{
 
 
 	auto SourceManager::addEntry(Source::ID src_id, PIR::Func::ID func_id) noexcept -> void {
-		evo::debugAssert(this->isLocked(), "Can only do add entry when locked");
+		evo::debugAssert(this->isLocked(), "Can only add entry when locked");
 		evo::debugAssert(this->hasEntry() == false, "Already has an entry function");
 
 		this->entry.emplace(src_id, func_id);
@@ -369,10 +369,24 @@ namespace panther{
 
 
 	auto SourceManager::getEntry() const noexcept -> Entry {
-		evo::debugAssert(this->isLocked(), "Can only do add entry when locked");
+		evo::debugAssert(this->isLocked(), "Can only get entry when locked");
 		evo::debugAssert(this->hasEntry(), "SourceManager does not have an entry");
 
 		return *this->entry;
+	};
+
+
+	auto SourceManager::hasExport(std::string_view ident) const noexcept -> bool {
+		evo::debugAssert(this->isLocked(), "Can only check export when locked");
+
+		return this->exported_funcs.contains(ident);
+	};
+
+	auto SourceManager::addExport(std::string_view ident) noexcept -> void {
+		evo::debugAssert(this->isLocked(), "Can only add export when locked");
+		evo::debugAssert(this->hasExport(ident) == false, "can't add export that's already in list");
+
+		this->exported_funcs.emplace(ident);
 	};
 
 

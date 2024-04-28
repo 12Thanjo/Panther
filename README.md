@@ -3,7 +3,9 @@
 Statically typed, compiled, high-performance, general-purpose programming language.
 
 ### Notes:
-- This compiler is currently super early into development, so it doesn't really do much yet.
+- This compiler is currently super early into development, so there's not any way to use it without directly editing settings in `pthr/main.cpp`
+- It is not robust yet. For example, it is possible to get it to have a fatal error in some cases while parsing
+- There are lots of features that are disallowed now but will be added at some point in the future
 - The logo may change in the future, but for now it's good enough
 
 

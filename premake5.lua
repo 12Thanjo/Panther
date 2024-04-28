@@ -25,7 +25,7 @@ workspace "Panther"
 	}
 
 
-	startproject "Main"
+	startproject "pthr"
 
 
 	---------------------------------------
@@ -218,12 +218,19 @@ include "./libs/premake5_LLVM.lua"
 include "./src/frontend/premake5_Panther_frontend.lua"
 include "./src/LLVM_interface/premake5_LLVM_interface.lua"
 include "./src/LLD_interface/premake5_LLD_interface.lua"
-include "./cli/premake5_cli.lua"
+include "./pthr/premake5_pthr.lua"
 
 
 ------------------------------------------------------------------------------
 -- grouping
 
+project("Evo").group = "External Libs"
 
+project("LLD_interface").group = "Interfaces"
+project("LLVM_interface").group = "Interfaces"
+
+project("Panther_frontend").group = "Panther Lib"
+
+project("pthr").group = "Executables"
 
 

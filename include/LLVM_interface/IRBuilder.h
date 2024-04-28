@@ -69,7 +69,12 @@ namespace panther{
 
 				// TODO: linkage
 				EVO_NODISCARD auto valueGlobal(
-					class Module& module, llvm::Constant* value, llvm::Type* type, bool is_constant, evo::CStrProxy name = '\0'
+					class Module& module,
+					llvm::Constant* value,
+					llvm::Type* type,
+					llvmint::LinkageTypes linkage,
+					bool is_constant,
+					evo::CStrProxy name = '\0'
 				) noexcept -> llvm::GlobalVariable*;
 
 

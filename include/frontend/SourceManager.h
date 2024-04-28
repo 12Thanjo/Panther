@@ -10,6 +10,7 @@
 
 #include <functional>
 #include <filesystem>
+#include <unordered_set>
 
 namespace panther{
 
@@ -142,6 +143,10 @@ namespace panther{
 			EVO_NODISCARD auto getEntry() const noexcept -> Entry;
 
 
+			EVO_NODISCARD auto hasExport(std::string_view ident) const noexcept -> bool;
+			auto addExport(std::string_view ident) noexcept -> void;
+
+
 
 			EVO_NODISCARD auto getIntrinsics() const noexcept -> const std::vector<PIR::Intrinsic>&;
 			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::ID id) const noexcept -> const PIR::Intrinsic&;
@@ -160,6 +165,7 @@ namespace panther{
 
 			std::vector<PIR::Intrinsic> intrinsics{};
 			
+			std::unordered_set<std::string_view> exported_funcs{};
 
 
 			MessageCallback message_callback;

@@ -65,8 +65,8 @@ namespace panther{
 
 
 
-			auto lower(SourceManager& source_manager) noexcept -> void {
-				std::vector<Source>& sources = source_manager.getSources();
+			auto lower(SourceManager& src_manager) noexcept -> void {
+				std::vector<Source>& sources = src_manager.getSources();
 
 				for(Source& source : sources){
 					for(PIR::Var::ID global_var_id : source.pir.global_vars){
@@ -168,15 +168,16 @@ namespace panther{
 			inline auto lower_global_var(const Source& source, PIR::Var& var) noexcept -> void {
 				const std::string mangled_name = PIRToLLVMIR::mangle_name(source, var);
 
-				const SourceManager& source_manager = source.getSourceManager();
-				const PIR::Type& type = source_manager.getType(var.type);
+				const SourceManager& src_manager = source.getSourceManager();
+				const PIR::Type& type = src_manager.getType(var.type);
 
-				llvm::Type* llvm_type = this->get_type(source_manager, type);
+				llvm::Type* llvm_type = this->get_type(src_manager, type);
 				llvm::Constant* value = this->get_const_value(source, var.value);
+				const llvmint::LinkageTypes linkage = var.isExport ? llvmint::LinkageTypes::ExternalLinkage : llvmint::LinkageTypes::PrivateLinkage;
 				evo::debugAssert(value != nullptr, "invalid const value");
 
 
-				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, var.isDef, mangled_name.c_str());
+				llvm::GlobalVariable* global_val = this->builder->valueGlobal(*this->module, value, llvm_type, linkage, var.isDef, mangled_name.c_str());
 
 				var.llvm.global = global_val;
 			};
@@ -198,7 +199,7 @@ namespace panther{
 
 
 			inline auto lower_func_declaration(Source& source, PIR::Func& func) noexcept -> void {
-				const SourceManager& source_manager = source.getSourceManager();
+				const SourceManager& src_manager = source.getSourceManager();
 
 				this->current_func = &func;
 				const std::string mangled_name = PIRToLLVMIR::mangle_name(source, func);
@@ -207,8 +208,8 @@ namespace panther{
 					if(func.returnType.isVoid()){
 						return this->builder->getTypeVoid();
 					}else{
-						const PIR::Type& return_type_obj = source_manager.getType(func.returnType.typeID());
-						return this->get_type(source_manager, return_type_obj);
+						const PIR::Type& return_type_obj = src_manager.getType(func.returnType.typeID());
+						return this->get_type(src_manager, return_type_obj);
 					}
 				}();
 
@@ -219,7 +220,7 @@ namespace panther{
 				for(size_t i = 0; i < func.params.size(); i+=1){
 					const PIR::Param& param = source.getParam(func.params[i]);
 
-					llvm::Type* param_type = this->get_type(source_manager, source_manager.getType(param.type));
+					llvm::Type* param_type = this->get_type(src_manager, src_manager.getType(param.type));
 					// param_types.emplace_back(param_type);
 					param_types.emplace_back(llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr()));
 
@@ -299,10 +300,10 @@ namespace panther{
 			inline auto lower_var(Source& source, PIR::Var& var) noexcept -> void {
 				const std::string ident = std::string(source.getToken(var.ident).value.string);
 
-				const SourceManager& source_manager = source.getSourceManager();
-				const PIR::Type& type = source_manager.getType(var.type);
+				const SourceManager& src_manager = source.getSourceManager();
+				const PIR::Type& type = src_manager.getType(var.type);
 
-				llvm::Type* llvm_type = this->get_type(source_manager, type);
+				llvm::Type* llvm_type = this->get_type(src_manager, type);
 
 				llvm::AllocaInst* alloca_val = this->builder->createAlloca(llvm_type, ident);
 
@@ -438,8 +439,8 @@ namespace panther{
 
 
 					case PIR::FuncCall::Kind::Intrinsic: {
-						const SourceManager& source_manager = source.getSourceManager();
-						const PIR::Intrinsic& intrinsic = source_manager.getIntrinsic(func_call.intrinsic);
+						const SourceManager& src_manager = source.getSourceManager();
+						const PIR::Intrinsic& intrinsic = src_manager.getIntrinsic(func_call.intrinsic);
 
 						switch(intrinsic.kind){
 							case PIR::Intrinsic::Kind::__printHelloWorld: {
@@ -483,7 +484,7 @@ namespace panther{
 
 
 
-			EVO_NODISCARD inline auto get_type(const SourceManager& source_manager, const PIR::Type& type) noexcept -> llvm::Type* {
+			EVO_NODISCARD inline auto get_type(const SourceManager& src_manager, const PIR::Type& type) noexcept -> llvm::Type* {
 				if(type.qualifiers.empty() == false){
 					if(type.qualifiers.back().isPtr){
 						return llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr());
@@ -492,7 +493,7 @@ namespace panther{
 					}
 				}
 
-				const PIR::BaseType& base_type = source_manager.getBaseType(type.baseType);
+				const PIR::BaseType& base_type = src_manager.getBaseType(type.baseType);
 
 
 				if(base_type.builtin.kind == Token::TypeInt){
@@ -587,8 +588,8 @@ namespace panther{
 						if(var.is_alloca){
 							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca, load_name));
 						}else{
-							const SourceManager& source_manager = source.getSourceManager();
-							llvm::Type* var_type = this->get_type(source_manager, source_manager.getType(var.type));
+							const SourceManager& src_manager = source.getSourceManager();
+							llvm::Type* var_type = this->get_type(src_manager, src_manager.getType(var.type));
 							return llvmint::ptrcast<llvm::Value>(
 								this->builder->createLoad(llvmint::ptrcast<llvm::Value>(var.llvm.global), var_type, load_name)
 							);
@@ -598,8 +599,8 @@ namespace panther{
 					case PIR::Expr::Kind::Param: {
 						const PIR::Param& param = source.getParam(value.param);
 
-						const SourceManager& source_manager = source.getSourceManager();
-						llvm::Type* param_type = this->get_type(source_manager, source_manager.getType(param.type));
+						const SourceManager& src_manager = source.getSourceManager();
+						llvm::Type* param_type = this->get_type(src_manager, src_manager.getType(param.type));
 
 
 						std::string load_addr_name = std::format("{}.loadAddr", source.getToken(param.ident).value.string);
@@ -661,8 +662,8 @@ namespace panther{
 
 						llvm::Value* lhs_value = this->get_value(source, deref.ptr);
 
-						const SourceManager& source_manager = source.getSourceManager();
-						llvm::Type* deref_type = this->get_type(source_manager, source_manager.getType(deref.type));
+						const SourceManager& src_manager = source.getSourceManager();
+						llvm::Type* deref_type = this->get_type(src_manager, src_manager.getType(deref.type));
 						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type, ".deref"));
 					} break;
 
@@ -724,10 +725,10 @@ namespace panther{
 					case PIR::Expr::Kind::ASTNode: {
 						llvm::Value* temporary = this->get_value(source, arg);
 
-						const SourceManager& source_manager = source.getSourceManager();
+						const SourceManager& src_manager = source.getSourceManager();
 
-						const PIR::Type& param_type = source_manager.getType(param_type_id);
-						llvm::Type* arg_type = this->get_type(source_manager, param_type);
+						const PIR::Type& param_type = src_manager.getType(param_type_id);
+						llvm::Type* arg_type = this->get_type(src_manager, param_type);
 
 						llvm::AllocaInst* temporary_storage = this->builder->createAlloca(arg_type, "temp_storage");
 						this->builder->createStore(temporary_storage, temporary);
@@ -738,10 +739,10 @@ namespace panther{
 					case PIR::Expr::Kind::FuncCall: {
 						llvm::Value* temporary = this->get_value(source, arg);
 
-						const SourceManager& source_manager = source.getSourceManager();
+						const SourceManager& src_manager = source.getSourceManager();
 
-						const PIR::Type& param_type = source_manager.getType(param_type_id);
-						llvm::Type* arg_type = this->get_type(source_manager, param_type);
+						const PIR::Type& param_type = src_manager.getType(param_type_id);
+						llvm::Type* arg_type = this->get_type(src_manager, param_type);
 
 						llvm::AllocaInst* temporary_storage = this->builder->createAlloca(arg_type, "temp_storage");
 						this->builder->createStore(temporary_storage, temporary);
@@ -796,7 +797,33 @@ namespace panther{
 				if(func.isExport){
 					return ident;
 				}else{
-					return std::format("P.{}.{}", source.getID().id, ident);
+					std::string base_name = std::format("P.{}.{}", source.getID().id, ident);
+
+					if(func.params.empty()){
+						return base_name;
+					}
+
+					base_name += '-';
+
+
+					for(size_t i = 0; i < func.params.size(); i+=1){
+						const PIR::Param::ID param_id = func.params[i];
+						const PIR::Param& param = source.getParam(param_id);
+
+						base_name += std::to_string(param.type.id);
+
+						switch(param.kind){
+							break; case AST::FuncParams::Param::Kind::Read: base_name += 'r';
+							break; case AST::FuncParams::Param::Kind::Write: base_name += 'w';
+							break; default: EVO_FATAL_BREAK("Unknown param kind");
+						};
+
+						if(i < func.params.size() - 1){
+							base_name += '-';
+						}
+					}
+
+					return base_name;
 				}
 			};
 
@@ -806,7 +833,12 @@ namespace panther{
 				evo::debugAssert(var.isGlobal(), "Variable name mangling should only be used on globals");
 
 				const std::string ident = std::string(source.getToken(var.ident).value.string);
-				return std::format("P.{}.{}", source.getID().id, ident);
+
+				if(var.isExport){
+					return ident;
+				}else{
+					return std::format("P.{}.{}", source.getID().id, ident);
+				}
 			};
 
 

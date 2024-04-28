@@ -145,11 +145,11 @@ namespace panther{
 
 
 		auto IRBuilder::valueGlobal(
-			llvmint::Module& module, llvm::Constant* value, llvm::Type* type, bool is_constant, evo::CStrProxy name
+			llvmint::Module& module, llvm::Constant* value, llvm::Type* type, llvmint::LinkageTypes linkage, bool is_constant, evo::CStrProxy name
 		) noexcept -> llvm::GlobalVariable* {
 			// this gets freed automatically in the destructor of the module
 			llvm::GlobalVariable* global = new llvm::GlobalVariable(
-				module.getModule(), type, is_constant, llvm::GlobalValue::PrivateLinkage, value, name.data()
+				module.getModule(), type, is_constant, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), value, name.data()
 			);
 
 			global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);

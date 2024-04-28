@@ -247,6 +247,26 @@ namespace panther{
 			};
 
 
+			inline auto addPublicFunc(std::string_view ident, PIR::Func::ID id) noexcept -> void {
+				using PubFuncListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::iterator;
+				PubFuncListIter pub_func_list_iter = this->pir.pub_funcs.find(ident);
+				if(pub_func_list_iter != this->pir.pub_funcs.end()){
+					// add to existing list
+					pub_func_list_iter->second.emplace_back(id);
+				}else{
+					// create new list
+					auto new_func_list = std::vector<PIR::Func::ID>{id};
+					this->pir.pub_funcs.emplace(ident, std::move(new_func_list));
+				}
+			};
+			inline auto addPublicVar(std::string_view ident, PIR::Var::ID id) noexcept -> void {
+				this->pir.pub_vars.emplace(ident, id);
+			};
+			inline auto addPublicImport(std::string_view ident, Source::ID id) noexcept -> void {
+				this->pir.pub_imports.emplace(ident, id);
+			};
+
+
 
 			//////////////////////////////////////////////////////////////////////
 			// messaging / errors
@@ -307,7 +327,7 @@ namespace panther{
 
 				std::vector<PIR::Var::ID> global_vars{};
 
-				std::unordered_map<std::string_view, PIR::Func::ID> pub_funcs{};
+				std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> pub_funcs{};
 				std::unordered_map<std::string_view, PIR::Var::ID> pub_vars{};
 				std::unordered_map<std::string_view, Source::ID> pub_imports{};
 			} pir;
