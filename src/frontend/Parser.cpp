@@ -397,6 +397,7 @@ namespace panther{
 		switch(this->get(this->peek()).kind){
 			case Token::TypeVoid:
 			case Token::TypeInt:
+			case Token::TypeUInt:
 			case Token::TypeBool:
 			case Token::TypeString:
 			// case Token::Ident: 
@@ -489,14 +490,21 @@ namespace panther{
 		const Result lhs_result = this->parse_prefix_expr();
 		if(lhs_result.code() == Result::WrongType || lhs_result.code() == Result::Error){ return lhs_result; }
 
-		return this->parse_infix_expr_impl(lhs_result.value(), 1);
+		return this->parse_infix_expr_impl(lhs_result.value(), 0);
 	};
 
 
 
 	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
 		switch(kind){
-			// This warns at the moment, but the fix will come with operators
+			case Token::get("+"): return 1;
+			case Token::get("+@"): return 1;
+			case Token::get("-"): return 1;
+			case Token::get("-@"): return 1;
+
+			case Token::get("*"): return 2;
+			case Token::get("*@"): return 2;
+			case Token::get("/"): return 2;
 		};
 
 		return -1;
@@ -524,10 +532,12 @@ namespace panther{
 		if(next_term.code() == Result::WrongType || next_term.code() == Result::Error){ return next_term; }
 
 
-		return this->create_node(
+		const AST::Node::ID created_infix_expr = this->create_node(
 			this->source.infixes, AST::Kind::Infix,
 			lhs, peeked_op, rhs_result.value()
 		);
+
+		return this->parse_infix_expr_impl(created_infix_expr, prec_level);
 	};
 
 
@@ -538,6 +548,7 @@ namespace panther{
 		switch(this->get(op_token).kind){
 			case Token::KeywordCopy:
 			case Token::KeywordAddr:
+			case Token::get("-"):
 				break;
 
 			default:

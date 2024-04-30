@@ -105,6 +105,36 @@ namespace panther{
 
 
 
+		///////////////////////////////////
+		// operators
+
+		auto IRBuilder::createAdd(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateAdd(lhs, rhs, name.data(), nuw, nsw);
+		};
+
+
+
+		auto IRBuilder::createSub(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateSub(lhs, rhs, name.data(), nuw, nsw);
+		};
+
+
+		auto IRBuilder::createMul(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateMul(lhs, rhs, name.data(), nuw, nsw);
+		};
+
+
+
+		auto IRBuilder::createUDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateUDiv(lhs, rhs, name.data(), false);
+		};
+
+		auto IRBuilder::createSDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateSDiv(lhs, rhs, name.data(), false);
+		};
+
+
+
 		//////////////////////////////////////////////////////////////////////
 		// set
 

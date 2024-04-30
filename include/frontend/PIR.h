@@ -23,6 +23,18 @@ namespace panther{
 			EVO_NODISCARD auto operator==(TypeID rhs) const noexcept -> bool { return this->id == rhs.id; };
 		};
 
+		struct IntrinsicID{ // typesafe identifier
+			uint32_t id;
+			explicit IntrinsicID(uint32_t _id) noexcept : id(_id) {};
+			EVO_NODISCARD auto operator==(IntrinsicID rhs) const noexcept -> bool { return this->id == rhs.id; };
+		};
+
+		struct FuncID{ // typesafe identifier
+			Source& source;
+			uint32_t id;
+			FuncID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
+		};
+
 
 
 		class TypeVoidableID{
@@ -62,11 +74,11 @@ namespace panther{
 				struct ID{ // typesafe identifier
 					uint32_t id;
 					explicit ID(uint32_t _id) noexcept : id(_id) {};
-					EVO_NODISCARD auto operator==(ID rhs) const noexcept -> bool { return this->id == rhs.id; };
+					EVO_NODISCARD auto operator==(const ID& rhs) const noexcept -> bool { return this->id == rhs.id; };
 				};
 
 				enum class Kind{
-					Import,
+					Import, // for the unnameable type that is returned by @import()
 					Builtin,
 					Function,
 				};
@@ -81,9 +93,15 @@ namespace panther{
 					};
 
 					std::vector<Param> params;
-					PIR::TypeVoidableID returnType; // nullopt means Void
+					PIR::TypeVoidableID returnType;
 
 					EVO_NODISCARD auto operator==(const Operator& rhs) const noexcept -> bool;
+				};
+
+
+				union OverloadedOperator {
+					IntrinsicID intrinsic;
+					FuncID func;
 				};
 
 			public:
@@ -129,6 +147,15 @@ namespace panther{
 
 				std::optional<Operator> callOperator{};
 
+				std::vector<OverloadedOperator> addOperators{};
+				std::vector<OverloadedOperator> addWrapOperators{};
+				std::vector<OverloadedOperator> subOperators{};
+				std::vector<OverloadedOperator> subWrapOperators{};
+				std::vector<OverloadedOperator> mulOperators{};
+				std::vector<OverloadedOperator> mulWrapOperators{};
+				std::vector<OverloadedOperator> divOperators{};
+				std::vector<OverloadedOperator> negateOperators{};
+
 			private:
 				
 		};
@@ -164,18 +191,6 @@ namespace panther{
 		struct ParamID{ // typesafe identifier
 			uint32_t id;
 			explicit ParamID(uint32_t _id) noexcept : id(_id) {};
-		};
-
-		struct FuncID{ // typesafe identifier
-			Source& source;
-			uint32_t id;
-			FuncID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
-		};
-
-		struct IntrinsicID{ // typesafe identifier
-			uint32_t id;
-			explicit IntrinsicID(uint32_t _id) noexcept : id(_id) {};
-			EVO_NODISCARD auto operator==(IntrinsicID rhs) const noexcept -> bool { return this->id == rhs.id; };
 		};
 
 
@@ -443,11 +458,56 @@ namespace panther{
 		struct Intrinsic{
 			using ID = IntrinsicID;
 
+			//////////////////////////////////////////////////////////////////////
+			// 																	//
+			// IMPORTANT: if the order of Kind ever changes, the order in 		//
+			// 		SourceManager::initIntrinsics() must be made to match		//
+			// 																	//
+			//////////////////////////////////////////////////////////////////////
+
 			enum class Kind{
 				import,
 				breakpoint,
+
+				// add
+				addInt,
+				addUInt,
+
+				// add wrap
+				addWrapInt,
+				addWrapUInt,
+
+				// sub
+				subInt,
+				subUInt,
+
+				// sub wrap
+				subWrapInt,
+				subWrapUInt,
+
+				// mul
+				mulInt,
+				mulUInt,
+
+				// mul wrap
+				mulWrapInt,
+				mulWrapUInt,
+
+				// div
+				divInt,
+				divUInt,
+
+				// negate
+				negateInt,
+
+
 				__printHelloWorld,
+				__printSeparator,
 				__printInt,
+				__printUInt,
+
+
+				_MAX_, // not an actual intrinsic
 			} kind;
 
 

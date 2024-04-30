@@ -12,6 +12,10 @@ func print = (val: Int) #pub -> Void {
 	@__printInt(val);
 }
 
+func print = (val: UInt) #pub -> Void {
+	@__printUInt(val);
+}
+
 
 func get_val = (num: Int write, should_change: Bool) #pub -> Int {
 	var output: Int = uninit;

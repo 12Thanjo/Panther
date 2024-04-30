@@ -43,6 +43,7 @@ namespace panther{
 
 			TypeBool,
 			TypeInt,
+			TypeUInt,
 			TypeString,
 
 
@@ -73,6 +74,14 @@ namespace panther{
 			Equal, // =
 
 			// DoubleEqual, // ==
+
+			Plus, // +
+			PlusWrap, // +@
+			Minus, // -
+			MinusWrap, // -@
+			Multiply, // *
+			MultiplyWrap, // *@
+			Divide, // /
 
 			RightArrow, // ->
 
@@ -171,8 +180,18 @@ namespace panther{
 			if(is_token("->")){ return Token::RightArrow; }
 			if(is_token(".^")){ return Token::Dereference; }
 
+			if(is_token("+@")){ return Token::PlusWrap; }
+			if(is_token("-@")){ return Token::MinusWrap; }
+			if(is_token("*@")){ return Token::MultiplyWrap; }
+
 			// length 1
 			if(is_token("=")){ return Token::Equal; }
+
+			if(is_token("+")){ return Token::Plus; }
+			if(is_token("-")){ return Token::Minus; }
+			if(is_token("*")){ return Token::Multiply; }
+			if(is_token("/")){ return Token::Divide; }
+
 			if(is_token("^")){ return Token::Pointer; }
 
 			if(is_token(".")){ return Token::Accessor; }
@@ -225,6 +244,8 @@ namespace panther{
 				break; case Kind::TypeVoid: return "Void";
 
 				break; case Kind::TypeInt: return "Int";
+				break; case Kind::TypeUInt: return "UInt";
+
 				break; case Kind::TypeBool: return "Bool";
 				break; case Kind::TypeString: return "String";
 
@@ -256,6 +277,14 @@ namespace panther{
 				break; case Kind::Equal: return "=";
 
 				// break; case Kind::DoubleEqual: return "==";
+
+				break; case Kind::Plus: return "+";
+				break; case Kind::PlusWrap: return "+@";
+				break; case Kind::Minus: return "-";
+				break; case Kind::MinusWrap: return "-@";
+				break; case Kind::Multiply: return "*";
+				break; case Kind::MultiplyWrap: return "*@";
+				break; case Kind::Divide: return "/";
 
 				break; case Kind::RightArrow: return "->";
 

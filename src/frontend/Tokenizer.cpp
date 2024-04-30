@@ -140,7 +140,7 @@ namespace panther{
 
 
 
-
+		// TODO: hashmap
 		if(kind == Token::Kind::Ident){
 			
 			///////////////////////////////////
@@ -156,6 +156,7 @@ namespace panther{
 			else if(ident_name == "Void") { this->create_token(Token::Kind::TypeVoid); }
 
 			else if(ident_name == "Int")    { this->create_token(Token::Kind::TypeInt); }
+			else if(ident_name == "UInt")   { this->create_token(Token::Kind::TypeUInt); }
 			else if(ident_name == "Bool")   { this->create_token(Token::Kind::TypeBool); }
 			else if(ident_name == "String") { this->create_token(Token::Kind::TypeString); }
 
@@ -251,8 +252,19 @@ namespace panther{
 		if(is_op("->")){ set_op("->"); return true; }
 		if(is_op(".^")){ set_op(".^"); return true; }
 
+		if(is_op("+@")){ set_op("+@"); return true; }
+		if(is_op("-@")){ set_op("-@"); return true; }
+		if(is_op("*@")){ set_op("*@"); return true; }
+
+
 		// length 1
 		if(is_op("=")){ set_op("="); return true; }
+
+		if(is_op("+")){ set_op("+"); return true; }
+		if(is_op("-")){ set_op("-"); return true; }
+		if(is_op("*")){ set_op("*"); return true; }
+		if(is_op("/")){ set_op("/"); return true; }
+
 		if(is_op("^")){ set_op("^"); return true; }
 
 		if(is_op(".")){ set_op("."); return true; }

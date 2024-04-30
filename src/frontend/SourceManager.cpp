@@ -156,54 +156,142 @@ namespace panther{
 		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeInt);
 		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(1)) );
 
-		// Bool (2)
-		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
+		// UInt (2)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeUInt);
 		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(2)) );
 
-		// String (3)
-		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeString);
+		// Bool (3)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeBool);
 		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(3)) );
+
+		// String (4)
+		this->base_types.emplace_back(PIR::BaseType::Kind::Builtin, Token::TypeString);
+		this->types.emplace_back( PIR::Type(PIR::BaseType::ID(4)) );
 	};
 
 
 	// TODO: optimize base types
 	auto SourceManager::initIntrinsics() noexcept -> void {
 		evo::debugAssert(this->isLocked(), "Can only initialize intrinsics when locked");
-		
+		using ParamKind = AST::FuncParams::Param::Kind;
 
-		{ // import()
+
+		///////////////////////////////////
+		// setup protos
+
+		const PIR::BaseType::ID math_ops_Int_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read}, {this->getTypeInt(), ParamKind::Read}, },
+				this->getTypeInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+		const PIR::BaseType::ID math_ops_UInt_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeUInt(), ParamKind::Read}, {this->getTypeUInt(), ParamKind::Read}, },
+				this->getTypeUInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+
+		const PIR::BaseType::ID Int_in_Int_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read} },
+				this->getTypeInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+
+		const PIR::BaseType::ID no_in_no_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+
+
+		const PIR::BaseType::ID import_type = [&]() noexcept {
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 			base_type.callOperator = PIR::BaseType::Operator(
 				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeString(), AST::FuncParams::Param::Kind::Read} },
 				this->getTypeImport()
 			);
 
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
-			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::import, "import", base_type_id);
-		}
-
-		{ // breakpoint()
-			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
-
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
-			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::breakpoint, "breakpoint", base_type_id);
-		}
+			return this->createBaseType(std::move(base_type));
+		}();
 
 
-		{ // __printHelloWorld()
-			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
-			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
 
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
-			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printHelloWorld, "__printHelloWorld", base_type_id);
-		}
+		//////////////////////////////////////////////////////////////////////
+		// 																	//
+		// IMPORTANT: these must be in the same order as 					//
+		// 		defined in PIR::Intrinsic::Kind								//
+		// 																	//
+		//////////////////////////////////////////////////////////////////////
+
+
+		///////////////////////////////////
+		// misc
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::import, "import", import_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::breakpoint, "breakpoint", no_in_no_out_type);
+
+
+		///////////////////////////////////
+		// math
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::addInt, "addInt", math_ops_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::addUInt, "addUInt", math_ops_UInt_type);
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::addWrapInt, "addWrapInt", math_ops_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::addWrapUInt, "addWrapUInt", math_ops_UInt_type);
+
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::subInt, "subInt", math_ops_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::subUInt, "subUInt", math_ops_UInt_type);
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::subWrapInt, "subWrapInt", math_ops_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::subWrapUInt, "subWrapUInt", math_ops_UInt_type);
+
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulInt, "mulInt", math_ops_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulWrapInt, "mulWrapInt", math_ops_Int_type);
+		
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulUInt, "mulUInt", math_ops_UInt_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulWrapUInt, "mulWrapUInt", math_ops_UInt_type);
+
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::divInt, "divInt", math_ops_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::divUInt, "divUInt", math_ops_UInt_type);
+
+
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::negateInt, "negateInt", Int_in_Int_out_type);
+
+
+
+		///////////////////////////////////
+		// temporary
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printHelloWorld, "__printHelloWorld", no_in_no_out_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printSeparator, "__printSeparator", no_in_no_out_type);
+
 
 
 		{ // __printInt()
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 			base_type.callOperator = PIR::BaseType::Operator(
-				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), AST::FuncParams::Param::Kind::Read} },
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read} },
 				PIR::Type::VoidableID::Void()
 			);
 
@@ -211,6 +299,53 @@ namespace panther{
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printInt, "__printInt", base_type_id);
 		}
 
+		{ // __printUInt()
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeUInt(), ParamKind::Read} },
+				PIR::Type::VoidableID::Void()
+			);
+
+			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printUInt, "__printUInt", base_type_id);
+		}
+
+
+
+
+
+		//////////////////////////////////////////////////////////////////////
+		// set operators
+
+		PIR::BaseType& type_Int = this->getBaseType(Token::TypeInt);
+		PIR::BaseType& type_UInt = this->getBaseType(Token::TypeUInt);
+
+		type_Int.addOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addInt));
+		type_UInt.addOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addUInt));
+
+		type_Int.addWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addWrapInt));
+		type_UInt.addWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addWrapUInt));
+
+
+		type_Int.subOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subInt));
+		type_UInt.subOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subUInt));
+
+		type_Int.subWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subWrapInt));
+		type_UInt.subWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subWrapUInt));
+
+
+		type_Int.mulOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulInt));
+		type_UInt.mulOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulUInt));
+
+		type_Int.mulWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulWrapInt));
+		type_UInt.mulWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulWrapUInt));
+
+
+		type_Int.divOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::divInt));
+		type_UInt.divOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::divUInt));
+
+
+		type_Int.negateOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::negateInt));
 	};
 
 
@@ -393,7 +528,7 @@ namespace panther{
 
 
 
-	auto SourceManager::getIntrinsics() const noexcept -> const std::vector<PIR::Intrinsic>& {
+	auto SourceManager::getIntrinsics() const noexcept -> evo::ArrayProxy<PIR::Intrinsic> {
 		evo::debugAssert(this->isLocked(), "Can only get intrinsics when locked");
 
 		return this->intrinsics;
@@ -404,6 +539,12 @@ namespace panther{
 		evo::debugAssert(this->isLocked(), "Can only get intrinsics when locked");
 
 		return this->intrinsics[id.id];
+	};
+
+	auto SourceManager::getIntrinsic(PIR::Intrinsic::Kind kind) const noexcept -> const PIR::Intrinsic& {
+		evo::debugAssert(this->isLocked(), "Can only get intrinsics when locked");
+
+		return this->intrinsics[static_cast<size_t>(kind)];
 	};
 
 

@@ -1,3 +1,11 @@
+
+// func main = () #entry -> Int {
+// 	var foo: Int = 3 + 5;
+
+// 	return foo;
+// }
+
+
 def test2 = @import("test2.pthr");
 
 var global_test #export : Int = 12;
@@ -5,6 +13,14 @@ var global_test #export : Int = 12;
 
 func set_value = (val: Int write) -> Void {
 	val = 12;
+}
+
+func set_value = (val: UInt write) -> Void {
+	val = 16;
+}
+
+func set_value = (val: UInt write, val_to_set: UInt) -> Void {
+	val = copy val_to_set;
 }
 
 func set_value = (val: Bool write) -> Void {
@@ -19,6 +35,19 @@ func get_global_num = () #pub -> Int^ {
 	return (addr test3.global_num);
 }
 
+
+func math_test = () -> Void {
+	@__printSeparator();
+	
+	var foo: Int = 12;
+	// foo = @divInt(120, @mulInt(@addInt(foo, @negateInt(2)), 3));
+	foo = 120 / ((foo +@ -2) * 3);
+	@__printInt(foo - -1); // 5
+
+
+	var uint: UInt = 3;
+	@__printUInt(@addUInt(0, uint)); // 3
+}
 
 
 
@@ -36,6 +65,16 @@ func main = () #entry -> Int {
 
 	test2.print();
 	test2.print(foo);
+
+
+	var uint_var: UInt = 12;
+	set_value(uint_var, 15);
+	test2.print(uint_var);
+	set_value(uint_var);
+	test2.print(uint_var);
+
+
+	math_test();
 
 	return output;
 }

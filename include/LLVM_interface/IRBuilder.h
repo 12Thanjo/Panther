@@ -14,6 +14,7 @@ namespace panther{
 			public:
 				enum class IntrinsicID{
 					debugtrap,
+					add,
 				};
 
 			public:
@@ -44,8 +45,17 @@ namespace panther{
 				auto createCondBranch(llvm::Value* cond, llvm::BasicBlock* then_block, llvm::BasicBlock* else_block) noexcept -> llvm::BranchInst*;
 
 				auto createCall(llvm::Function* func, evo::ArrayProxy<llvm::Value*> params, evo::CStrProxy name = '\0') noexcept -> llvm::CallInst*;
-
 				auto createIntrinsicCall(IntrinsicID id, evo::ArrayProxy<llvm::Value*> params) noexcept -> llvm::CallInst*;
+
+
+				///////////////////////////////////
+				// operators
+
+				auto createAdd(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createSub(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createMul(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createUDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createSDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
 
 
 				//////////////////////////////////////////////////////////////////////

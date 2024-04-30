@@ -443,6 +443,10 @@ namespace panther{
 						const PIR::Intrinsic& intrinsic = src_manager.getIntrinsic(func_call.intrinsic);
 
 						switch(intrinsic.kind){
+							case PIR::Intrinsic::Kind::breakpoint: {
+								this->builder->createIntrinsicCall(llvmint::IRBuilder::IntrinsicID::debugtrap, {});
+							} break;
+
 							case PIR::Intrinsic::Kind::__printHelloWorld: {
 								evo::debugAssert(this->libc.puts != nullptr, "libc was not initialized");
 
@@ -450,18 +454,29 @@ namespace panther{
 								this->builder->createCall(this->libc.puts, { llvmint::ptrcast<llvm::Value>(hello_world_str) });
 							} break;
 
-							case PIR::Intrinsic::Kind::breakpoint: {
-								this->builder->createIntrinsicCall(llvmint::IRBuilder::IntrinsicID::debugtrap, {});
-							} break;
-
 							case PIR::Intrinsic::Kind::__printInt: {
 								evo::debugAssert(this->libc.printf != nullptr, "libc was not initialized");
 								
-								static llvm::GlobalVariable* print_int_str = this->builder->valueString("num: %lli\n", "print_int_str");
-								
+								static llvm::GlobalVariable* print_int_str = this->builder->valueString("Int: %lli\n", "print_int_str");
 								this->builder->createCall(
 									this->libc.printf, { llvmint::ptrcast<llvm::Value>(print_int_str), this->get_value(source, func_call.args[0]) }
 								);
+							} break;
+
+							case PIR::Intrinsic::Kind::__printUInt: {
+								evo::debugAssert(this->libc.printf != nullptr, "libc was not initialized");
+								
+								static llvm::GlobalVariable* print_uint_str = this->builder->valueString("UInt: %llu\n", "print_uint_str");
+								this->builder->createCall(
+									this->libc.printf, { llvmint::ptrcast<llvm::Value>(print_uint_str), this->get_value(source, func_call.args[0]) }
+								);
+							} break;
+
+							case PIR::Intrinsic::Kind::__printSeparator: {
+								evo::debugAssert(this->libc.puts != nullptr, "libc was not initialized");
+
+								static llvm::GlobalVariable* separator_str = this->builder->valueString("------------------------------", "separator_str");
+								this->builder->createCall(this->libc.puts, { llvmint::ptrcast<llvm::Value>(separator_str) });
 							} break;
 
 							default: {
@@ -500,6 +515,9 @@ namespace panther{
 					// TODO: make sure is register sized
 					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
 
+				}else if(base_type.builtin.kind == Token::TypeUInt){
+					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
+				
 				}else if(base_type.builtin.kind == Token::TypeBool){
 					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
 				}
@@ -614,11 +632,149 @@ namespace panther{
 
 					case PIR::Expr::Kind::FuncCall: {
 						const PIR::FuncCall& func_call = source.getFuncCall(value.funcCall);
-						const PIR::Func& func = Source::getFunc(func_call.func);
 
-						const std::vector<llvm::Value*> args = this->create_func_call_args(source, func_call);
+						switch(func_call.kind){
+							case PIR::FuncCall::Kind::Func: {
+								const PIR::Func& func = Source::getFunc(func_call.func);
 
-						return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvmFunc, args, '\0'));
+								const std::vector<llvm::Value*> args = this->create_func_call_args(source, func_call);
+
+								return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvmFunc, args, '\0'));								
+							} break;
+
+							case PIR::FuncCall::Kind::Intrinsic: {
+								const SourceManager& src_manager = source.getSourceManager();
+								const PIR::Intrinsic& intrinsic = src_manager.getIntrinsic(func_call.intrinsic);
+
+								switch(intrinsic.kind){
+									///////////////////////////////////
+									// add 
+
+									case PIR::Intrinsic::Kind::addInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createAdd(lhs, rhs, false, true, "addInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::addUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createAdd(lhs, rhs, true, false, "addUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// add wrap
+
+									case PIR::Intrinsic::Kind::addWrapInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createAdd(lhs, rhs, false, false, "addWrapInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::addWrapUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createAdd(lhs, rhs, false, false, "addWrapUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// sub
+
+									case PIR::Intrinsic::Kind::subInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSub(lhs, rhs, false, true, "subInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::subUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSub(lhs, rhs, true, false, "subUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// sub wrap
+
+									case PIR::Intrinsic::Kind::subWrapInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSub(lhs, rhs, false, false, "subWrapInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::subWrapUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSub(lhs, rhs, false, false, "subWrapUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// mul
+
+									case PIR::Intrinsic::Kind::mulInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createMul(lhs, rhs, false, true, "mulInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::mulUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createMul(lhs, rhs, false, false, "mulUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// mul wrap
+
+									case PIR::Intrinsic::Kind::mulWrapInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSub(lhs, rhs, false, false, "mulWrapInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::mulWrapUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSub(lhs, rhs, false, false, "mulWrapUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// div
+
+									case PIR::Intrinsic::Kind::divInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createSDiv(lhs, rhs, "divInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::divUInt: {
+										llvm::Value* lhs = this->get_value(source, func_call.args[0]);
+										llvm::Value* rhs = this->get_value(source, func_call.args[1]);
+										return this->builder->createUDiv(lhs, rhs, "divUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// negate
+
+									case PIR::Intrinsic::Kind::negateInt: {
+										llvm::Value* zero = llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(0));
+										llvm::Value* rhs = this->get_value(source, func_call.args[0]);
+										return this->builder->createSub(zero, rhs, false, true, "negateInt");
+									} break;
+								};
+
+								EVO_FATAL_BREAK("Unkown intrinsic");
+							} break;
+						};
+
+						EVO_FATAL_BREAK("Unkown func call kind");
+
 					} break;
 
 					case PIR::Expr::Kind::Prefix: {

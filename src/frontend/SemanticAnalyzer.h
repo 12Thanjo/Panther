@@ -48,6 +48,8 @@ namespace panther{
 
 			EVO_NODISCARD auto get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID>;
 
+			EVO_NODISCARD auto is_implicitly_convertable_to(const PIR::Type& from, const PIR::Type& to, const AST::Node& expr) const noexcept -> bool;
+
 
 			// Not for use in global variables
 			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
@@ -106,7 +108,7 @@ namespace panther{
 			EVO_NODISCARD auto lookup_func_in_import(std::string_view ident, const Source& import, const AST::FuncCall& func_call) const noexcept
 			-> evo::Result<PIR::Func::ID>;
 			EVO_NODISCARD auto match_function_to_overloads(
-				std::string_view ident, const AST::FuncCall& func_call, const std::vector<PIR::Func::ID>& overload_list
+				std::string_view ident, const AST::FuncCall& func_call, evo::ArrayProxy<PIR::Func::ID> overload_list
 			) const noexcept -> evo::Result<PIR::Func::ID>;
 
 

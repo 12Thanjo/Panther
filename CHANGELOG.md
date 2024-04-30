@@ -1,5 +1,36 @@
 # Changelog
 
+### v0.24.0
+- Added the UInt type
+- Added implicit conversion for integral literals
+- Added the intrinsic function `@__printUInt(UInt read)` and `@__printSeparator()`
+	- This existance of this is just temporary
+- Added the following intrinsic functions
+	- `@addInt(Int read, Int read) -> Int`
+	- `@addUInt(UInt read, UInt read) -> UInt`
+	- `@addWrapInt(Int read, Int read) -> Int`
+	- `@addWrapUInt(UInt read, UInt read) -> UInt`
+	- `@subInt(Int read, Int read) -> Int`
+	- `@subUInt(UInt read, UInt read) -> UInt`
+	- `@subWrapInt(Int read, Int read) -> Int`
+	- `@subWrapUInt(UInt read, UInt read) -> UInt`
+	- `@mulInt(Int read, Int read) -> Int`
+	- `@mulUInt(UInt read, UInt read) -> UInt`
+	- `@mulWrapInt(Int read, Int read) -> Int`
+	- `@mulWrapUInt(UInt read, UInt read) -> UInt`
+	- `@divInt(Int read, Int read) -> Int`
+	- `@divUInt(UInt read, UInt read) -> UInt`
+	- `@negateInt(Int read) -> Int`
+- Added the following operators
+	- `+`
+	- `+@` (addition with wrapping)
+	- `-` (both negate and subtraction)
+	- `-@` (subtraction with wrapping)
+	- `*`
+	- `*@` (multiplication with wrapping)
+	- `/`
+	
+
 ### v0.23.0
 - Added function overloading
 - Fixed fatal errors with using functions by explicitly disallowing it (only temporary)

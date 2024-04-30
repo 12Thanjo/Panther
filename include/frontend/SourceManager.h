@@ -130,8 +130,9 @@ namespace panther{
 			// TODO: better way of doing this?
 			EVO_NODISCARD static inline auto getTypeImport() noexcept -> PIR::Type::ID { return PIR::Type::ID(0); };
 			EVO_NODISCARD static inline auto getTypeInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(1); };
-			EVO_NODISCARD static inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(2); };
-			EVO_NODISCARD static inline auto getTypeString() noexcept -> PIR::Type::ID { return PIR::Type::ID(3); };
+			EVO_NODISCARD static inline auto getTypeUInt() noexcept -> PIR::Type::ID { return PIR::Type::ID(2); };
+			EVO_NODISCARD static inline auto getTypeBool() noexcept -> PIR::Type::ID { return PIR::Type::ID(3); };
+			EVO_NODISCARD static inline auto getTypeString() noexcept -> PIR::Type::ID { return PIR::Type::ID(4); };
 
 
 			EVO_NODISCARD auto printType(PIR::Type::ID id) const noexcept -> std::string;
@@ -147,10 +148,12 @@ namespace panther{
 			auto addExport(std::string_view ident) noexcept -> void;
 
 
-
-			EVO_NODISCARD auto getIntrinsics() const noexcept -> const std::vector<PIR::Intrinsic>&;
+			EVO_NODISCARD auto getIntrinsics() const noexcept -> evo::ArrayProxy<PIR::Intrinsic>;
+			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::Kind kind) const noexcept -> const PIR::Intrinsic&;
 			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::ID id) const noexcept -> const PIR::Intrinsic&;
-			EVO_NODISCARD static inline auto getIntrinsicIDImport() noexcept -> PIR::Intrinsic::ID { return PIR::Intrinsic::ID(0); };
+			EVO_NODISCARD static inline auto getIntrinsicID(PIR::Intrinsic::Kind kind) noexcept -> PIR::Intrinsic::ID {
+				return PIR::Intrinsic::ID(static_cast<uint32_t>(kind));
+			};
 
 		private:
 			Config config;
@@ -163,7 +166,7 @@ namespace panther{
 
 			std::optional<Entry> entry{};
 
-			std::vector<PIR::Intrinsic> intrinsics{};
+			evo::StaticVector<PIR::Intrinsic, static_cast<size_t>(PIR::Intrinsic::Kind::_MAX_)> intrinsics{};
 			
 			std::unordered_set<std::string_view> exported_funcs{};
 
