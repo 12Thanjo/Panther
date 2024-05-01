@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.24.1
+- Added implicit conversion for infix operators
+- Fixed an implicit conversion error not properly reporting
+- Fixed some multiply operators calling the incorrect functions
+
 ### v0.24.0
 - Added the UInt type
 - Added implicit conversion for integral literals

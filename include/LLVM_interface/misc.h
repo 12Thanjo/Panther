@@ -27,6 +27,8 @@ namespace panther{
 
 		EVO_NODISCARD auto getFuncArguments(llvm::Function* func) noexcept -> std::vector<llvm::Argument*>;
 
+		auto setFuncNoReturn(llvm::Function* func) noexcept -> void;
+
 
 	};
 };

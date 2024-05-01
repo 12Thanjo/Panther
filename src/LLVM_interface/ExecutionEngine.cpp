@@ -24,28 +24,22 @@ namespace panther{
 		};
 
 
-		static auto run_function(llvm::ExecutionEngine* engine, std::string_view func_name) noexcept -> llvm::GenericValue {
-			llvm::Function* func = engine->FindFunctionNamed(func_name);
-			return engine->runFunction(func, {});	
+
+		auto ExecutionEngine::getFuncAddress(std::string_view func_name) noexcept -> uint64_t {
+			const std::string func_name_str = std::string(func_name);
+			return this->engine->getFunctionAddress(func_name_str);
 		};
 
-
-		template<>
-		auto ExecutionEngine::runFunction<uint64_t>(std::string_view func_name) noexcept -> uint64_t {
-			return run_function(this->engine, func_name).IntVal.getLimitedValue();
-		};
-
-		template<>
-		auto ExecutionEngine::runFunction<uint32_t>(std::string_view func_name) noexcept -> uint32_t {
-			uint64_t output = run_function(this->engine, func_name).IntVal.getLimitedValue();
-			return uint32_t(output);
-		};
 
 
 
 		template<>
 		auto ExecutionEngine::runFunction<void>(std::string_view func_name) noexcept -> void {
-			run_function(this->engine, func_name);
+			const uint64_t func_addr = this->getFuncAddress(func_name);
+
+			using FuncType = void(*)(void);
+			const FuncType func = (FuncType)func_addr;
+			func();
 		};
 	
 	};

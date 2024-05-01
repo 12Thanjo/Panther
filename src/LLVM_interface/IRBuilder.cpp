@@ -162,6 +162,10 @@ namespace panther{
 			return this->builder->getIntN(n, num);
 		};
 
+		auto IRBuilder::valueCInt(int num) noexcept -> llvm::ConstantInt* {
+			return this->builder->getInt32(unsigned(num));
+		};
+
 
 		auto IRBuilder::valueBool(bool val) noexcept -> llvm::ConstantInt* {
 			return this->builder->getInt1(val);
@@ -225,6 +229,11 @@ namespace panther{
 
 		auto IRBuilder::getTypeI_N(unsigned n) noexcept -> llvm::IntegerType* {
 			 return this->builder->getIntNTy(n);
+		};
+
+
+		auto IRBuilder::getTypeCInt() noexcept -> llvm::IntegerType* {
+			 return this->builder->getInt32Ty();
 		};
 
 

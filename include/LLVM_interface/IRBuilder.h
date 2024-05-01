@@ -14,7 +14,6 @@ namespace panther{
 			public:
 				enum class IntrinsicID{
 					debugtrap,
-					add,
 				};
 
 			public:
@@ -73,6 +72,8 @@ namespace panther{
 				EVO_NODISCARD auto valueUI64(uint64_t num) noexcept -> llvm::ConstantInt*;
 				EVO_NODISCARD auto valueUI_N(unsigned n, uint64_t num) noexcept -> llvm::ConstantInt*;
 
+				EVO_NODISCARD auto valueCInt(int num) noexcept -> llvm::ConstantInt*;
+
 				EVO_NODISCARD auto valueBool(bool val) noexcept -> llvm::ConstantInt*;
 
 				EVO_NODISCARD auto valueString(evo::CStrProxy str, evo::CStrProxy name = '\0') noexcept -> llvm::GlobalVariable*;
@@ -107,6 +108,7 @@ namespace panther{
 
 				EVO_NODISCARD auto getTypeI_N(unsigned n) noexcept -> llvm::IntegerType*;
 
+				EVO_NODISCARD auto getTypeCInt() noexcept -> llvm::IntegerType*;
 
 
 				EVO_NODISCARD auto getTypePtr() noexcept -> llvm::PointerType*;

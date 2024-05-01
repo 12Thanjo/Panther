@@ -48,7 +48,7 @@ namespace panther{
 
 			EVO_NODISCARD auto get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID>;
 
-			EVO_NODISCARD auto is_implicitly_convertable_to(const PIR::Type& from, const PIR::Type& to, const AST::Node& expr) const noexcept -> bool;
+			EVO_NODISCARD auto is_implicitly_convertable_to(const PIR::Type& from, const PIR::Type& to, const AST::Node& from_expr) const noexcept -> bool;
 
 
 			// Not for use in global variables

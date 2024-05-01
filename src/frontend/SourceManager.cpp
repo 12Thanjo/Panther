@@ -265,9 +265,9 @@ namespace panther{
 
 
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulInt, "mulInt", math_ops_Int_type);
-		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulWrapInt, "mulWrapInt", math_ops_Int_type);
-		
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulUInt, "mulUInt", math_ops_UInt_type);
+		
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulWrapInt, "mulWrapInt", math_ops_Int_type);
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::mulWrapUInt, "mulWrapUInt", math_ops_UInt_type);
 
 
@@ -277,6 +277,7 @@ namespace panther{
 
 
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::negateInt, "negateInt", Int_in_Int_out_type);
+
 
 
 
@@ -312,6 +313,16 @@ namespace panther{
 
 
 
+		///////////////////////////////////
+		// debug checking of ordering
+
+		#if defined(PANTHER_CONFIG_DEBUG)
+			for(uint32_t i = 0; i < uint32_t(PIR::Intrinsic::Kind::_MAX_); i+=1){
+				const PIR::Intrinsic::Kind i_kind = static_cast<PIR::Intrinsic::Kind>(i);
+				const PIR::Intrinsic& intrinsic = this->getIntrinsic(i_kind);
+				evo::Assert(intrinsic.kind == i_kind, "found an intrinsic with incorrect cooresponding kind");
+			}
+		#endif
 
 
 		//////////////////////////////////////////////////////////////////////
@@ -346,6 +357,7 @@ namespace panther{
 
 
 		type_Int.negateOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::negateInt));
+
 	};
 
 

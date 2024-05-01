@@ -46,6 +46,12 @@ namespace panther{
 			return args;
 		};
 
+
+
+		auto setFuncNoReturn(llvm::Function* func) noexcept -> void {
+			func->addFnAttr(llvm::Attribute::AttrKind::NoReturn);
+		};
+
 	
 	};
 };
