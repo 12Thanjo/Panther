@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.25.0
+- Fixed formatting for building documentation
+- Added `alias` statements
+
 ### v0.24.1
 - Added implicit conversion for infix operators
 - Fixed an implicit conversion error not properly reporting
@@ -9,7 +13,7 @@
 - Added the UInt type
 - Added implicit conversion for integral literals
 - Added the intrinsic function `@__printUInt(UInt read)` and `@__printSeparator()`
-	- This existance of this is just temporary
+	- This existence of this is just temporary
 - Added the following intrinsic functions
 	- `@addInt(Int read, Int read) -> Int`
 	- `@addUInt(UInt read, UInt read) -> UInt`

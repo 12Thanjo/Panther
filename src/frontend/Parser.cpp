@@ -49,6 +49,9 @@ namespace panther{
 		result = this->parse_unreachable();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
+		result = this->parse_alias();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
 		// meant for things like function calls (make sure to check in semantic ananlysis that there actually are side effects)
 		result = this->parse_expr();
 		if(result.code() == Result::Success){
@@ -392,15 +395,52 @@ namespace panther{
 	};
 
 
+	auto Parser::parse_alias() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordAlias){ return Result::WrongType; };
+		this->skip(1);
+
+		// ident
+		const Result ident = this->parse_ident();
+		if(this->check_result_fail(ident, "identifier in alias")){ return Result::Error; }
+
+		// attributes
+		auto attributes = std::vector<Token::ID>();
+		while(this->get(this->peek()).kind == Token::Attribute){
+			attributes.emplace_back(this->next());
+		};
+
+		// =
+		if(this->expect_token(Token::get("="), "in alias") == false){ return Result::Error; }
+		
+		const Result type = this->parse_type();
+		if(this->check_result_fail(type, "type in alias")){ return Result::Error; }		
+
+		// ;
+		if(this->expect_token(Token::get(";"), "at end of assignment") == false){ return Result::Error; }
+
+		return this->create_node(
+			this->source.aliases, AST::Kind::Alias,
+			ident.value(), std::move(attributes), type.value()
+		);
+	};
+
+
+
+
+
 	// TODO: add checking for EOF
 	auto Parser::parse_type() noexcept -> Result {
+		bool is_builtin = true;
 		switch(this->get(this->peek()).kind){
 			case Token::TypeVoid:
 			case Token::TypeInt:
 			case Token::TypeUInt:
 			case Token::TypeBool:
 			case Token::TypeString:
-			// case Token::Ident: 
+				break;
+
+			case Token::Ident:
+				is_builtin = false;
 				break;
 
 			default:
@@ -408,7 +448,20 @@ namespace panther{
 		};
 
 
-		const Token::ID base_type = this->next();
+		const evo::Result<AST::Type::Base> base_type = [&]() noexcept {
+			if(is_builtin){
+				return evo::Result<AST::Type::Base>(AST::Type::Base(this->next()));
+			}else{
+				const Result accessor_expr = this->parse_accessor_expr();
+				if(accessor_expr.code() != Result::Success){ return evo::Result<AST::Type::Base>(evo::resultError); }
+				return evo::Result<AST::Type::Base>( AST::Type::Base{ .node = accessor_expr.value() } );
+			}
+		}();
+
+		if(base_type.isError()){ return Result::Error; }
+
+
+
 
 
 		auto qualifiers = std::vector<AST::Type::Qualifier>();
@@ -427,7 +480,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.types, AST::Kind::Type,
-			base_type, std::move(qualifiers)
+			base_type.value(), is_builtin, std::move(qualifiers)
 		);
 	};
 

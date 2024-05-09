@@ -5,11 +5,12 @@ This file is not complete.
 
 ## Building the LLVM Project
 You can do this anywhere on your PC.
-
-`mkdir LLVM`
-`cd LLVM`
-`mkdir build`
-`git clone https://github.com/llvm/llvm-project.git --depth=1`
+```
+mkdir LLVM
+cd LLVM
+mkdir build
+git clone https://github.com/llvm/llvm-project.git --depth=1
+```
 
 
 ### Windows:

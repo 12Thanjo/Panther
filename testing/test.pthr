@@ -1,81 +1,18 @@
-
-// func main = () #entry -> Int {
-// 	var foo: Int = 3 + 5;
-
-// 	return foo;
-// }
-
-
 def test2 = @import("test2.pthr");
 
-var global_test #export : Int = 12;
-
-
-func set_value = (val: Int write) -> Void {
-	val = 12;
-}
-
-func set_value = (val: UInt write) -> Void {
-	val = 16;
-}
-
-func set_value = (val: UInt write, val_to_set: UInt) -> Void {
-	val = copy val_to_set;
-}
-
-func set_value = (val: Bool write) -> Void {
-	set_value(val);
-}
-
-
-
-
-func get_global_num = () #pub -> Int^ {
-	def test3 = test2.test3;
-	return (addr test3.global_num);
-}
-
-
-func math_test = () -> Void {
-	@__printSeparator();
-	
-	var foo: Int = 12;
-	// // foo = @divInt(120, @mulInt(@addWrapInt(foo, @negateInt(2)), 3));
-	foo = 120 / ((foo +@ -2) * 3);
-	@__printInt(foo - -1); // 5
-
-
-	var uint: UInt = 3;
-	uint = 9 + uint;
-	@__printUInt(uint * 4); // 48
-}
-
+alias Integer #pub = Int;
+alias IntPtr = Integer^;
 
 
 func main = () #entry -> Int {
-	var foo: Int = 9;
-	var bool: Bool = true;
+	def bool: test2.test3.Boolean = false;
 
-
-	// set_value(bool);
 	if(bool){
-		set_value(get_global_num().^);
+		var foo: test2.Integer = 12;
+		var foo_ptr: IntPtr = addr foo;
+
+		return foo;
 	}
 
-	var output: Int = test2.get_val(foo, bool);
-
-	test2.print();
-	test2.print(foo);
-
-
-	var uint_var: UInt = 12;
-	set_value(uint_var, 15);
-	test2.print(uint_var);
-	set_value(uint_var);
-	test2.print(uint_var);
-
-
-	math_test();
-
-	return output;
+	return 0;
 }

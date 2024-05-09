@@ -12,6 +12,7 @@ namespace panther{
 			Func,
 			Return,
 			Conditional,
+			Alias,
 			
 			Type,
 			Block,
@@ -93,8 +94,22 @@ namespace panther{
 		};
 
 
+		struct Alias{
+			Node::ID ident;
+			std::vector<Token::ID> attributes;
+			Node::ID type;
+		};
+
+
+
+
 		struct Type{
-			Token::ID token;
+			union Base{
+				Token::ID token;
+				Node::ID node;
+			} base;
+
+			bool isBuiltin;
 
 			struct Qualifier{
 				bool isPtr;
@@ -102,6 +117,9 @@ namespace panther{
 			};
 			std::vector<Qualifier> qualifiers;
 		};
+
+
+
 
 		struct Block{
 			std::vector<Node::ID> nodes;

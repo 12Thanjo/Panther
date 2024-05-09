@@ -67,6 +67,8 @@ namespace panther{
 			KeywordWrite,
 			KeywordIn,
 
+			KeywordAlias,
+
 
 			///////////////////////////////////
 			// operators
@@ -269,6 +271,8 @@ namespace panther{
 				break; case Kind::KeywordRead: return "read";
 				break; case Kind::KeywordWrite: return "write";
 				break; case Kind::KeywordIn: return "in";
+
+				break; case Kind::KeywordAlias: return "alias";
 
 
 				///////////////////////////////////

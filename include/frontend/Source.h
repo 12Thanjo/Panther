@@ -75,6 +75,9 @@ namespace panther{
 			EVO_NODISCARD auto getReturn(AST::Node::ID node_id) const noexcept -> const AST::Return&;
 			EVO_NODISCARD auto getReturn(const AST::Node& node) const noexcept -> const AST::Return&;
 
+			EVO_NODISCARD auto getAlias(AST::Node::ID node_id) const noexcept -> const AST::Alias&;
+			EVO_NODISCARD auto getAlias(const AST::Node& node) const noexcept -> const AST::Alias&;
+
 
 			EVO_NODISCARD auto getType(AST::Node::ID node_id) const noexcept -> const AST::Type&;
 			EVO_NODISCARD auto getType(const AST::Node& node) const noexcept -> const AST::Type&;
@@ -304,6 +307,7 @@ namespace panther{
 			std::vector<AST::Func> funcs{};
 			std::vector<AST::FuncParams> func_params{};
 			std::vector<AST::Conditional> conditionals{};
+			std::vector<AST::Alias> aliases{};
 			std::vector<AST::Return> returns{};
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
@@ -330,6 +334,7 @@ namespace panther{
 				std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> pub_funcs{};
 				std::unordered_map<std::string_view, PIR::Var::ID> pub_vars{};
 				std::unordered_map<std::string_view, Source::ID> pub_imports{};
+				std::unordered_map<std::string_view, PIR::Type::VoidableID> pub_aliases{};
 			} pir;
 
 

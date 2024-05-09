@@ -1,33 +1,3 @@
-def test = @import("test.pthr");
-
 def test3 #pub = @import("test3.pthr");
 
-
-
-func print = () #pub -> Void {
-	@__printHelloWorld();
-}
-
-func print = (val: Int) #pub -> Void {
-	@__printInt(val);
-}
-
-func print = (val: UInt) #pub -> Void {
-	@__printUInt(val);
-}
-
-
-func get_val = (num: Int write, should_change: Bool) #pub -> Int {
-	var output: Int = uninit;
-
-	if(should_change){
-		num = copy test.get_global_num().^;
-		output = 1;
-	}else{
-		output = 0;
-	}
-
-	return output;
-}
-
-
+alias Integer #pub = Int;

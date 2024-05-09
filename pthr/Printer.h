@@ -18,15 +18,15 @@ namespace panther{
 				Printer(bool should_use_colors) : use_colors(should_use_colors) {};
 				~Printer() = default;
 
-				auto fatal(evo::CStrProxy msg) const noexcept -> void;
-				auto error(evo::CStrProxy msg) const noexcept -> void;
-				auto warning(evo::CStrProxy msg) const noexcept -> void;
-				auto success(evo::CStrProxy msg) const noexcept -> void;
-				auto info(evo::CStrProxy msg) const noexcept -> void;
-				auto debug(evo::CStrProxy msg) const noexcept -> void;
-				auto trace(evo::CStrProxy msg) const noexcept -> void;
+				auto fatal(std::string_view msg) const noexcept -> void;
+				auto error(std::string_view msg) const noexcept -> void;
+				auto warning(std::string_view msg) const noexcept -> void;
+				auto success(std::string_view msg) const noexcept -> void;
+				auto info(std::string_view msg) const noexcept -> void;
+				auto debug(std::string_view msg) const noexcept -> void;
+				auto trace(std::string_view msg) const noexcept -> void;
 
-				auto print(evo::CStrProxy msg) const noexcept -> void;
+				auto print(std::string_view msg) const noexcept -> void;
 
 
 				EVO_NODISCARD inline auto usesColors() const noexcept -> bool { return this->use_colors; };
@@ -46,21 +46,23 @@ namespace panther{
 				///////////////////////////////////
 				// ast
 
-				auto print_stmt(const Source& source, const AST::Node& node_id) noexcept -> void;
-				auto print_var_decl(const Source& source, const AST::Node& node_id) noexcept -> void;
-				auto print_func(const Source& source, const AST::Node& node_id) noexcept -> void;
-				auto print_func_params(const Source& source, const AST::Node& node_id) noexcept -> void;
-				auto print_conditional(const Source& source, const AST::Node& node_id) noexcept -> void;
-				auto print_return(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_stmt(const AST::Node& node) noexcept -> void;
+				auto print_var_decl(const AST::Node& node) noexcept -> void;
+				auto print_func(const AST::Node& node) noexcept -> void;
+				auto print_func_params(const AST::Node& node) noexcept -> void;
+				auto print_conditional(const AST::Node& node) noexcept -> void;
+				auto print_return(const AST::Node& node) noexcept -> void;
+				auto print_alias(const AST::Node& node) noexcept -> void;
 
-				auto print_infix(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_infix(const AST::Node& node) noexcept -> void;
 				
-				auto print_type(const Source& source, const AST::Node& node_id) noexcept -> void;
-				auto print_block(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_type(const AST::Node& node) noexcept -> void;
+				auto print_block(const AST::Node& node) noexcept -> void;
 
-				auto print_expr(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_expr(const AST::Node& node) noexcept -> void;
 
-				auto print_literal(const Source& source, const AST::Node& node_id) noexcept -> void;
+				auto print_ident(const AST::Node& node) noexcept -> void;
+				auto print_literal(const AST::Node& node) noexcept -> void;
 
 
 				///////////////////////////////////
@@ -72,6 +74,8 @@ namespace panther{
 				auto indenter_set_end() noexcept -> void;	
 
 				auto indenter_print() noexcept -> void;
+				auto indenter_print_arrow() noexcept -> void;
+				auto indenter_print_end() noexcept -> void;
 
 				enum class IndenterType{
 					Line,
@@ -84,6 +88,7 @@ namespace panther{
 
 			private:
 				bool use_colors;
+				const Source* ast_source = nullptr;
 		};
 		
 

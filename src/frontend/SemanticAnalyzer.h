@@ -35,6 +35,7 @@ namespace panther{
 			EVO_NODISCARD auto analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool;
 			EVO_NODISCARD auto analyze_unreachable(const Token& unreachable) noexcept -> bool;
 			EVO_NODISCARD auto analyze_assignment(const AST::Infix& infix) noexcept -> bool;
+			EVO_NODISCARD auto analyze_alias(const AST::Alias& alias) noexcept -> bool;
 			
 			EVO_NODISCARD auto analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry) noexcept -> bool; // enters a new scope
 			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
@@ -86,6 +87,11 @@ namespace panther{
 				AST::Node::ID ident;
 			};
 
+			struct Alias{
+				PIR::Type::VoidableID type_id;
+				AST::Node::ID ident;
+			};
+
 			auto enter_scope(PIR::StmtBlock* stmts_entry) noexcept -> void;
 			auto leave_scope() noexcept -> void;
 
@@ -93,6 +99,7 @@ namespace panther{
 			auto add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void;
 			auto add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void;
 			auto add_import_to_scope(std::string_view str, Import import) noexcept -> void;
+			auto add_alias_to_scope(std::string_view str, Alias alias) noexcept -> void;
 
 			auto set_scope_terminated() noexcept -> void;
 			EVO_NODISCARD auto scope_is_terminated() const noexcept -> bool;
@@ -150,6 +157,7 @@ namespace panther{
 				std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> funcs{};
 				std::unordered_map<std::string_view, PIR::Param::ID> params{};
 				std::unordered_map<std::string_view, Import> imports{};
+				std::unordered_map<std::string_view, Alias> aliases{};
 
 
 				// all control paths return or are unreachable

@@ -181,6 +181,8 @@ namespace panther{
 			else if(ident_name == "write") { this->create_token(Token::Kind::KeywordWrite); }
 			else if(ident_name == "in")    { this->create_token(Token::Kind::KeywordIn); }
 
+			else if(ident_name == "alias")    { this->create_token(Token::Kind::KeywordAlias); }
+
 
 			///////////////////////////////////
 			// else

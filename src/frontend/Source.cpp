@@ -92,6 +92,16 @@ namespace panther{
 		return this->returns[node.index];
 	};
 
+	auto Source::getAlias(AST::Node::ID node_id) const noexcept -> const AST::Alias& {
+		return this->getAlias(this->getNode(node_id));
+	};
+	auto Source::getAlias(const AST::Node& node) const noexcept -> const AST::Alias& {
+		evo::debugAssert(node.kind == AST::Kind::Alias, "Node is not a Alias");
+		return this->aliases[node.index];
+	};
+
+
+
 	auto Source::getPrefix(AST::Node::ID node_id) const noexcept -> const AST::Prefix& {
 		return this->getPrefix(this->getNode(node_id));
 	};
@@ -345,8 +355,12 @@ namespace panther{
 			
 			case AST::Kind::Type: {
 				const AST::Type& type = this->getType(node);
-				const Token& token = this->getToken(type.token);
-				return token.location;
+				if(type.isBuiltin){
+					const Token& token = this->getToken(type.base.token);
+					return token.location;
+				}else{
+					return this->get_node_location(this->getNode(type.base.node));
+				}
 			} break;
 
 			case AST::Kind::Block: {

@@ -10,57 +10,57 @@ namespace panther{
 	namespace cli{
 		
 
-		auto Printer::fatal(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleFatal(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::fatal(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::fatal(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::error(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleError(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::error(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::error(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::warning(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleWarning(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::warning(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::warning(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::success(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleSuccess(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::success(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::success(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::info(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleInfo(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::info(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::info(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::debug(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleDebug(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::debug(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::debug(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::trace(evo::CStrProxy msg) const noexcept -> void {
-			if(this->use_colors){ evo::styleConsoleTrace(); };
-			evo::log(msg);
-			if(this->use_colors){ evo::styleConsoleReset(); };
+		auto Printer::trace(std::string_view msg) const noexcept -> void {
+			if(this->use_colors){ evo::styleConsole::trace(); };
+			evo::print(msg);
+			if(this->use_colors){ evo::styleConsole::reset(); };
 		};
 
 
-		auto Printer::print(evo::CStrProxy msg) const noexcept -> void {
-			evo::log(msg);
+		auto Printer::print(std::string_view msg) const noexcept -> void {
+			evo::print(msg);
 		};
 
 
@@ -260,6 +260,8 @@ namespace panther{
 
 
 		auto Printer::print_ast(const Source& source) noexcept -> void {
+			this->ast_source = &source;
+
 			this->info( std::format("AST: {}\n", source.getLocation().string()) );
 			if(source.global_stmts.size() == 0){
 				this->trace("(NONE)\n");
@@ -271,38 +273,41 @@ namespace panther{
 
 
 			for(AST::Node::ID node_id : source.global_stmts){
-				this->print_stmt(source, source.nodes[node_id.id]);
+				this->print_stmt(source.nodes[node_id.id]);
 			}
 
 
 			this->indents.clear();
+
+			this->ast_source = nullptr;
 		};
 
 
 
 
-		auto Printer::print_stmt(const Source& source, const AST::Node& node) noexcept -> void {
+		auto Printer::print_stmt(const AST::Node& node) noexcept -> void {
 			switch(node.kind){
-				break; case AST::Kind::VarDecl: this->print_var_decl(source, node);
-				break; case AST::Kind::Func: this->print_func(source, node);
-				break; case AST::Kind::Conditional: this->print_conditional(source, node);
-				break; case AST::Kind::Return: this->print_return(source, node);
-				break; case AST::Kind::Infix: this->print_infix(source, node);
+				break; case AST::Kind::VarDecl: this->print_var_decl(node);
+				break; case AST::Kind::Func: this->print_func(node);
+				break; case AST::Kind::Conditional: this->print_conditional(node);
+				break; case AST::Kind::Return: this->print_return(node);
+				break; case AST::Kind::Alias: this->print_alias(node);
+				break; case AST::Kind::Infix: this->print_infix(node);
 
-				break; case AST::Kind::FuncCall: this->print_expr(source, node);
+				break; case AST::Kind::FuncCall: this->print_expr(node);
 
 				break; case AST::Kind::Unreachable: {
 					this->indenter_print();
 					this->info("[UNREACHABLE]\n");
 				} break;
 
-				break; default: EVO_FATAL_BREAK("Unknown stmt type");
+				break; default: evo::debugFatalBreak("Unknown stmt type");
 			};
 		};
 
 
-		auto Printer::print_var_decl(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::VarDecl& var_decl = source.getVarDecl(node);
+		auto Printer::print_var_decl(const AST::Node& node) noexcept -> void {
+			const AST::VarDecl& var_decl = this->ast_source->getVarDecl(node);
 
 			this->indenter_print();
 			this->info("VarDecl:\n");
@@ -310,10 +315,9 @@ namespace panther{
 
 			this->indenter_print();
 			this->info("Ident: ");
-			this->debug( std::format("{}\n", source.getToken(source.getNode(var_decl.ident).token).value.string) );
+			this->print_ident(this->ast_source->getNode(var_decl.ident));
 
-			this->indenter_set_arrow();
-			this->indenter_print();
+			this->indenter_print_arrow();
 			if(var_decl.attributes.empty()){
 				this->info("Attributes: ");
 				this->debug("[NONE]\n");
@@ -330,13 +334,12 @@ namespace panther{
 
 					this->indenter_print();
 
-					this->debug( std::format("#{}\n", source.getToken(var_decl.attributes[i]).value.string) );
+					this->debug( std::format("#{}\n", this->ast_source->getToken(var_decl.attributes[i]).value.string) );
 				}
 				this->indenter_pop();
 			}
 
-			this->indenter_set_arrow();
-			this->indenter_print();
+			this->indenter_print_arrow();
 			this->info("Decl Type: ");
 			if(var_decl.isDef){
 				this->debug("def\n");
@@ -344,25 +347,20 @@ namespace panther{
 				this->debug("var\n");
 			}
 
-			this->indenter_set_arrow();
-			this->indenter_print();
+			this->indenter_print_arrow();
 			if(var_decl.type.has_value()){
-				this->info("Type:\n");
-				this->indenter_push();
-					this->indenter_set_end();
-					this->print_type(source, source.getNode(*var_decl.type));
-				this->indenter_pop();
+				this->info("Type:");
+				this->print_type(this->ast_source->getNode(*var_decl.type));
 			}else{
 				this->info("Type: ");
 				this->debug("[INFERENCE]\n");
 			}
 
-			this->indenter_set_end();
-			this->indenter_print();
+			this->indenter_print_end();
 			this->info("Expr:\n");
 			this->indenter_push();
 				this->indenter_set_end();
-				this->print_expr(source, source.getNode(var_decl.expr));
+				this->print_expr(this->ast_source->getNode(var_decl.expr));
 			this->indenter_pop();
 
 
@@ -371,8 +369,8 @@ namespace panther{
 		};
 
 
-		auto Printer::print_func(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::Func& func = source.getFunc(node);
+		auto Printer::print_func(const AST::Node& node) noexcept -> void {
+			const AST::Func& func = this->ast_source->getFunc(node);
 
 			this->indenter_print();
 			this->info("Func:\n");
@@ -380,13 +378,12 @@ namespace panther{
 
 				this->indenter_print();
 				this->info("Ident: ");
-				this->debug( std::format("{}\n", source.getToken(source.getNode(func.ident).token).value.string) );
+				this->print_ident(this->ast_source->getNode(func.ident));
 
 				this->indenter_set_arrow();
-				this->print_func_params(source, source.getNode(func.params));
+				this->print_func_params(this->ast_source->getNode(func.params));
 
-				this->indenter_set_arrow();
-				this->indenter_print();
+				this->indenter_print_arrow();
 				if(func.attributes.empty()){
 					this->info("Attributes: ");
 					this->debug("[NONE]\n");
@@ -403,26 +400,21 @@ namespace panther{
 
 						this->indenter_print();
 
-						this->debug( std::format("#{}\n", source.getToken(func.attributes[i]).value.string) );
+						this->debug( std::format("#{}\n", this->ast_source->getToken(func.attributes[i]).value.string) );
 					}
 					this->indenter_pop();
 				}
 
-				this->indenter_set_arrow();
-				this->indenter_print();
-				this->info("Return Type:\n");
-				this->indenter_push();
-					this->indenter_set_end();
-					this->print_type(source, source.getNode(func.returnType));
-				this->indenter_pop();
+				this->indenter_print_arrow();
+				this->info("Return Type:");
+				this->print_type(this->ast_source->getNode(func.returnType));
 
 
-				this->indenter_set_end();
-				this->indenter_print();
+				this->indenter_print_end();
 				this->info("Block:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_block(source, source.getNode(func.block));
+					this->print_block(this->ast_source->getNode(func.block));
 				this->indenter_pop();
 
 			this->indenter_pop();
@@ -430,8 +422,8 @@ namespace panther{
 
 
 
-		auto Printer::print_func_params(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::FuncParams& func_params = source.getFuncParams(node);
+		auto Printer::print_func_params(const AST::Node& node) noexcept -> void {
+			const AST::FuncParams& func_params = this->ast_source->getFuncParams(node);
 			
 			this->indenter_print();
 			if(func_params.params.empty()){
@@ -454,22 +446,16 @@ namespace panther{
 					this->info( std::format("param {}:\n", i) );
 					this->indenter_push();
 
-						this->indenter_set_arrow();
-						this->indenter_print();
+						this->indenter_print_arrow();
 						this->info("Ident: ");
-						this->debug(std::format("{}\n", source.getToken(source.getNode(param.ident).token).value.string));
+						this->print_ident(this->ast_source->getNode(param.ident));
 
-						this->indenter_set_arrow();
-						this->indenter_print();
-						this->info("Type:\n");
-						this->indenter_push();
-							this->indenter_set_end();
-							this->print_type(source, source.getNode(param.type));
-						this->indenter_pop();
+						this->indenter_print_arrow();
+						this->info("Type:");
+						this->print_type(this->ast_source->getNode(param.type));
 
 
-						this->indenter_set_end();
-						this->indenter_print();
+						this->indenter_print_end();
 						this->info("Kind: ");
 						switch(param.kind){
 							break; case AST::FuncParams::Param::Kind::Read:  this->debug("read\n");
@@ -485,8 +471,8 @@ namespace panther{
 		};
 
 
-		auto Printer::print_conditional(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::Conditional& conditional = source.getConditional(node);
+		auto Printer::print_conditional(const AST::Node& node) noexcept -> void {
+			const AST::Conditional& conditional = this->ast_source->getConditional(node);
 
 			this->indenter_print();
 			this->info("Conditional:\n");
@@ -496,35 +482,33 @@ namespace panther{
 				this->info("If:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_expr(source, source.getNode(conditional.ifExpr));
+					this->print_expr(this->ast_source->getNode(conditional.ifExpr));
 				this->indenter_pop();
 
 
-				this->indenter_set_arrow();
-				this->indenter_print();
+				this->indenter_print_arrow();
 				this->info("Then:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_block(source, source.getNode(conditional.thenBlock));
+					this->print_block(this->ast_source->getNode(conditional.thenBlock));
 				this->indenter_pop();
 
 
-				this->indenter_set_end();
-				this->indenter_print();
+				this->indenter_print_end();
 				if(conditional.elseBlock.has_value()){
 					this->info("Else:\n");
 					this->indenter_push();
 						this->indenter_set_end();
 
-						const AST::Node& else_block = source.getNode(*conditional.elseBlock);
+						const AST::Node& else_block = this->ast_source->getNode(*conditional.elseBlock);
 						if(else_block.kind == AST::Kind::Block){
-							this->print_block(source, else_block);
+							this->print_block(else_block);
 
 						}else if(else_block.kind == AST::Kind::Conditional){
-							this->print_conditional(source, else_block);
+							this->print_conditional(else_block);
 
 						}else{
-							EVO_FATAL_BREAK("Unsupported else-block kind");
+							evo::debugFatalBreak("Unsupported else-block kind");
 						}
 
 					this->indenter_pop();
@@ -538,8 +522,8 @@ namespace panther{
 		};
 
 
-		auto Printer::print_return(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::Return& return_stmt = source.getReturn(node);
+		auto Printer::print_return(const AST::Node& node) noexcept -> void {
+			const AST::Return& return_stmt = this->ast_source->getReturn(node);
 
 			this->indenter_print();
 
@@ -547,7 +531,7 @@ namespace panther{
 				this->info("Return:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_expr(source, source.getNode(*return_stmt.value));
+					this->print_expr(this->ast_source->getNode(*return_stmt.value));
 				this->indenter_pop();
 
 			}else{
@@ -557,9 +541,29 @@ namespace panther{
 
 		};
 
+		auto Printer::print_alias(const AST::Node& node) noexcept -> void {
+			const AST::Alias& alias = this->ast_source->getAlias(node);
 
-		auto Printer::print_infix(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::Infix& infix = source.getInfix(node);
+			this->indenter_print();
+			this->info("Alias:\n");
+
+			this->indenter_push();
+
+				this->indenter_print();
+				this->info("Ident: ");
+				this->print_ident(this->ast_source->getNode(alias.ident));
+
+
+				this->indenter_print_end();
+				this->info("Type:");
+				this->print_type(this->ast_source->getNode(alias.type));
+
+			this->indenter_pop();
+		};
+
+
+		auto Printer::print_infix(const AST::Node& node) noexcept -> void {
+			const AST::Infix& infix = this->ast_source->getInfix(node);
 
 			this->indenter_print();
 			this->info("Infix Op:\n");
@@ -567,22 +571,20 @@ namespace panther{
 			this->indenter_push();
 				this->indenter_print();
 				this->info("op: ");
-				this->debug( std::format("{}\n", Token::printKind(source.getToken(infix.op).kind)) );
+				this->debug( std::format("{}\n", Token::printKind(this->ast_source->getToken(infix.op).kind)) );
 
-				this->indenter_set_arrow();
-				this->indenter_print();
+				this->indenter_print_arrow();
 				this->info("lhs:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_expr(source, source.getNode(infix.lhs));
+					this->print_expr(this->ast_source->getNode(infix.lhs));
 				this->indenter_pop();
 
-				this->indenter_set_end();
-				this->indenter_print();
+				this->indenter_print_end();
 				this->info("rhs:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_expr(source, source.getNode(infix.rhs));
+					this->print_expr(this->ast_source->getNode(infix.rhs));
 				this->indenter_pop();
 
 			this->indenter_pop();
@@ -590,38 +592,67 @@ namespace panther{
 
 
 
-		auto Printer::print_type(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::Type& type = source.getType(node);
+		auto Printer::print_type(const AST::Node& node) noexcept -> void {
+			const AST::Type& type = this->ast_source->getType(node);
 
-			this->indenter_print();
 
-			auto print_str = std::string( Token::printKind(source.getToken(type.token).kind) );
-			bool is_first_qualifer = true;
-			for(const AST::Type::Qualifier& qualifier : type.qualifiers){
-				if(type.qualifiers.size() > 1){
-					if(is_first_qualifer){
-						is_first_qualifer = false;
-					}else{
-						print_str += ' ';
+			auto print_qualifiers = [&]() noexcept -> void {
+				auto qualifier_str = std::string();
+				bool is_first_qualifer = true;
+				for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+					if(type.qualifiers.size() > 1){
+						if(is_first_qualifer){
+							is_first_qualifer = false;
+						}else{
+							qualifier_str += ' ';
+						}
 					}
+					if(qualifier.isPtr){ qualifier_str += '^'; }
+					if(qualifier.isConst){ qualifier_str += '|'; }
 				}
-				if(qualifier.isPtr){ print_str += '^'; }
-				if(qualifier.isConst){ print_str += '|'; }
+
+				this->debug(qualifier_str);
+			};
+
+				
+			if(type.isBuiltin){
+				this->print(" ");
+				this->debug(Token::printKind(this->ast_source->getToken(type.base.token).kind));
+				print_qualifiers();
+				this->trace(" [BUILTIN]\n");
+
+			}else{
+				this->print("\n");
+
+				this->indenter_push();
+					this->indenter_print();
+					this->info("Base Type:\n");
+					this->indenter_push();
+						this->indenter_set_end();
+						this->print_expr(this->ast_source->getNode(type.base.node));
+					this->indenter_pop();
+
+					this->indenter_set_end();
+					this->indenter_print();
+					this->info("Qualifiers: ");
+					if(type.qualifiers.empty()){
+						this->debug("[NONE]\n");
+					}else{
+						print_qualifiers();
+						this->print("\n");
+					}
+
+				this->indenter_pop();
 			}
 
-			this->debug(print_str);
-
-
-			// TODO: check if builtin
-			this->trace(" [BUILTIN]\n");
 		};
 
-		auto Printer::print_block(const Source& source, const AST::Node& node) noexcept -> void {
-			const AST::Block& block = source.getBlock(node);
+
+		auto Printer::print_block(const AST::Node& node) noexcept -> void {
+			const AST::Block& block = this->ast_source->getBlock(node);
 
 			if(block.nodes.empty()){
-				this->indenter_set_end();
-				this->indenter_print();
+				this->indenter_print_end();
 				this->debug("[EMPTY]\n");
 				return;
 			}
@@ -635,26 +666,26 @@ namespace panther{
 					this->indenter_set_end();
 				}
 
-				this->print_stmt(source, source.getNode(stmt));
+				this->print_stmt(this->ast_source->getNode(stmt));
 			}
 		};
 
 
 
-		auto Printer::print_expr(const Source& source, const AST::Node& node) noexcept -> void {
+		auto Printer::print_expr(const AST::Node& node) noexcept -> void {
 			switch(node.kind){
 				case AST::Kind::Literal: {
-					this->print_literal(source, node);
+					this->print_literal(node);
 				} break;
 
 				case AST::Kind::Ident: {
 					this->indenter_print();
-					this->debug( std::format("{}\n", source.getToken(node.token).value.string) );
+					this->debug( std::format("{}\n", this->ast_source->getToken(node.token).value.string) );
 				} break;
 
 				case AST::Kind::Intrinsic: {
 					this->indenter_print();
-					this->debug( std::format("@{}\n", source.getToken(node.token).value.string) );
+					this->debug( std::format("@{}\n", this->ast_source->getToken(node.token).value.string) );
 				} break;
 
 				case AST::Kind::Uninit: {
@@ -664,7 +695,7 @@ namespace panther{
 
 
 				case AST::Kind::FuncCall: {
-					const AST::FuncCall& func_call = source.getFuncCall(node);
+					const AST::FuncCall& func_call = this->ast_source->getFuncCall(node);
 
 					this->indenter_print();
 					this->info("Function Call:\n");
@@ -674,11 +705,10 @@ namespace panther{
 						this->info("Target:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							this->print_expr(source, source.getNode(func_call.target));
+							this->print_expr(this->ast_source->getNode(func_call.target));
 						this->indenter_pop();
 
-						this->indenter_set_end();
-						this->indenter_print();
+						this->indenter_print_end();
 						if(func_call.args.empty()){
 							this->info("Arguments: ");
 							this->debug("[NONE]\n");
@@ -697,7 +727,7 @@ namespace panther{
 									this->info(std::format("arg {}:\n", i));
 									this->indenter_push();
 										this->indenter_set_end();
-										this->print_expr(source, source.getNode(func_call.args[i]));
+										this->print_expr(this->ast_source->getNode(func_call.args[i]));
 									this->indenter_pop();
 								}
 							this->indenter_pop();
@@ -708,7 +738,7 @@ namespace panther{
 
 
 				case AST::Kind::Prefix: {
-					const AST::Prefix& prefix = source.getPrefix(node);
+					const AST::Prefix& prefix = this->ast_source->getPrefix(node);
 
 					this->indenter_print();
 					this->info("Prefix Op:\n");
@@ -718,14 +748,13 @@ namespace panther{
 						this->indenter_set_end();
 						this->indenter_print();
 						this->info("Op: ");
-						this->debug( std::format("{}\n", Token::printKind(source.getToken(prefix.op).kind)) );
+						this->debug( std::format("{}\n", Token::printKind(this->ast_source->getToken(prefix.op).kind)) );
 
-						this->indenter_set_end();
-						this->indenter_print();
+						this->indenter_print_end();
 						this->info("RHS:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							this->print_expr(source, source.getNode(prefix.rhs));
+							this->print_expr(this->ast_source->getNode(prefix.rhs));
 						this->indenter_pop();
 
 					this->indenter_pop();
@@ -733,7 +762,7 @@ namespace panther{
 
 
 				case AST::Kind::Infix: {
-					const AST::Infix& infix = source.getInfix(node);
+					const AST::Infix& infix = this->ast_source->getInfix(node);
 
 					this->indenter_print();
 					this->info("Infix Op:\n");
@@ -742,22 +771,20 @@ namespace panther{
 
 						this->indenter_print();
 						this->info("Op: ");
-						this->debug( std::format("{}\n", Token::printKind(source.getToken(infix.op).kind)) );
+						this->debug( std::format("{}\n", Token::printKind(this->ast_source->getToken(infix.op).kind)) );
 
-						this->indenter_set_arrow();
-						this->indenter_print();
+						this->indenter_print_arrow();
 						this->info("LHS:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							this->print_expr(source, source.getNode(infix.lhs));
+							this->print_expr(this->ast_source->getNode(infix.lhs));
 						this->indenter_pop();
 
-						this->indenter_set_end();
-						this->indenter_print();
+						this->indenter_print_end();
 						this->info("RHS:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							this->print_expr(source, source.getNode(infix.rhs));
+							this->print_expr(this->ast_source->getNode(infix.rhs));
 						this->indenter_pop();
 
 					this->indenter_pop();
@@ -765,7 +792,7 @@ namespace panther{
 
 
 				case AST::Kind::Postfix: {
-					const AST::Postfix& postfix = source.getPostfix(node);
+					const AST::Postfix& postfix = this->ast_source->getPostfix(node);
 
 					this->indenter_print();
 					this->info("Postfix Op:\n");
@@ -774,29 +801,33 @@ namespace panther{
 
 						this->indenter_print();
 						this->info("Op: ");
-						this->debug( std::format("{}\n", Token::printKind(source.getToken(postfix.op).kind)) );
+						this->debug( std::format("{}\n", Token::printKind(this->ast_source->getToken(postfix.op).kind)) );
 
-						this->indenter_set_end();
-						this->indenter_print();
+						this->indenter_print_end();
 						this->info("LHS:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							this->print_expr(source, source.getNode(postfix.lhs));
+							this->print_expr(this->ast_source->getNode(postfix.lhs));
 						this->indenter_pop();
 
 					this->indenter_pop();
 				} break;
 
-				break; default: EVO_FATAL_BREAK("Node is not an expr");
+				break; default: evo::debugFatalBreak("Node is not an expr");
 			};
 		};
 
 
+		auto Printer::print_ident(const AST::Node& node) noexcept -> void {
+			this->debug( std::format("{}\n", this->ast_source->getIdent(node).value.string) );
+		};
 
-		auto Printer::print_literal(const Source& source, const AST::Node& node) noexcept -> void {
+
+
+		auto Printer::print_literal(const AST::Node& node) noexcept -> void {
 			evo::debugAssert(node.kind == AST::Kind::Literal, "Node is not a literal");
 
-			const Token& token = source.getToken(node.token);
+			const Token& token = this->ast_source->getToken(node.token);
 
 			this->indenter_print();
 
@@ -806,10 +837,10 @@ namespace panther{
 				break; case Token::LiteralBool: this->debug(evo::boolStr(token.value.boolean)); this->trace(" [LiteralBool]");
 				break; case Token::LiteralString: this->debug(std::format("\"{}\"", token.value.string)); this->trace(" [LiteralString]");
 				break; case Token::LiteralChar: this->debug(std::format("'{}'", token.value.string)); this->trace(" [LiteralChar]");
-				break; default: EVO_FATAL_BREAK("Unknown token kind");
+				break; default: evo::debugFatalBreak("Unknown token kind");
 			};
 
-			this->print('\n');
+			this->print("\n");
 		};
 
 
@@ -853,6 +884,18 @@ namespace panther{
 				     if(this->indents.back() == IndenterType::Arrow){    this->indents.back() = IndenterType::Line; }
 				else if(this->indents.back() == IndenterType::EndArrow){ this->indents.back() = IndenterType::None; }
 			}
+		};
+
+
+
+		auto Printer::indenter_print_arrow() noexcept -> void {
+			this->indenter_set_arrow();
+			this->indenter_print();
+		};
+
+		auto Printer::indenter_print_end() noexcept -> void {
+			this->indenter_set_end();
+			this->indenter_print();
 		};
 
 

@@ -8,6 +8,19 @@ namespace panther{
 	auto SemanticAnalyzer::semantic_analysis_declarations() noexcept -> bool {
 		this->enter_scope(nullptr);
 
+		// analyze global aliases
+		for(AST::Node::ID global_stmt : this->source.global_stmts){
+			const AST::Node& node = this->source.getNode(global_stmt);
+
+			switch(node.kind){
+				case AST::Kind::Alias: {
+					if(this->analyze_alias(this->source.getAlias(node)) == false){ return false; }
+				} break;
+			};
+		}
+
+
+		// analyze global vars
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
@@ -21,7 +34,7 @@ namespace panther{
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			if(node.kind != AST::Kind::VarDecl){
+			if(node.kind != AST::Kind::VarDecl && node.kind != AST::Kind::Alias){
 				if(this->analyze_stmt(node) == false){
 					return false;
 				}
@@ -61,6 +74,7 @@ namespace panther{
 			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node));
 			break; case AST::Kind::FuncCall: return this->analyze_func_call(this->source.getFuncCall(node));
 			break; case AST::Kind::Unreachable: return this->analyze_unreachable(this->source.getUnreachable(node));
+			break; case AST::Kind::Alias: return this->analyze_alias(this->source.getAlias(node));
 			break;
 
 			case AST::Kind::Literal: {
@@ -79,7 +93,7 @@ namespace panther{
 			} break;
 		};
 
-		EVO_FATAL_BREAK("unknown ast kind");
+		evo::debugFatalBreak("unknown ast kind");
 	};
 
 
@@ -622,7 +636,7 @@ namespace panther{
 				this->leave_scope();
 
 			}else{
-				EVO_FATAL_BREAK("Unkonwn else block kind");
+				evo::debugFatalBreak("Unkonwn else block kind");
 			}
 
 		}else{
@@ -872,7 +886,7 @@ namespace panther{
 				}
 
 
-				EVO_FATAL_BREAK("Unknown intrinsic func");
+				evo::debugFatalBreak("Unknown intrinsic func");
 			} break;
 
 
@@ -899,11 +913,11 @@ namespace panther{
 					} break;
 				};
 
-				EVO_FATAL_BREAK("Unknown or unsupported infix type");
+				evo::debugFatalBreak("Unknown or unsupported infix type");
 			} break;
 		};
 		
-		EVO_FATAL_BREAK("Unknown or unsupported func call target");
+		evo::debugFatalBreak("Unknown or unsupported func call target");
 	};
 
 
@@ -926,6 +940,61 @@ namespace panther{
 
 		return true;
 	};
+
+
+
+	auto SemanticAnalyzer::analyze_alias(const AST::Alias& alias) noexcept -> bool {
+		///////////////////////////////////
+		// ident
+
+		const Token& ident_tok = this->source.getIdent(alias.ident);
+		const std::string_view ident_str = ident_tok.value.string;
+		if(this->has_in_scope(ident_str)){
+			this->already_defined(ident_tok);
+			return false;
+		}
+
+
+		///////////////////////////////////
+		// attributes
+
+		bool is_pub = false;
+
+		for(Token::ID attribute_tok : alias.attributes){
+			const Token& attribute = this->source.getToken(attribute_tok);
+
+			if(attribute.value.string == "pub"){
+				is_pub = true;		
+
+			}else{
+				// TODO: better messaging
+				this->source.error("Unkonwn or unsupported attribute in alias", attribute);
+				return false;
+			}
+		}
+
+
+
+		///////////////////////////////////
+		// type
+
+		const evo::Result<PIR::Type::VoidableID> type = this->get_type_id(alias.type);
+		if(type.isError()){ return false; }
+
+
+		///////////////////////////////////
+		// create
+
+		this->add_alias_to_scope(ident_str, Alias(type.value(), alias.ident));
+
+		if(is_pub){
+			this->source.pir.pub_aliases.emplace(ident_str, type.value());
+		}
+
+		return true;
+	};
+
+
 
 
 
@@ -1102,7 +1171,7 @@ namespace panther{
 						break; case Token::LiteralString: return Token::TypeString;
 					};
 
-					EVO_FATAL_BREAK("Unkonwn literal type");
+					evo::debugFatalBreak("Unkonwn literal type");
 				}();
 
 
@@ -1139,6 +1208,10 @@ namespace panther{
 
 					}else if(scope.imports.contains(ident_str)){
 						return this->src_manager.getTypeImport();
+
+					}else if(scope.aliases.contains(ident_str)){
+						this->source.error("Type aliases cannot be used as expressions", node);
+						return evo::resultError;
 					}
 				}
 
@@ -1255,7 +1328,7 @@ namespace panther{
 						return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
 					} break;
 
-					default: EVO_FATAL_BREAK("Unknown prefix operator");
+					default: evo::debugFatalBreak("Unknown prefix operator");
 				};
 
 			} break;
@@ -1359,7 +1432,7 @@ namespace panther{
 								case Token::get("/"): return base_type_of_lhs.divOperators.empty() == false;
 							};
 
-							EVO_FATAL_BREAK("Unknown intrinsic kind");
+							evo::debugFatalBreak("Unknown intrinsic kind");
 						}();
 
 						if(has_operator == false){
@@ -1431,18 +1504,18 @@ namespace panther{
 									case Token::get("/"): return base_type_to_use->divOperators[0].intrinsic;
 								};
 
-								EVO_FATAL_BREAK("Unknown intrinsic kind");
+								evo::debugFatalBreak("Unknown intrinsic kind");
 							}();
 
 							const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
 							return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
 						}
 
-						EVO_FATAL_BREAK("Unknown base type kind");
+						evo::debugFatalBreak("Unknown base type kind");
 					} break;
 				};
 
-				EVO_FATAL_BREAK("Unknown infix kind");
+				evo::debugFatalBreak("Unknown infix kind");
 			} break;
 
 
@@ -1474,7 +1547,7 @@ namespace panther{
 						return this->src_manager.getOrCreateTypeID(lhs_type_copy);
 					} break;
 
-					default: EVO_FATAL_BREAK("Unknown postfix operator");
+					default: evo::debugFatalBreak("Unknown postfix operator");
 				};
 
 			} break;
@@ -1483,63 +1556,139 @@ namespace panther{
 
 
 			case AST::Kind::Uninit: {
-				EVO_FATAL_BREAK("[uninit] exprs should not be analyzed with this function");
+				evo::debugFatalBreak("[uninit] exprs should not be analyzed with this function");
 			} break;
 		};
 
-		EVO_FATAL_BREAK("Unknown expr type");
+		evo::debugFatalBreak("Unknown expr type");
 	};
 
 
 
 	auto SemanticAnalyzer::get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID> {
 		const AST::Type& type = this->source.getType(node_id);
-		const Token& type_token = this->source.getToken(type.token);
 
-		if(type_token.kind == Token::TypeVoid){
-			if(type.qualifiers.empty() == false){
-				this->source.error("Void type cannot have qualifiers", node_id);
+		auto base_type_id = std::optional<PIR::BaseType::ID>();
+		auto type_qualifiers = std::vector<AST::Type::Qualifier>();
+
+		if(type.isBuiltin){
+			const Token& type_token = this->source.getToken(type.base.token);
+
+
+			if(type_token.kind == Token::TypeVoid){
+				if(type.qualifiers.empty() == false){
+					this->source.error("Void type cannot have qualifiers", node_id);
+					return evo::resultError;
+				}
+
+				return PIR::Type::VoidableID::Void();
+			}
+
+			if(type_token.kind == Token::TypeString){
+				this->source.error("String type is not supported yet", node_id);
 				return evo::resultError;
 			}
 
-			return PIR::Type::VoidableID::Void();
-		}
-
-		if(type_token.kind == Token::TypeString){
-			this->source.error("String type is not supported yet", node_id);
-			return evo::resultError;
-		}
 
 
+			base_type_id = this->src_manager.getBaseTypeID(type_token.kind);
+			type_qualifiers = type.qualifiers;
 
-		std::vector<AST::Type::Qualifier> type_qualifiers = type.qualifiers;
+		}else{
+			// not builtin-type
 
-		{
-			// checking const-ness of type levels
-			bool type_qualifiers_has_a_const = false;
-			bool has_warned = false;
-			for(auto i = type_qualifiers.rbegin(); i != type_qualifiers.rend(); ++i){
-				if(type_qualifiers_has_a_const){
-					if(i->isConst == false && has_warned == false){
-						has_warned = true;
-						this->source.warning("If one type level is const, all previous levels will automatically be made const as well", node_id);
+			const AST::Node& base_type_node = this->source.getNode(type.base.node);
+
+			switch(base_type_node.kind){
+				case AST::Kind::Ident: {
+					const Token& ident_tok = this->source.getIdent(base_type_node);
+					const std::string_view ident = ident_tok.value.string;
+
+					for(const Scope& scope : this->scopes){
+						if(scope.aliases.contains(ident)){
+							const Alias& alias = scope.aliases.at(ident);
+
+							if(type.qualifiers.empty() == false && alias.type_id.isVoid()){
+								this->source.error("Void type cannot have qualifiers", node_id); 
+								return evo::resultError;
+							}
+
+							const PIR::Type& alias_type = this->src_manager.getType(alias.type_id.typeID());
+
+							base_type_id = alias_type.baseType;
+							type_qualifiers = alias_type.qualifiers;
+
+							for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+								type_qualifiers.push_back(qualifier);
+							}
+						}
+					}
+				} break;
+
+
+				case AST::Kind::Infix: {
+					const AST::Infix& infix = this->source.getInfix(base_type_node);
+
+					if(this->source.getToken(infix.op).kind != Token::get(".")){
+						// TODO: better messaging
+						this->source.error("Invalid base type", base_type_node);
+						return evo::resultError;
 					}
 
-					i->isConst = true;
+					const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
+					if(value_of_lhs.isError()){ return evo::resultError; }
+					evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-				}else if(i->isConst){
-					type_qualifiers_has_a_const = true;
+					const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
+					const Token& rhs_ident = this->source.getIdent(infix.rhs);
+
+					if(import_source.pir.pub_aliases.contains(rhs_ident.value.string)){
+						return import_source.pir.pub_aliases.at(rhs_ident.value.string);
+					}
+
+					this->source.error(std::format("Import does not have a public type \"{}\"", rhs_ident.value.string), rhs_ident);
+					return evo::resultError;
+
+				} break;
+
+
+				default: {
+					// TODO: better messaging
+					this->source.error("Invalid base type", base_type_node);
+					return evo::resultError;
+				} break;
+			};
+
+		}
+
+		evo::debugAssert(base_type_id.has_value(), "base type id was not set");
+
+
+		// checking const-ness of type levels
+		bool type_qualifiers_has_a_const = false;
+		bool has_warned = false;
+		for(auto i = type_qualifiers.rbegin(); i != type_qualifiers.rend(); ++i){
+			if(type_qualifiers_has_a_const){
+				if(i->isConst == false && has_warned == false){
+					has_warned = true;
+					this->source.warning("If one type level is const, all previous levels will automatically be made const as well", node_id);
 				}
+
+				i->isConst = true;
+
+			}else if(i->isConst){
+				type_qualifiers_has_a_const = true;
 			}
 		}
-		
+
 
 		return PIR::Type::VoidableID(
 			this->src_manager.getOrCreateTypeID(
-				PIR::Type(this->src_manager.getBaseTypeID(type_token.kind), type_qualifiers)
+				PIR::Type(*base_type_id, type_qualifiers)
 			)
 		);
 	};
+
 
 
 
@@ -1597,9 +1746,11 @@ namespace panther{
 						const Source::ID import_source_id = scope.imports.at(value_ident_str).source_id;
 						return PIR::Expr(import_source_id);
 					}
+
+					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in expression");
 				}
 
-				EVO_FATAL_BREAK("Didn't find value_ident");
+				evo::debugFatalBreak("Didn't find value_ident");
 			} break;
 
 
@@ -1634,7 +1785,7 @@ namespace panther{
 							}
 						}
 
-						EVO_FATAL_BREAK("Unknown intrinsic");
+						evo::debugFatalBreak("Unknown intrinsic");
 					}();
 
 
@@ -1676,10 +1827,10 @@ namespace panther{
 
 					};
 
-					EVO_FATAL_BREAK("Unknown or unsupported infix type");
+					evo::debugFatalBreak("Unknown or unsupported infix type");
 				}
 
-				EVO_FATAL_BREAK("Unknown func target kind");
+				evo::debugFatalBreak("Unknown func target kind");
 
 			} break;
 
@@ -1751,7 +1902,8 @@ namespace panther{
 							return PIR::Expr(imported_source_id);
 						}
 
-						EVO_FATAL_BREAK("should have already caught that it's non-existant");
+
+						evo::debugFatalBreak("should have already caught that it's non-existant");
 					} break;
 
 
@@ -1818,7 +1970,7 @@ namespace panther{
 									case Token::get("/"): return base_type_to_use.divOperators[0].intrinsic;
 								};
 
-								EVO_FATAL_BREAK("Unknown intrinsic kind");
+								evo::debugFatalBreak("Unknown intrinsic kind");
 							}();
 
 							const evo::Result<PIR::Expr> lhs_expr = this->get_expr_value(infix.lhs);
@@ -1836,7 +1988,7 @@ namespace panther{
 
 				};
 
-				EVO_FATAL_BREAK("Unknown or unsupported infix type");
+				evo::debugFatalBreak("Unknown or unsupported infix type");
 			} break;
 
 
@@ -1862,7 +2014,7 @@ namespace panther{
 					} break;
 				};
 
-				EVO_FATAL_BREAK("Unknown or unsupported postfix type");
+				evo::debugFatalBreak("Unknown or unsupported postfix type");
 			} break;
 
 
@@ -1878,7 +2030,7 @@ namespace panther{
 
 		};
 
-		EVO_FATAL_BREAK("Unknown node value kind");
+		evo::debugFatalBreak("Unknown node value kind");
 	};
 
 
@@ -1927,9 +2079,11 @@ namespace panther{
 						this->source.error("At this time, constant-evaluated values cannot be the value of an import", node);
 						return evo::resultError;
 					}
+
+					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in const expr");
 				}
 
-				EVO_FATAL_BREAK("Unkown ident");
+				evo::debugFatalBreak("Unkown ident");
 
 			} break;
 
@@ -1964,7 +2118,7 @@ namespace panther{
 						}
 					}
 
-					EVO_FATAL_BREAK("Unknown intrinsic");
+					evo::debugFatalBreak("Unknown intrinsic");
 				}();
 
 				// imports
@@ -1998,7 +2152,7 @@ namespace panther{
 
 				};
 
-				EVO_FATAL_BREAK("Unknown prefix kind");
+				evo::debugFatalBreak("Unknown prefix kind");
 			} break;
 
 			case AST::Kind::Postfix: {
@@ -2015,7 +2169,7 @@ namespace panther{
 				return evo::resultError;
 			} break;
 
-			default: EVO_FATAL_BREAK("Unknown node value kind");
+			default: evo::debugFatalBreak("Unknown node value kind");
 		};
 
 	};
@@ -2051,7 +2205,7 @@ namespace panther{
 				} break;
 			};
 
-			EVO_FATAL_BREAK("Unkonwn or unsupported error code");
+			evo::debugFatalBreak("Unkonwn or unsupported error code");
 		}
 
 		return imported_source_id_result.value();
@@ -2103,7 +2257,7 @@ namespace panther{
 							return evo::resultError;
 						}
 
-						EVO_FATAL_BREAK("Invalid lhs type");
+						evo::debugFatalBreak("Invalid lhs type");
 					} break;
 
 					case Token::get("+"): return ExprValueType::Ephemeral;
@@ -2114,7 +2268,7 @@ namespace panther{
 					case Token::get("*@"): return ExprValueType::Ephemeral;
 					case Token::get("/"): return ExprValueType::Ephemeral;
 				};
-				EVO_FATAL_BREAK("Unknown infix kind");
+				evo::debugFatalBreak("Unknown infix kind");
 			}break;
 
 			break; case AST::Kind::Postfix: {
@@ -2123,7 +2277,7 @@ namespace panther{
 				switch(this->source.getToken(postfix.op).kind){
 					break; case Token::get(".^"): return ExprValueType::Concrete;
 				};
-				EVO_FATAL_BREAK("Unknown postfix kind");
+				evo::debugFatalBreak("Unknown postfix kind");
 			} break;
 
 			break; case AST::Kind::Ident: return ExprValueType::Concrete;
@@ -2132,7 +2286,7 @@ namespace panther{
 			break; case AST::Kind::Uninit: return ExprValueType::Ephemeral;
 		};
 
-		EVO_FATAL_BREAK("Unknown AST node kind");
+		evo::debugFatalBreak("Unknown AST node kind");
 	};
 
 
@@ -2140,8 +2294,8 @@ namespace panther{
 		const AST::Node& value_node = this->source.getNode(node_id);
 
 		switch(value_node.kind){
-			break; case AST::Kind::Prefix: EVO_FATAL_BREAK("Not concrete");
-			break; case AST::Kind::FuncCall: EVO_FATAL_BREAK("Not concrete");
+			break; case AST::Kind::Prefix: evo::debugFatalBreak("Not concrete");
+			break; case AST::Kind::FuncCall: evo::debugFatalBreak("Not concrete");
 
 
 			break; case AST::Kind::Infix: {
@@ -2175,10 +2329,10 @@ namespace panther{
 							}
 						}
 
-						EVO_FATAL_BREAK("Invalid lhs type");
+						evo::debugFatalBreak("Invalid lhs type");
 					} break;
 
-					default: EVO_FATAL_BREAK("Unknown infix kind");
+					default: evo::debugFatalBreak("Unknown infix kind");
 				};
 			} break;
 
@@ -2198,7 +2352,7 @@ namespace panther{
 
 					} break;
 
-					default: EVO_FATAL_BREAK("Unknown postfix kind");
+					default: evo::debugFatalBreak("Unknown postfix kind");
 				};
 			} break;
 
@@ -2233,18 +2387,20 @@ namespace panther{
 					if(scope.imports.contains(value_ident_str)){
 						return false;
 					}
+
+					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in expression");
 				}
 
-				EVO_FATAL_BREAK("Didn't find value_ident");
+				evo::debugFatalBreak("Didn't find value_ident");
 			} break;
 
 			break; case AST::Kind::Intrinsic: return false;
 
-			break; case AST::Kind::Literal: EVO_FATAL_BREAK("Not concrete");
-			break; case AST::Kind::Uninit: EVO_FATAL_BREAK("Not concrete");
+			break; case AST::Kind::Literal: evo::debugFatalBreak("Not concrete");
+			break; case AST::Kind::Uninit: evo::debugFatalBreak("Not concrete");
 		};
 
-		EVO_FATAL_BREAK("Unknown AST node kind")
+		evo::debugFatalBreak("Unknown AST node kind");
 	};
 
 
@@ -2308,9 +2464,20 @@ namespace panther{
 				);
 				return;
 			}
+
+			if(scope.aliases.contains(ident_str)){
+				const Alias& alias = scope.aliases.at(ident_str);
+				const Location location = this->source.getIdent(alias.ident).location;
+
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					std::vector<Message::Info>{ Message::Info("First defined here:", location) }
+				);
+				return;
+			}
 		}
 
-		EVO_FATAL_BREAK("Didn't find ident");
+		evo::debugFatalBreak("Didn't find ident");
 	};
 
 
@@ -2354,6 +2521,10 @@ namespace panther{
 		this->scopes.back().imports.emplace(str, import);
 	};
 
+	auto SemanticAnalyzer::add_alias_to_scope(std::string_view str, Alias alias) noexcept -> void {
+		this->scopes.back().aliases.emplace(str, alias);
+	};
+
 
 	auto SemanticAnalyzer::set_scope_terminated() noexcept -> void {
 		this->scopes.back().is_terminated = true;
@@ -2378,6 +2549,7 @@ namespace panther{
 			if(scope.funcs.contains(ident)){ return true; }
 			if(scope.params.contains(ident)){ return true; }
 			if(scope.imports.contains(ident)){ return true; }
+			if(scope.aliases.contains(ident)){ return true; }
 		}
 
 		return false;
