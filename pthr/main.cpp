@@ -169,8 +169,8 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	auto file_paths = std::vector<std::filesystem::path>{
 		(config.relative_directory / "test.pthr").make_preferred(),
-		(config.relative_directory / "test2.pthr").make_preferred(),
-		(config.relative_directory / "test3.pthr").make_preferred(),
+		// (config.relative_directory / "test2.pthr").make_preferred(),
+		// (config.relative_directory / "test3.pthr").make_preferred(),
 	};
 
 

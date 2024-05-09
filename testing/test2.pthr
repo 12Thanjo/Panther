@@ -1,3 +1,0 @@
-def test3 #pub = @import("test3.pthr");
-
-alias Integer #pub = Int;

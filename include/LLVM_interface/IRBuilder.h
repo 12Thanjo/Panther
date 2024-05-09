@@ -47,6 +47,13 @@ namespace panther{
 				auto createIntrinsicCall(IntrinsicID id, evo::ArrayProxy<llvm::Value*> params) noexcept -> llvm::CallInst*;
 
 
+				struct PhiIncoming{
+					llvm::Value* value;
+					llvm::BasicBlock* basic_block;
+				};
+				auto createPhi(llvm::Type* type, evo::ArrayProxy<PhiIncoming> incoming, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+
+
 				///////////////////////////////////
 				// operators
 
@@ -55,6 +62,22 @@ namespace panther{
 				auto createMul(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
 				auto createUDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
 				auto createSDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+
+
+				auto createICmpEQ(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpNE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+
+				auto createICmpUGT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpUGE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpULT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpULE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				
+				auto createICmpSGT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpSGE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpSLT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createICmpSLE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+
+				auto createNot(llvm::Value* value, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
 
 
 				//////////////////////////////////////////////////////////////////////

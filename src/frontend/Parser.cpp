@@ -550,14 +550,24 @@ namespace panther{
 
 	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
 		switch(kind){
-			case Token::get("+"): return 1;
-			case Token::get("+@"): return 1;
-			case Token::get("-"): return 1;
-			case Token::get("-@"): return 1;
+			case Token::get("&&"):  return 1;
+			case Token::get("||"):  return 1;
 
-			case Token::get("*"): return 2;
-			case Token::get("*@"): return 2;
-			case Token::get("/"): return 2;
+			case Token::get("=="):  return 3;
+			case Token::get("!="):  return 3;
+			case Token::get("<"):   return 3;
+			case Token::get("<="):  return 3;
+			case Token::get(">"):   return 3;
+			case Token::get(">="):  return 3;
+
+			case Token::get("+"):   return 5;
+			case Token::get("+@"):  return 5;
+			case Token::get("-"):   return 5;
+			case Token::get("-@"):  return 5;
+
+			case Token::get("*"):   return 6;
+			case Token::get("*@"):  return 6;
+			case Token::get("/"):   return 6;
 		};
 
 		return -1;
@@ -602,6 +612,7 @@ namespace panther{
 			case Token::KeywordCopy:
 			case Token::KeywordAddr:
 			case Token::get("-"):
+			case Token::get("!"):
 				break;
 
 			default:

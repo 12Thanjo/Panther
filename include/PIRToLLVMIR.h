@@ -768,6 +768,150 @@ namespace panther{
 										llvm::Value* rhs = this->get_value(func_call.args[0]);
 										return this->builder->createSub(zero, rhs, false, true, "negateInt");
 									} break;
+
+
+									///////////////////////////////////
+									// logical Int
+
+									case PIR::Intrinsic::Kind::equalInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpEQ(lhs, rhs, "equalInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::notEqualInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpNE(lhs, rhs, "notEqualInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::lessThanInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpSLT(lhs, rhs, "lessThanInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::lessThanEqualInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpSLE(lhs, rhs, "lessThanEqualInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::greaterThanInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpSGT(lhs, rhs, "greaterThanInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::greaterThanEqualInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpSGE(lhs, rhs, "greaterThanEqualInt");
+									} break;
+
+
+									///////////////////////////////////
+									// logical UInt
+
+									case PIR::Intrinsic::Kind::equalUInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpEQ(lhs, rhs, "equalUInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::notEqualUInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpNE(lhs, rhs, "notEqualUInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::lessThanUInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpULT(lhs, rhs, "lessThanUInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::lessThanEqualUInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpULE(lhs, rhs, "lessThanEqualUInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::greaterThanUInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpUGT(lhs, rhs, "greaterThanUInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::greaterThanEqualUInt: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpUGE(lhs, rhs, "greaterThanEqualUInt");
+									} break;
+
+
+									///////////////////////////////////
+									// logical Bool
+
+									case PIR::Intrinsic::Kind::equalBool: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpEQ(lhs, rhs, "equalBool");
+									} break;
+
+									case PIR::Intrinsic::Kind::notEqualBool: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										return this->builder->createICmpNE(lhs, rhs, "notEqualBool");
+									} break;
+
+									case PIR::Intrinsic::Kind::logicalAnd: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+
+										llvm::BasicBlock* current_block = this->builder->getInsertPoint();
+										llvm::BasicBlock* logical_and_rhs = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.rhs");
+										llvm::BasicBlock* logical_and_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.end");
+
+										this->builder->createCondBranch(lhs, logical_and_rhs, logical_and_end);
+
+										this->builder->setInsertionPoint(logical_and_rhs);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										this->builder->createBranch(logical_and_end);
+
+										this->builder->setInsertionPoint(logical_and_end);
+
+										return this->builder->createPhi(llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool()), {
+											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(false)), current_block),
+											llvmint::IRBuilder::PhiIncoming(rhs, logical_and_rhs),
+										}, "logicalAnd");
+									} break;
+
+									case PIR::Intrinsic::Kind::logicalOr: {
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
+
+										llvm::BasicBlock* current_block = this->builder->getInsertPoint();
+										llvm::BasicBlock* logical_or_rhs = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.rhs");
+										llvm::BasicBlock* logical_or_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.end");
+
+										this->builder->createCondBranch(lhs, logical_or_end, logical_or_rhs);
+
+										this->builder->setInsertionPoint(logical_or_rhs);
+										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										this->builder->createBranch(logical_or_end);
+
+										this->builder->setInsertionPoint(logical_or_end);
+
+										return this->builder->createPhi(llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool()), {
+											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(true)), current_block),
+											llvmint::IRBuilder::PhiIncoming(rhs, logical_or_rhs),
+										}, "logicalOr");
+									} break;
+
+									case PIR::Intrinsic::Kind::logicalNot: {
+										llvm::Value* rhs = this->get_value(func_call.args[0]);
+										return this->builder->createNot(rhs, "logicalNot");
+									} break;
+
 								};
 
 								EVO_FATAL_BREAK("Unkown intrinsic");

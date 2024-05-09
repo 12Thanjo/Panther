@@ -1312,10 +1312,9 @@ namespace panther{
 						const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
 						const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
 
-						if(rhs_base_type.negateOperators.empty()){
-							// TODO: better messaging
+						if(rhs_base_type.ops.negate.empty()){
 							this->source.error(
-								"This type does not have a negate ([-]) operator", prefix.rhs,
+								"This type does not have a negate (-a) operator", prefix.rhs,
 								std::vector<Message::Info>{
 									Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
 								}
@@ -1323,7 +1322,29 @@ namespace panther{
 							return evo::resultError;
 						}
 
-						const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.negateOperators[0].intrinsic;
+						const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.negate[0].intrinsic;
+						const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
+						return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
+					} break;
+
+					case Token::get("!"): {
+						const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
+						if(type_of_rhs.isError()){ return evo::resultError; }
+
+						const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
+						const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
+
+						if(rhs_base_type.ops.logicalNot.empty()){
+							this->source.error(
+								"This type does not have a logical not (!a) operator", prefix.rhs,
+								std::vector<Message::Info>{
+									Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
+								}
+							);
+							return evo::resultError;
+						}
+
+						const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.logicalNot[0].intrinsic;
 						const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
 						return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
 					} break;
@@ -1400,7 +1421,11 @@ namespace panther{
 					case Token::get("+"): case Token::get("+@"):
 					case Token::get("-"): case Token::get("-@"):
 					case Token::get("*"): case Token::get("*@"):
-					case Token::get("/"): {
+					case Token::get("/"):
+					case Token::get("=="): case Token::get("!="):
+					case Token::get("<"):  case Token::get("<="):
+					case Token::get(">"):  case Token::get(">="): 
+					case Token::get("&&"): case Token::get("||"): {
 
 						///////////////////////////////////
 						// lhs
@@ -1423,13 +1448,22 @@ namespace panther{
 
 						const bool has_operator = [&]() noexcept {
 							switch(infix_op_kind){
-								case Token::get("+"): return base_type_of_lhs.addOperators.empty() == false;
-								case Token::get("+@"): return base_type_of_lhs.addWrapOperators.empty() == false;
-								case Token::get("-"): return base_type_of_lhs.subOperators.empty() == false;
-								case Token::get("-@"): return base_type_of_lhs.subWrapOperators.empty() == false;
-								case Token::get("*"): return base_type_of_lhs.mulOperators.empty() == false;
-								case Token::get("*@"): return base_type_of_lhs.mulWrapOperators.empty() == false;
-								case Token::get("/"): return base_type_of_lhs.divOperators.empty() == false;
+								case Token::get("+"):  return base_type_of_lhs.ops.add.empty() == false;
+								case Token::get("+@"): return base_type_of_lhs.ops.addWrap.empty() == false;
+								case Token::get("-"):  return base_type_of_lhs.ops.sub.empty() == false;
+								case Token::get("-@"): return base_type_of_lhs.ops.subWrap.empty() == false;
+								case Token::get("*"):  return base_type_of_lhs.ops.mul.empty() == false;
+								case Token::get("*@"): return base_type_of_lhs.ops.mulWrap.empty() == false;
+								case Token::get("/"):  return base_type_of_lhs.ops.div.empty() == false;
+
+								case Token::get("=="): return base_type_of_lhs.ops.logicalEqual.empty() == false;
+								case Token::get("!="): return base_type_of_lhs.ops.notEqual.empty() == false;
+								case Token::get("<"):  return base_type_of_lhs.ops.lessThan.empty() == false;
+								case Token::get("<="): return base_type_of_lhs.ops.lessThanEqual.empty() == false;
+								case Token::get(">"):  return base_type_of_lhs.ops.greaterThan.empty() == false;
+								case Token::get(">="): return base_type_of_lhs.ops.greaterThanEqual.empty() == false;
+								case Token::get("&&"): return base_type_of_lhs.ops.logicalAnd.empty() == false;
+								case Token::get("||"): return base_type_of_lhs.ops.logicalOr.empty() == false;
 							};
 
 							evo::debugFatalBreak("Unknown intrinsic kind");
@@ -1495,13 +1529,22 @@ namespace panther{
 
 							const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
 								switch(infix_op_kind){
-									case Token::get("+"): return base_type_to_use->addOperators[0].intrinsic;
-									case Token::get("+@"): return base_type_to_use->addWrapOperators[0].intrinsic;
-									case Token::get("-"): return base_type_to_use->subOperators[0].intrinsic;
-									case Token::get("-@"): return base_type_to_use->subWrapOperators[0].intrinsic;
-									case Token::get("*"): return base_type_to_use->mulOperators[0].intrinsic;
-									case Token::get("*@"): return base_type_to_use->mulWrapOperators[0].intrinsic;
-									case Token::get("/"): return base_type_to_use->divOperators[0].intrinsic;
+									case Token::get("+"):  return base_type_to_use->ops.add[0].intrinsic;
+									case Token::get("+@"): return base_type_to_use->ops.addWrap[0].intrinsic;
+									case Token::get("-"):  return base_type_to_use->ops.sub[0].intrinsic;
+									case Token::get("-@"): return base_type_to_use->ops.subWrap[0].intrinsic;
+									case Token::get("*"):  return base_type_to_use->ops.mul[0].intrinsic;
+									case Token::get("*@"): return base_type_to_use->ops.mulWrap[0].intrinsic;
+									case Token::get("/"):  return base_type_to_use->ops.div[0].intrinsic;
+
+									case Token::get("=="): return base_type_to_use->ops.logicalEqual[0].intrinsic;
+									case Token::get("!="): return base_type_to_use->ops.notEqual[0].intrinsic;
+									case Token::get("<"):  return base_type_to_use->ops.lessThan[0].intrinsic;
+									case Token::get("<="): return base_type_to_use->ops.lessThanEqual[0].intrinsic;
+									case Token::get(">"):  return base_type_to_use->ops.greaterThan[0].intrinsic;
+									case Token::get(">="): return base_type_to_use->ops.greaterThanEqual[0].intrinsic;
+									case Token::get("&&"): return base_type_to_use->ops.logicalAnd[0].intrinsic;
+									case Token::get("||"): return base_type_to_use->ops.logicalOr[0].intrinsic;
 								};
 
 								evo::debugFatalBreak("Unknown intrinsic kind");
@@ -1848,10 +1891,9 @@ namespace panther{
 					const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
 					const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
 
-					if(rhs_base_type.negateOperators.empty()){
-						// TODO: better messaging
+					if(rhs_base_type.ops.negate.empty()){
 						this->source.error(
-							"This type does not have a negate ([-]) operator", prefix.rhs,
+							"This type does not have a negate (-a) operator", prefix.rhs,
 							std::vector<Message::Info>{
 								Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
 							}
@@ -1859,7 +1901,28 @@ namespace panther{
 						return evo::resultError;
 					}
 
-					const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.negateOperators[0].intrinsic;
+					const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.negate[0].intrinsic;
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{rhs_value.value()});
+					return PIR::Expr(func_call_id);
+
+				}else if(this->source.getToken(prefix.op).kind == Token::get("!")){
+					const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
+					if(type_of_rhs.isError()){ return evo::resultError; }
+
+					const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
+					const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
+
+					if(rhs_base_type.ops.logicalNot.empty()){
+						this->source.error(
+							"This type does not have a logical not (!a) operator", prefix.rhs,
+							std::vector<Message::Info>{
+								Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
+							}
+						);
+						return evo::resultError;
+					}
+
+					const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.logicalNot[0].intrinsic;
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{rhs_value.value()});
 					return PIR::Expr(func_call_id);
 				}
@@ -1910,7 +1973,11 @@ namespace panther{
 					case Token::get("+"): case Token::get("+@"):
 					case Token::get("-"): case Token::get("-@"):
 					case Token::get("*"): case Token::get("*@"):
-					case Token::get("/"): {
+					case Token::get("/"): 
+					case Token::get("=="): case Token::get("!="):
+					case Token::get("<"):  case Token::get("<="):
+					case Token::get(">"):  case Token::get(">="): 
+					case Token::get("&&"): case Token::get("||"): {
 						///////////////////////////////////
 						// lhs
 
@@ -1961,13 +2028,22 @@ namespace panther{
 
 							const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
 								switch(infix_op_kind){
-									case Token::get("+"): return base_type_to_use.addOperators[0].intrinsic;
-									case Token::get("+@"): return base_type_to_use.addWrapOperators[0].intrinsic;
-									case Token::get("-"): return base_type_to_use.subOperators[0].intrinsic;
-									case Token::get("-@"): return base_type_to_use.subWrapOperators[0].intrinsic;
-									case Token::get("*"): return base_type_to_use.mulOperators[0].intrinsic;
-									case Token::get("*@"): return base_type_to_use.mulWrapOperators[0].intrinsic;
-									case Token::get("/"): return base_type_to_use.divOperators[0].intrinsic;
+									case Token::get("+"):  return base_type_to_use.ops.add[0].intrinsic;
+									case Token::get("+@"): return base_type_to_use.ops.addWrap[0].intrinsic;
+									case Token::get("-"):  return base_type_to_use.ops.sub[0].intrinsic;
+									case Token::get("-@"): return base_type_to_use.ops.subWrap[0].intrinsic;
+									case Token::get("*"):  return base_type_to_use.ops.mul[0].intrinsic;
+									case Token::get("*@"): return base_type_to_use.ops.mulWrap[0].intrinsic;
+									case Token::get("/"):  return base_type_to_use.ops.div[0].intrinsic;
+
+									case Token::get("=="): return base_type_to_use.ops.logicalEqual[0].intrinsic;
+									case Token::get("!="): return base_type_to_use.ops.notEqual[0].intrinsic;
+									case Token::get("<"):  return base_type_to_use.ops.lessThan[0].intrinsic;
+									case Token::get("<="): return base_type_to_use.ops.lessThanEqual[0].intrinsic;
+									case Token::get(">"):  return base_type_to_use.ops.greaterThan[0].intrinsic;
+									case Token::get(">="): return base_type_to_use.ops.greaterThanEqual[0].intrinsic;
+									case Token::get("&&"): return base_type_of_lhs.ops.logicalAnd[0].intrinsic;
+									case Token::get("||"): return base_type_of_lhs.ops.logicalOr[0].intrinsic;
 								};
 
 								evo::debugFatalBreak("Unknown intrinsic kind");
@@ -2260,13 +2336,22 @@ namespace panther{
 						evo::debugFatalBreak("Invalid lhs type");
 					} break;
 
-					case Token::get("+"): return ExprValueType::Ephemeral;
+					case Token::get("+"):  return ExprValueType::Ephemeral;
 					case Token::get("+@"): return ExprValueType::Ephemeral;
-					case Token::get("-"): return ExprValueType::Ephemeral;
+					case Token::get("-"):  return ExprValueType::Ephemeral;
 					case Token::get("-@"): return ExprValueType::Ephemeral;
-					case Token::get("*"): return ExprValueType::Ephemeral;
+					case Token::get("*"):  return ExprValueType::Ephemeral;
 					case Token::get("*@"): return ExprValueType::Ephemeral;
-					case Token::get("/"): return ExprValueType::Ephemeral;
+					case Token::get("/"):  return ExprValueType::Ephemeral;
+
+					case Token::get("=="): return ExprValueType::Ephemeral;
+					case Token::get("!="): return ExprValueType::Ephemeral;
+					case Token::get("<"):  return ExprValueType::Ephemeral;
+					case Token::get("<="): return ExprValueType::Ephemeral;
+					case Token::get(">"):  return ExprValueType::Ephemeral;
+					case Token::get(">="): return ExprValueType::Ephemeral;
+					case Token::get("&&"): return ExprValueType::Ephemeral;
+					case Token::get("||"): return ExprValueType::Ephemeral;
 				};
 				evo::debugFatalBreak("Unknown infix kind");
 			}break;

@@ -75,7 +75,15 @@ namespace panther{
 			
 			Equal, // =
 
-			// DoubleEqual, // ==
+			LogicalEqual, // ==
+			NotEqual, // !=
+			LessThan, // <
+			LessThanEqual, // <=
+			GreaterThan, // <
+			GreaterThanEqual, // <=
+			LogicalNot, // !
+			LogicalAnd, // &&
+			LogicalOr, // ||
 
 			Plus, // +
 			PlusWrap, // +@
@@ -178,7 +186,14 @@ namespace panther{
 			// operators
 
 			// length 2
-			// if(is_token("==")){ return Token::DoubleEqual; }
+			if(is_token("==")){ return Token::LogicalEqual; }
+			if(is_token("!=")){ return Token::NotEqual; }
+			if(is_token("<=")){ return Token::LessThanEqual; }
+			if(is_token(">=")){ return Token::GreaterThanEqual; }
+
+			if(is_token("&&")){ return Token::LogicalAnd; }
+			if(is_token("||")){ return Token::LogicalOr; }
+
 			if(is_token("->")){ return Token::RightArrow; }
 			if(is_token(".^")){ return Token::Dereference; }
 
@@ -188,6 +203,11 @@ namespace panther{
 
 			// length 1
 			if(is_token("=")){ return Token::Equal; }
+
+			if(is_token("!")){ return Token::LogicalNot; }
+
+			if(is_token("<")){ return Token::LessThan; }
+			if(is_token(">")){ return Token::GreaterThan; }			
 
 			if(is_token("+")){ return Token::Plus; }
 			if(is_token("-")){ return Token::Minus; }
@@ -225,7 +245,7 @@ namespace panther{
 			switch(kind){
 				break; case Kind::None: evo::unreachable(); return "{{ERROR}}";
 
-				break; case Kind::Ident: return "Ident";
+				break; case Kind::Ident:     return "Ident";
 				break; case Kind::Intrinsic: return "Intrinsic";
 				break; case Kind::Attribute: return "Attribute";
 
@@ -233,86 +253,94 @@ namespace panther{
 				///////////////////////////////////
 				// literals
 
-				break; case Kind::LiteralBool: return "LiteralBool";
-				break; case Kind::LiteralInt: return "LiteralInt";
-				break; case Kind::LiteralFloat: return "LiteralFloat";
-				break; case Kind::LiteralChar: return "LiteralChar";
+				break; case Kind::LiteralBool:   return "LiteralBool";
+				break; case Kind::LiteralInt:    return "LiteralInt";
+				break; case Kind::LiteralFloat:  return "LiteralFloat";
+				break; case Kind::LiteralChar:   return "LiteralChar";
 				break; case Kind::LiteralString: return "LiteralString";
 
 
 				///////////////////////////////////
 				// types
 
-				break; case Kind::TypeVoid: return "Void";
+				break; case Kind::TypeVoid:   return "Void";
 
-				break; case Kind::TypeInt: return "Int";
-				break; case Kind::TypeUInt: return "UInt";
+				break; case Kind::TypeInt:    return "Int";
+				break; case Kind::TypeUInt:   return "UInt";
 
-				break; case Kind::TypeBool: return "Bool";
+				break; case Kind::TypeBool:   return "Bool";
 				break; case Kind::TypeString: return "String";
 
 
 				///////////////////////////////////
 				// keywords
 
-				break; case Kind::KeywordVar: return "var";
-				break; case Kind::KeywordDef: return "def";
-				break; case Kind::KeywordFunc: return "func";
+				break; case Kind::KeywordVar:         return "var";
+				break; case Kind::KeywordDef:         return "def";
+				break; case Kind::KeywordFunc:        return "func";
 
-				break; case Kind::KeywordReturn: return "return";
+				break; case Kind::KeywordReturn:      return "return";
 				break; case Kind::KeywordUnreachable: return "unreachable";
-				break; case Kind::KeywordIf: return "if";
-				break; case Kind::KeywordElse: return "else";
+				break; case Kind::KeywordIf:          return "if";
+				break; case Kind::KeywordElse:        return "else";
 
-				break; case Kind::KeywordCopy: return "copy";
-				break; case Kind::KeywordUninit: return "uninit";
-				break; case Kind::KeywordAddr: return "addr";
+				break; case Kind::KeywordCopy:        return "copy";
+				break; case Kind::KeywordUninit:      return "uninit";
+				break; case Kind::KeywordAddr:        return "addr";
 
-				break; case Kind::KeywordRead: return "read";
-				break; case Kind::KeywordWrite: return "write";
-				break; case Kind::KeywordIn: return "in";
+				break; case Kind::KeywordRead:        return "read";
+				break; case Kind::KeywordWrite:       return "write";
+				break; case Kind::KeywordIn:          return "in";
 
-				break; case Kind::KeywordAlias: return "alias";
+				break; case Kind::KeywordAlias:       return "alias";
 
 
 				///////////////////////////////////
 				// operators
 				
-				break; case Kind::Equal: return "=";
+				break; case Kind::Equal:                 return "=";
 
-				// break; case Kind::DoubleEqual: return "==";
+				break; case Kind::LogicalEqual:          return "==";
+				break; case Kind::NotEqual:              return "!=";
+				break; case Kind::LessThan:              return "<";
+				break; case Kind::LessThanEqual:         return "<=";
+				break; case Kind::GreaterThan:           return ">";
+				break; case Kind::GreaterThanEqual:      return ">=";
+				break; case Kind::LogicalNot:            return "!";
+				break; case Kind::LogicalAnd:            return "&&";
+				break; case Kind::LogicalOr:             return "||";
 
-				break; case Kind::Plus: return "+";
-				break; case Kind::PlusWrap: return "+@";
-				break; case Kind::Minus: return "-";
-				break; case Kind::MinusWrap: return "-@";
-				break; case Kind::Multiply: return "*";
-				break; case Kind::MultiplyWrap: return "*@";
-				break; case Kind::Divide: return "/";
+				break; case Kind::Plus:                  return "+";
+				break; case Kind::PlusWrap:              return "+@";
+				break; case Kind::Minus:                 return "-";
+				break; case Kind::MinusWrap:             return "-@";
+				break; case Kind::Multiply:              return "*";
+				break; case Kind::MultiplyWrap:          return "*@";
+				break; case Kind::Divide:                return "/";
 
-				break; case Kind::RightArrow: return "->";
+				break; case Kind::RightArrow:            return "->";
 
-				break; case Kind::Pointer: return "^";
-				break; case Kind::Dereference: return ".^";
+				break; case Kind::Pointer:               return "^";
+				break; case Kind::Dereference:           return ".^";
 
-				break; case Kind::Accessor: return ".";
+				break; case Kind::Accessor:              return ".";
 
 
 				///////////////////////////////////
 				// punctuation
 
-				break; case Kind::OpenParen: return "(";
-				break; case Kind::CloseParen: return ")";
-				break; case Kind::OpenBracket: return "[";
+				break; case Kind::OpenParen:    return "(";
+				break; case Kind::CloseParen:   return ")";
+				break; case Kind::OpenBracket:  return "[";
 				break; case Kind::CloseBracket: return "]";
-				break; case Kind::OpenBrace: return "{";
-				break; case Kind::CloseBrace: return "}";
+				break; case Kind::OpenBrace:    return "{";
+				break; case Kind::CloseBrace:   return "}";
 
-				break; case Kind::Comma: return ",";
-				break; case Kind::SemiColon: return ";";
-				break; case Kind::Colon: return ":";
+				break; case Kind::Comma:        return ",";
+				break; case Kind::SemiColon:    return ";";
+				break; case Kind::Colon:        return ":";
 
-				break; case Kind::Pipe: return "|";
+				break; case Kind::Pipe:         return "|";
 				
 			};
 

@@ -32,12 +32,12 @@ namespace panther{
 		// create
 
 		auto IRBuilder::createBasicBlock(llvm::Function* func, evo::CStrProxy name) noexcept -> llvm::BasicBlock* {
-			return llvm::BasicBlock::Create(this->getContext(), name.data(), func);
+			return llvm::BasicBlock::Create(this->getContext(), name.c_str(), func);
 		};
 
 
 		auto IRBuilder::createAlloca(llvm::Type* type, llvm::Value* array_length, evo::CStrProxy name) noexcept -> llvm::AllocaInst* {
-			return this->builder->CreateAlloca(type, array_length, name.data());
+			return this->builder->CreateAlloca(type, array_length, name.c_str());
 		};
 		auto IRBuilder::createAlloca(llvm::Type* type, evo::CStrProxy name) noexcept -> llvm::AllocaInst* {
 			return this->createAlloca(type, nullptr, name);
@@ -45,7 +45,7 @@ namespace panther{
 
 
 		auto IRBuilder::createLoad(llvm::Value* value, llvm::Type* type, evo::CStrProxy name) noexcept -> llvm::LoadInst* {
-			return this->builder->CreateLoad(type, value, name.data());
+			return this->builder->CreateLoad(type, value, name.c_str());
 		};
 		auto IRBuilder::createLoad(llvm::AllocaInst* alloca, evo::CStrProxy name) noexcept -> llvm::LoadInst* {
 			return this->createLoad(alloca, alloca->getAllocatedType(), name);
@@ -85,7 +85,7 @@ namespace panther{
 
 
 		auto IRBuilder::createCall(llvm::Function* func, evo::ArrayProxy<llvm::Value*> params, evo::CStrProxy name) noexcept -> llvm::CallInst* {
-			llvm::CallInst* call_inst = this->builder->CreateCall(func, llvm::ArrayRef<llvm::Value*>{params.data(), params.size()}, name.data());
+			llvm::CallInst* call_inst = this->builder->CreateCall(func, llvm::ArrayRef<llvm::Value*>{params.data(), params.size()}, name.c_str());
 			call_inst->setDoesNotThrow();
 
 			return call_inst;
@@ -104,33 +104,94 @@ namespace panther{
 		};
 
 
+		auto IRBuilder::createPhi(llvm::Type* type, evo::ArrayProxy<PhiIncoming> incoming, evo::CStrProxy name) noexcept -> llvm::Value* {
+			llvm::PHINode* phi = this->builder->CreatePHI(type, evo::uint(incoming.size()), name.c_str());
+
+			for(const PhiIncoming& incom : incoming){
+				phi->addIncoming(incom.value, incom.basic_block);
+			}
+
+			return static_cast<llvm::Value*>(phi);
+		};
+
+
 
 		///////////////////////////////////
 		// operators
 
 		auto IRBuilder::createAdd(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {
-			return this->builder->CreateAdd(lhs, rhs, name.data(), nuw, nsw);
+			return this->builder->CreateAdd(lhs, rhs, name.c_str(), nuw, nsw);
 		};
 
 
 
 		auto IRBuilder::createSub(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {
-			return this->builder->CreateSub(lhs, rhs, name.data(), nuw, nsw);
+			return this->builder->CreateSub(lhs, rhs, name.c_str(), nuw, nsw);
 		};
 
 
 		auto IRBuilder::createMul(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {
-			return this->builder->CreateMul(lhs, rhs, name.data(), nuw, nsw);
+			return this->builder->CreateMul(lhs, rhs, name.c_str(), nuw, nsw);
 		};
 
 
 
 		auto IRBuilder::createUDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
-			return this->builder->CreateUDiv(lhs, rhs, name.data(), false);
+			return this->builder->CreateUDiv(lhs, rhs, name.c_str(), false);
 		};
 
 		auto IRBuilder::createSDiv(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
-			return this->builder->CreateSDiv(lhs, rhs, name.data(), false);
+			return this->builder->CreateSDiv(lhs, rhs, name.c_str(), false);
+		};
+
+
+
+
+
+		auto IRBuilder::createICmpEQ(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpEQ(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpNE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpNE(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpUGT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpUGT(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpUGE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpUGE(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpULT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpULT(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpULE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpULE(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpSGT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpSGT(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpSGE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpSGE(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpSLT(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpSLT(lhs, rhs, name.c_str());
+		};
+
+		auto IRBuilder::createICmpSLE(llvm::Value* lhs, llvm::Value* rhs, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateICmpSLE(lhs, rhs, name.c_str());
+		};
+
+
+
+		auto IRBuilder::createNot(llvm::Value* value, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateNot(value, name.c_str());
 		};
 
 
@@ -174,7 +235,7 @@ namespace panther{
 
 
 		auto IRBuilder::valueString(evo::CStrProxy str, evo::CStrProxy name) noexcept -> llvm::GlobalVariable* {
-			return this->builder->CreateGlobalString(str.data(), name.data());;
+			return this->builder->CreateGlobalString(str.c_str(), name.c_str());;
 		};
 
 
@@ -183,7 +244,7 @@ namespace panther{
 		) noexcept -> llvm::GlobalVariable* {
 			// this gets freed automatically in the destructor of the module
 			llvm::GlobalVariable* global = new llvm::GlobalVariable(
-				module.getModule(), type, is_constant, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), value, name.data()
+				module.getModule(), type, is_constant, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), value, name.c_str()
 			);
 
 			global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);

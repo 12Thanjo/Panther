@@ -200,11 +200,49 @@ namespace panther{
 		}();
 
 
+		const PIR::BaseType::ID logical_Int_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read}, {this->getTypeInt(), ParamKind::Read}, },
+				this->getTypeBool()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		const PIR::BaseType::ID logical_UInt_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeUInt(), ParamKind::Read}, {this->getTypeUInt(), ParamKind::Read}, },
+				this->getTypeBool()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		const PIR::BaseType::ID logical_Bool_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeBool(), ParamKind::Read}, {this->getTypeBool(), ParamKind::Read}, },
+				this->getTypeBool()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+
 		const PIR::BaseType::ID Int_in_Int_out_type = [&]() noexcept {
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 			base_type.callOperator = PIR::BaseType::Operator(
 				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read} },
 				this->getTypeInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		const PIR::BaseType::ID Bool_in_Bool_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeBool(), ParamKind::Read} },
+				this->getTypeBool()
 			);
 
 			return this->createBaseType(std::move(base_type));
@@ -279,6 +317,30 @@ namespace panther{
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::negateInt, "negateInt", Int_in_Int_out_type);
 
 
+		///////////////////////////////////
+		// logical
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::equalInt, "equalInt", logical_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::notEqualInt, "notEqualInt", logical_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::lessThanInt, "lessThanInt", logical_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::lessThanEqualInt, "lessThanEqualInt", logical_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::greaterThanInt, "greaterThanInt", logical_Int_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::greaterThanEqualInt, "greaterThanEqualInt", logical_Int_type);
+
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::equalUInt, "equalUInt", logical_UInt_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::notEqualUInt, "notEqualUInt", logical_UInt_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::lessThanUInt, "lessThanUInt", logical_UInt_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::lessThanEqualUInt, "lessThanEqualUInt", logical_UInt_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::greaterThanUInt, "greaterThanUInt", logical_UInt_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::greaterThanEqualUInt, "greaterThanEqualUInt", logical_UInt_type);
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::equalBool, "equalBool", logical_Bool_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::notEqualBool, "notEqualBool", logical_Bool_type);
+		
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::logicalAnd, "logicalAnd", logical_Bool_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::logicalOr, "logicalOr", logical_Bool_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::logicalNot, "logicalNot", Bool_in_Bool_out_type);
 
 
 		///////////////////////////////////
@@ -330,33 +392,69 @@ namespace panther{
 
 		PIR::BaseType& type_Int = this->getBaseType(Token::TypeInt);
 		PIR::BaseType& type_UInt = this->getBaseType(Token::TypeUInt);
-
-		type_Int.addOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addInt));
-		type_UInt.addOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addUInt));
-
-		type_Int.addWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addWrapInt));
-		type_UInt.addWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addWrapUInt));
+		PIR::BaseType& type_Bool = this->getBaseType(Token::TypeBool);
 
 
-		type_Int.subOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subInt));
-		type_UInt.subOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subUInt));
+		///////////////////////////////////
+		// math
 
-		type_Int.subWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subWrapInt));
-		type_UInt.subWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subWrapUInt));
+		type_Int.ops.add.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addInt));
+		type_UInt.ops.add.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addUInt));
 
-
-		type_Int.mulOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulInt));
-		type_UInt.mulOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulUInt));
-
-		type_Int.mulWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulWrapInt));
-		type_UInt.mulWrapOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulWrapUInt));
+		type_Int.ops.addWrap.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addWrapInt));
+		type_UInt.ops.addWrap.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::addWrapUInt));
 
 
-		type_Int.divOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::divInt));
-		type_UInt.divOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::divUInt));
+		type_Int.ops.sub.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subInt));
+		type_UInt.ops.sub.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subUInt));
+
+		type_Int.ops.subWrap.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subWrapInt));
+		type_UInt.ops.subWrap.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::subWrapUInt));
 
 
-		type_Int.negateOperators.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::negateInt));
+		type_Int.ops.mul.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulInt));
+		type_UInt.ops.mul.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulUInt));
+
+		type_Int.ops.mulWrap.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulWrapInt));
+		type_UInt.ops.mulWrap.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::mulWrapUInt));
+
+
+		type_Int.ops.div.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::divInt));
+		type_UInt.ops.div.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::divUInt));
+
+
+		type_Int.ops.negate.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::negateInt));
+
+
+		///////////////////////////////////
+		// logical
+
+		type_Int.ops.logicalEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::equalInt));
+		type_UInt.ops.logicalEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::equalUInt));
+		type_Bool.ops.logicalEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::equalBool));
+
+		type_Int.ops.notEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::notEqualInt));
+		type_UInt.ops.notEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::notEqualUInt));
+		type_Bool.ops.notEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::notEqualBool));
+
+		type_Int.ops.lessThan.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::lessThanInt));
+		type_UInt.ops.lessThan.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::lessThanUInt));
+
+		type_Int.ops.lessThanEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::lessThanEqualInt));
+		type_UInt.ops.lessThanEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::lessThanEqualUInt));
+
+		type_Int.ops.greaterThan.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::greaterThanInt));
+		type_UInt.ops.greaterThan.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::greaterThanUInt));
+
+		type_Int.ops.greaterThanEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::greaterThanEqualInt));
+		type_UInt.ops.greaterThanEqual.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::greaterThanEqualUInt));
+
+
+		type_Bool.ops.logicalNot.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::logicalNot));
+		type_Bool.ops.logicalAnd.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::logicalAnd));
+		type_Bool.ops.logicalOr.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::logicalOr));
+
+
 
 	};
 

@@ -145,16 +145,34 @@ namespace panther{
 				};
 
 
+
 				std::optional<Operator> callOperator{};
 
-				std::vector<OverloadedOperator> addOperators{};
-				std::vector<OverloadedOperator> addWrapOperators{};
-				std::vector<OverloadedOperator> subOperators{};
-				std::vector<OverloadedOperator> subWrapOperators{};
-				std::vector<OverloadedOperator> mulOperators{};
-				std::vector<OverloadedOperator> mulWrapOperators{};
-				std::vector<OverloadedOperator> divOperators{};
-				std::vector<OverloadedOperator> negateOperators{};
+				struct /* ops */ {
+					std::vector<OverloadedOperator> add{};
+					std::vector<OverloadedOperator> addWrap{};
+					std::vector<OverloadedOperator> sub{};
+					std::vector<OverloadedOperator> subWrap{};
+					std::vector<OverloadedOperator> mul{};
+					std::vector<OverloadedOperator> mulWrap{};
+					std::vector<OverloadedOperator> div{};
+					std::vector<OverloadedOperator> negate{};
+
+					std::vector<OverloadedOperator> logicalEqual{};
+					std::vector<OverloadedOperator> notEqual{};
+					std::vector<OverloadedOperator> lessThan{};
+					std::vector<OverloadedOperator> lessThanEqual{};
+					std::vector<OverloadedOperator> greaterThan{};
+					std::vector<OverloadedOperator> greaterThanEqual{};
+					std::vector<OverloadedOperator> logicalNot{};
+					std::vector<OverloadedOperator> logicalAnd{};
+					std::vector<OverloadedOperator> logicalOr{};
+				} ops;
+
+
+
+
+
 
 			private:
 				
@@ -499,6 +517,31 @@ namespace panther{
 
 				// negate
 				negateInt,
+
+
+				// Logical Int
+				equalInt,
+				notEqualInt,
+				lessThanInt,
+				lessThanEqualInt,
+				greaterThanInt,
+				greaterThanEqualInt,
+
+				// logical UInt
+				equalUInt,
+				notEqualUInt,
+				lessThanUInt,
+				lessThanEqualUInt,
+				greaterThanUInt,
+				greaterThanEqualUInt,
+
+				// logical Bool
+				equalBool,
+				notEqualBool,
+				logicalAnd,
+				logicalOr,
+				logicalNot,
+
 
 
 				__printHelloWorld,

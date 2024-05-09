@@ -1,5 +1,35 @@
 # Changelog
 
+### v0.26.0
+- Added the following intrinic functions:
+	- `@equalInt(Int read, Int read) -> Int`
+	- `@notEqualInt(Int read, Int read) -> Int`
+	- `@lessThanInt(Int read, Int read) -> Int`
+	- `@lessThanEqualInt(Int read, Int read) -> Int`
+	- `@greaterThanInt(Int read, Int read) -> Int`
+	- `@greaterThanEqualInt(Int read, Int read) -> Int`
+	- `@equalUInt(UInt read, Uint read) -> UInt`
+	- `@notEqualUInt(UInt read, Uint read) -> UInt`
+	- `@lessThanUInt(UInt read, Uint read) -> UInt`
+	- `@lessThanEqualUInt(UInt read, Uint read) -> UInt`
+	- `@greaterThanUInt(UInt read, Uint read) -> UInt`
+	- `@greaterThanEqualUInt(UInt read, Uint read) -> UInt`
+	- `@equalBool(Bool read, Bool read) -> Bool`
+	- `@notEqualBool(Bool read, Bool read) -> Bool`
+	- `@logicalAnd(Bool read, Bool read) -> Bool`
+	- `@logicalOr(Bool read, Bool read) -> Bool`
+	- `@logicalNot(Bool read) -> Bool`
+- Added the following operators:
+	- `==`
+	- `!=`
+	- `<`
+	- `<=`
+	- `>`
+	- `>=`
+	- `&&`
+	- `||`
+	- `!`
+
 ### v0.25.0
 - Fixed formatting for building documentation
 - Added `alias` statements
@@ -14,7 +44,7 @@
 - Added implicit conversion for integral literals
 - Added the intrinsic function `@__printUInt(UInt read)` and `@__printSeparator()`
 	- This existence of this is just temporary
-- Added the following intrinsic functions
+- Added the following intrinsic functions:
 	- `@addInt(Int read, Int read) -> Int`
 	- `@addUInt(UInt read, UInt read) -> UInt`
 	- `@addWrapInt(Int read, Int read) -> Int`
@@ -30,7 +60,7 @@
 	- `@divInt(Int read, Int read) -> Int`
 	- `@divUInt(UInt read, UInt read) -> UInt`
 	- `@negateInt(Int read) -> Int`
-- Added the following operators
+- Added the following operators:
 	- `+`
 	- `+@` (addition with wrapping)
 	- `-` (both negate and subtraction)

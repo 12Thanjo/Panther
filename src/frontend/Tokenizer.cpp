@@ -17,8 +17,8 @@ namespace panther{
 			if(this->tokenize_whitespace()){ continue; }
 			if(this->tokenize_comment()){ continue; }
 			if(this->tokenize_identifier()){ continue; }
-			if(this->tokenize_punctuation()){ continue; }
 			if(this->tokenize_operators()){ continue; }
+			if(this->tokenize_punctuation()){ continue; }
 			if(this->tokenize_number_literal()){ continue; }
 			if(this->tokenize_string_literal()){ continue; }
 
@@ -249,8 +249,16 @@ namespace panther{
 		};
 
 
+
 		// length 2
-		// if(is_op("==")){ set_op("=="); return true; }
+		if(is_op("==")){ set_op("=="); return true; }
+		if(is_op("!=")){ set_op("!="); return true; }
+		if(is_op("<=")){ set_op("<="); return true; }
+		if(is_op(">=")){ set_op(">="); return true; }
+
+		if(is_op("&&")){ set_op("&&"); return true; }
+		if(is_op("||")){ set_op("||"); return true; }
+
 		if(is_op("->")){ set_op("->"); return true; }
 		if(is_op(".^")){ set_op(".^"); return true; }
 
@@ -261,6 +269,11 @@ namespace panther{
 
 		// length 1
 		if(is_op("=")){ set_op("="); return true; }
+
+		if(is_op("!")){ set_op("!"); return true; }
+
+		if(is_op("<")){ set_op("<"); return true; }
+		if(is_op(">")){ set_op(">"); return true; }
 
 		if(is_op("+")){ set_op("+"); return true; }
 		if(is_op("-")){ set_op("-"); return true; }

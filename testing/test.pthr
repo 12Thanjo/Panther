@@ -1,18 +1,29 @@
-def test2 = @import("test2.pthr");
 
-alias Integer #pub = Int;
-alias IntPtr = Integer^;
+func get_false = () -> Bool {
+	@__printInt(0);
+	return false;
+}
+
+func get_true = () -> Bool {
+	@__printInt(1);
+	return true;
+}
+
 
 
 func main = () #entry -> Int {
-	def bool: test2.test3.Boolean = false;
 
-	if(bool){
-		var foo: test2.Integer = 12;
-		var foo_ptr: IntPtr = addr foo;
-
-		return foo;
+	@__printSeparator();
+	if(get_false() && get_false()){
+		@__printHelloWorld();
 	}
+
+	@__printSeparator();
+	if(get_true() || get_false()){
+		@__printHelloWorld();
+	}
+
+
 
 	return 0;
 }
