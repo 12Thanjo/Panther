@@ -67,6 +67,14 @@ namespace panther{
 		return this->funcs[node.index];
 	};
 
+	auto Source::getTemplatePack(AST::Node::ID node_id) const noexcept -> const AST::TemplatePack& {
+		return this->getTemplatePack(this->getNode(node_id));
+	};
+	auto Source::getTemplatePack(const AST::Node& node) const noexcept -> const AST::TemplatePack& {
+		evo::debugAssert(node.kind == AST::Kind::TemplatePack, "Node is not a TemplatePack");
+		return this->template_packs[node.index];
+	};
+
 	auto Source::getFuncParams(AST::Node::ID node_id) const noexcept -> const AST::FuncParams& {
 		return this->getFuncParams(this->getNode(node_id));
 	};

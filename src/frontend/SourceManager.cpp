@@ -30,7 +30,6 @@ namespace panther{
 
 
 
-
 	// auto SourceManager::getSource(Source::ID id) noexcept -> Source& {
 	// 	evo::debugAssert(id.id < this->sources.size(), "Attempted to get invalid source file id");
 	// 	evo::debugAssert(this->isLocked(), "Can only get sources when locked");

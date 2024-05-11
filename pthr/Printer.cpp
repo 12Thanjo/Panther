@@ -381,6 +381,9 @@ namespace panther{
 				this->print_ident(this->ast_source->getNode(func.ident));
 
 				this->indenter_set_arrow();
+				this->print_template_pack(func.template_pack);
+
+				this->indenter_set_arrow();
 				this->print_func_params(this->ast_source->getNode(func.params));
 
 				this->indenter_print_arrow();
@@ -416,6 +419,105 @@ namespace panther{
 					this->indenter_set_end();
 					this->print_block(this->ast_source->getNode(func.block));
 				this->indenter_pop();
+
+			this->indenter_pop();
+		};
+
+
+		auto Printer::print_template_pack(const std::optional<AST::Node::ID>& opt_node_id) noexcept -> void {
+			this->indenter_print();
+
+			if(opt_node_id.has_value() == false){
+				this->info("Template Pack: ");
+				this->debug("[NONE]\n");
+				return;
+			}
+
+			const AST::TemplatePack& template_pack = this->ast_source->getTemplatePack(*opt_node_id);
+
+			if(template_pack.templates.empty()){
+				this->info("Template Pack: ");
+				this->debug("[EMPTY]\n");
+				return;	
+			}
+
+			this->info("Template Pack:\n");
+			this->indenter_push();
+
+				for(size_t i = 0; i < template_pack.templates.size(); i+=1){
+					const AST::TemplatePack::Template& template_param = template_pack.templates[i];
+
+					if(i < template_pack.templates.size() - 1){
+						this->indenter_set_arrow();
+					}else{
+						this->indenter_set_end();
+					}
+
+					this->indenter_print();
+					this->info( std::format("template param {}:\n", i) );
+					this->indenter_push();
+
+						this->indenter_print_arrow();
+						this->info("Ident: ");
+						this->print_ident(this->ast_source->getNode(template_param.ident));
+
+						this->indenter_print_end();
+						this->info("Type:");
+						if(template_param.is_type_keyword){
+							this->debug(" Type\n");
+						}else{
+							this->print_type(this->ast_source->getNode(template_param.type_node));
+						}
+
+					this->indenter_pop();
+				}
+
+			this->indenter_pop();
+		};
+
+		auto Printer::print_template_args(const std::optional<std::vector<AST::Node::ID>>& opt_args) noexcept -> void {
+			this->indenter_print();
+
+			if(opt_args.has_value() == false){
+				this->info("Template Pack: ");
+				this->debug("[NONE]\n");
+				return;
+			}
+
+
+			if(opt_args->empty()){
+				this->info("Template Pack: ");
+				this->debug("[EMPTY]\n");
+				return;	
+			}
+
+			this->info("Template Pack:\n");
+			this->indenter_push();
+
+				for(size_t i = 0; i < opt_args->size(); i+=1){
+					const AST::Node& arg_node = this->ast_source->getNode( (*opt_args)[i] );
+
+					if(i < opt_args->size() - 1){
+						this->indenter_set_arrow();
+					}else{
+						this->indenter_set_end();
+					}
+
+					this->indenter_print();
+					this->info( std::format("template param {}:\n", i) );
+					this->indenter_push();
+
+						this->indenter_set_end();
+
+						if(arg_node.kind == AST::Kind::Type){
+							this->indenter_print();
+							this->print_type(arg_node);
+						}else{
+							this->print_expr(arg_node);
+						}
+
+					this->indenter_pop();
+				}
 
 			this->indenter_pop();
 		};
@@ -707,6 +809,10 @@ namespace panther{
 							this->indenter_set_end();
 							this->print_expr(this->ast_source->getNode(func_call.target));
 						this->indenter_pop();
+
+						this->indenter_set_arrow();
+						this->print_template_args(func_call.template_args);
+
 
 						this->indenter_print_end();
 						if(func_call.args.empty()){

@@ -40,7 +40,7 @@ namespace panther{
 			EVO_NODISCARD auto analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry) noexcept -> bool; // enters a new scope
 			EVO_NODISCARD auto analyze_block(const AST::Block& block) noexcept -> bool;
 
-			EVO_NODISCARD auto check_func_call(const AST::FuncCall& func_call, PIR::Type::ID type_id) const noexcept -> bool;
+			EVO_NODISCARD auto check_func_call(const AST::FuncCall& func_call, PIR::Type::ID func_type_id) const noexcept -> bool;
 			EVO_NODISCARD auto get_func_call_args(const AST::FuncCall& func_call) const noexcept -> std::vector<PIR::Expr>;
 
 			// note: func_call is only used when looking up a function overload

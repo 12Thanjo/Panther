@@ -1,29 +1,8 @@
 
-func get_false = () -> Bool {
-	@__printInt(0);
-	return false;
-}
-
-func get_true = () -> Bool {
-	@__printInt(1);
-	return true;
-}
-
-
 
 func main = () #entry -> Int {
-
-	@__printSeparator();
-	if(get_false() && get_false()){
-		@__printHelloWorld();
-	}
-
-	@__printSeparator();
-	if(get_true() || get_false()){
-		@__printHelloWorld();
-	}
-
 
 
 	return 0;
 }
+

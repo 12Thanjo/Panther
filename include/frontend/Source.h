@@ -66,6 +66,9 @@ namespace panther{
 			EVO_NODISCARD auto getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func&;
 			EVO_NODISCARD auto getFunc(const AST::Node& node) const noexcept -> const AST::Func&;
 
+			EVO_NODISCARD auto getTemplatePack(AST::Node::ID node_id) const noexcept -> const AST::TemplatePack&;
+			EVO_NODISCARD auto getTemplatePack(const AST::Node& node) const noexcept -> const AST::TemplatePack&;
+
 			EVO_NODISCARD auto getFuncParams(AST::Node::ID node_id) const noexcept -> const AST::FuncParams&;
 			EVO_NODISCARD auto getFuncParams(const AST::Node& node) const noexcept -> const AST::FuncParams&;
 
@@ -305,6 +308,7 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
+			std::vector<AST::TemplatePack> template_packs{};
 			std::vector<AST::FuncParams> func_params{};
 			std::vector<AST::Conditional> conditionals{};
 			std::vector<AST::Alias> aliases{};

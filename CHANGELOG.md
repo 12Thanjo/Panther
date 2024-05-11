@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.26.1
+- Added parsing of function parameter packs
+- Fixed fatal error caused by not properly checking that an identifier can be called like a function
+- Fixed function calls not being properly checked by semantic analysis
+
 ### v0.26.0
 - Added the following intrinic functions:
 	- `@equalInt(Int read, Int read) -> Int`

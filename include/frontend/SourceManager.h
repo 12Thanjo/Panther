@@ -149,8 +149,8 @@ namespace panther{
 
 
 			EVO_NODISCARD auto getIntrinsics() const noexcept -> evo::ArrayProxy<PIR::Intrinsic>;
-			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::Kind kind) const noexcept -> const PIR::Intrinsic&;
 			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::ID id) const noexcept -> const PIR::Intrinsic&;
+			EVO_NODISCARD auto getIntrinsic(PIR::Intrinsic::Kind kind) const noexcept -> const PIR::Intrinsic&;
 			EVO_NODISCARD static inline auto getIntrinsicID(PIR::Intrinsic::Kind kind) noexcept -> PIR::Intrinsic::ID {
 				return PIR::Intrinsic::ID(static_cast<uint32_t>(kind));
 			};

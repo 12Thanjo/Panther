@@ -8,6 +8,7 @@ namespace panther{
 
 		enum class Kind{
 			VarDecl,
+			TemplatePack,
 			FuncParams,
 			Func,
 			Return,
@@ -57,6 +58,22 @@ namespace panther{
 			Node::ID expr;
 		};
 
+		struct TemplatePack{
+			struct Template{
+				Node::ID ident;
+
+				bool is_type_keyword;
+				union{
+					Node::ID type_node;
+					Token::ID keyword;
+				};
+
+				Template(Node::ID _ident, Node::ID node) noexcept : ident(_ident), is_type_keyword(false), type_node(node) {};
+				Template(Node::ID _ident, Token::ID _keyword) noexcept : ident(_ident), is_type_keyword(true),  keyword(_keyword) {};
+			};
+
+			std::vector<Template> templates;
+		};
 
 		struct FuncParams{
 			struct Param{
@@ -75,9 +92,12 @@ namespace panther{
 
 		struct Func{
 			Node::ID ident;
+
+			std::optional<Node::ID> template_pack;
 			Node::ID params;
 			std::vector<Token::ID> attributes;
 			Node::ID returnType;
+			
 			Node::ID block;
 		};
 
@@ -146,6 +166,7 @@ namespace panther{
 
 		struct FuncCall{
 			Node::ID target;
+			std::optional<std::vector<Node::ID>> template_args;
 			std::vector<Node::ID> args;
 		};
 

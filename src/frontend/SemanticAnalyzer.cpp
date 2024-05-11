@@ -194,7 +194,7 @@ namespace panther{
 
 					if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
 						this->source.error(
-							"Variable cannot be assigned a value of a different type, and cannot be implicitly converted", 
+							"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
 							expr_node,
 
 							std::vector<Message::Info>{
@@ -321,6 +321,15 @@ namespace panther{
 		// check function is in global scope
 		if(this->is_global_scope() == false){
 			this->source.error("Functions can only be defined at global scope", ident);
+			return false;
+		}
+
+
+		///////////////////////////////////
+		// template pack
+
+		if(func.template_pack.has_value()){
+			this->source.error("Function declaration with a template pack is not supported yet", ident);
 			return false;
 		}
 
@@ -845,6 +854,20 @@ namespace panther{
 		// check if discarding return value
 		const PIR::Type& target_type = this->src_manager.getType(target_type_id.value());
 		const PIR::BaseType& target_base_type = this->src_manager.getBaseType(target_type.baseType);
+
+		if(target_base_type.callOperator.has_value() == false){
+			this->source.error(
+				"cannot be called like a function", func_call.target,
+				std::vector<Message::Info>{
+					std::format(
+						"Type \"{}\" does not have a call operator",
+						this->src_manager.printType(target_type_id.value())
+					)
+				}
+			);
+			return false;
+		}
+
 		if(target_base_type.callOperator->returnType.isVoid() == false){
 			this->source.error("Discarding return value of function call", func_call.target);
 			return false;
@@ -1026,13 +1049,13 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::check_func_call(const AST::FuncCall& func_call, PIR::Type::ID type_id) const noexcept -> bool {
-		const PIR::Type& type = this->src_manager.getType(type_id);
+	auto SemanticAnalyzer::check_func_call(const AST::FuncCall& func_call, PIR::Type::ID func_type_id) const noexcept -> bool {
+		const PIR::Type& type = this->src_manager.getType(func_type_id);
 
 		if(type.qualifiers.empty() == false){
 			this->source.error(
 				"cannot be called like a function", func_call.target,
-				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(type_id)) }
+				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(func_type_id)) }
 			);
 			return false;
 		}
@@ -1042,8 +1065,14 @@ namespace panther{
 			// TODO: better messaging?
 			this->source.error(
 				"cannot be called like a function", func_call.target,
-				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(type_id)) }
+				std::vector<Message::Info>{ std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(func_type_id)) }
 			);
+			return false;
+		}
+
+
+		if(func_call.template_args.has_value()){
+			this->source.error("Template arguments are not supported yet", func_call.target);
 			return false;
 		}
 
@@ -1243,11 +1272,12 @@ namespace panther{
 				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target), &func_call);
 				if(target_type_id.isError()){ return evo::resultError; }
 
+				// check function call / arguments
+				if(this->check_func_call(func_call, target_type_id.value()) == false){ return evo::resultError; }
 
-				// check that it's a function type
+				// check it returns a value
 				const PIR::Type& type = this->src_manager.getType(target_type_id.value());
 				const PIR::BaseType& base_type = this->src_manager.getBaseType(type.baseType);
-
 				const PIR::Type::VoidableID return_type = base_type.callOperator->returnType;
 				if(return_type.isVoid()){
 					this->source.error("Function does not return a value", func_call.target);
@@ -2693,6 +2723,12 @@ namespace panther{
 			}
 
 			return overload_list[0];
+		}
+
+
+		if(func_call.template_args.has_value()){
+			this->source.error("Template arguments are not supported yet", func_call.target);
+			return evo::resultError;
 		}
 
 

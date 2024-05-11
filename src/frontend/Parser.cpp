@@ -143,8 +143,20 @@ namespace panther{
 
 		// =
 		if(this->expect_token(Token::get("="), "in function declaration") == false){ return Result::Error; }
+	
+		// templates
+		const Result template_pack = this->parse_template_pack();
+		if(template_pack.code() == Result::Error){ return Result::Error; }
 
-		
+		const std::optional<AST::Node::ID> template_pack_value = [&]() noexcept {
+			if(template_pack.code() == Result::Success){
+				return std::optional<AST::Node::ID>(template_pack.value());
+			}else{
+				return std::optional<AST::Node::ID>(std::nullopt);
+			}
+		}();
+
+
 		const Result func_params = this->parse_func_params();
 		if(this->check_result_fail(func_params, "parameter block in function declaration")){ return Result::Error; }
 
@@ -170,7 +182,66 @@ namespace panther{
 
 		return this->create_node(
 			this->source.funcs, AST::Kind::Func,
-			ident.value(), func_params.value(), std::move(attributes), return_type.value(), block.value()
+			ident.value(), template_pack_value, func_params.value(), std::move(attributes), return_type.value(), block.value()
+		);
+	};
+
+
+	// TODO: add checking for EOF
+	auto Parser::parse_template_pack() noexcept -> Result {
+		// {
+		if(this->get(this->peek()).kind != Token::get("{")){ return Result::WrongType; }
+		this->skip(1);
+
+
+		auto templates = std::vector<AST::TemplatePack::Template>();
+
+		while(true){
+			if(this->get(this->peek()).kind == Token::get("}")){
+				this->skip(1);
+				break;
+			}
+
+			// ident
+			const Result ident_result = this->parse_ident();
+			if(this->check_result_fail(ident_result, "identifier in template parameter")){ return Result::Error; }
+
+			// :
+			if(this->expect_token(Token::get(":"), "in template parameter") == false){ return Result::Error; }
+
+
+			// type
+			if(this->get(this->peek()).kind == Token::KeywordType){
+				templates.emplace_back(ident_result.value(), this->next());
+
+			}else{
+				const Result type_result = this->parse_type();
+				if(this->check_result_fail(type_result, "type in template parameter")){ return Result::Error; }
+
+
+				templates.emplace_back(ident_result.value(), type_result.value());
+			}
+
+
+			
+
+			// check if ending or should continue
+			const Token::ID after_param_peek = this->next();
+			const Token& after_param_peek_tok = this->get(after_param_peek);
+			if(after_param_peek_tok.kind != Token::get(",")){
+				if(after_param_peek_tok.kind != Token::get("}")){
+					this->expected_but_got("\",\" at end of template parameter or \"}\" at end of template pack block", after_param_peek);
+					return Result::Error;
+				}
+
+				break;
+			}
+		};
+
+
+		return this->create_node(
+			this->source.template_packs, AST::Kind::TemplatePack,
+			std::move(templates)
 		);
 	};
 
@@ -199,7 +270,7 @@ namespace panther{
 
 			// type
 			const Result type_result = this->parse_type();
-			if(this->check_result_fail(type_result, "type inf function parameter")){ return Result::Error; }
+			if(this->check_result_fail(type_result, "type in function parameter")){ return Result::Error; }
 
 			// kind
 			using ParamKind = AST::FuncParams::Param::Kind;
@@ -664,6 +735,8 @@ namespace panther{
 				output = this->create_node(this->source.infixes, AST::Kind::Infix,
 					output.value(), accessor_op_token, rhs_result.value()
 				);
+
+				continue;
 				
 			}else if(peeked_kind == Token::get(".^")){
 				const Token::ID op_token = this->next();
@@ -672,7 +745,13 @@ namespace panther{
 					output.value(), op_token
 				);
 
-			}else if(peeked_kind == Token::get("(")){
+				continue;
+
+			}
+
+
+
+			auto parse_arguments = [&]() noexcept -> evo::Result<std::vector<AST::Node::ID>> {
 				this->skip(1);
 
 				auto arguments = std::vector<AST::Node::ID>();
@@ -684,7 +763,9 @@ namespace panther{
 					}
 
 					const Result expr_result = this->parse_expr();
-					if(this->check_result_fail(expr_result, "expression inside function call")){ return Result::Error; }
+					if(this->check_result_fail(expr_result, "expression inside function call")){
+						return evo::Result<std::vector<AST::Node::ID>>(evo::resultError);
+					}
 
 					arguments.emplace_back(expr_result.value());
 
@@ -693,16 +774,83 @@ namespace panther{
 					if(after_param_peek.kind != Token::get(",")){
 						if(after_param_peek.kind != Token::get(")")){
 							this->expected_but_got("\",\" at end of function call argument or \")\" at end of function call", after_param_peek_tok);
-							return Result::Error;
+							return evo::Result<std::vector<AST::Node::ID>>(evo::resultError);
 						}
 
 						break;
 					}
 				};
 
+				return evo::Result<std::vector<AST::Node::ID>>(arguments);
+			};
+
+
+			if(peeked_kind == Token::get("(")){
+				const evo::Result<std::vector<AST::Node::ID>> arguments = parse_arguments();
+				if(arguments.isError()){ return Result::Error; }
+
 				output = this->create_node(this->source.func_calls, AST::Kind::FuncCall,
-					output.value(), std::move(arguments)
+					output.value(), std::nullopt, std::move(arguments.value())
 				);
+
+			}else if(peeked_kind == Token::get("{")){
+				this->skip(1);
+
+				auto template_args = std::vector<AST::Node::ID>();
+
+				while(true){
+					if(this->get(this->peek()).kind == Token::get("}")){
+						this->skip(1);
+						break;
+					}
+
+
+					const Result type_result = this->parse_type();
+					switch(type_result.code()){
+						case Result::Success: {
+							template_args.emplace_back(type_result.value());
+						} break;
+
+						case Result::WrongType: {
+							const Result expr_result = this->parse_expr();
+							if(this->check_result_fail(expr_result, "expression inside template")){ return Result::Error; }
+
+							template_args.emplace_back(expr_result.value());
+						} break;
+
+						case Result::Error: {
+							return Result::Error;
+						} break;
+					};
+
+
+					const Token::ID after_param_peek_tok = this->next();
+					const Token& after_param_peek = this->get(after_param_peek_tok);
+					if(after_param_peek.kind != Token::get(",")){
+						if(after_param_peek.kind != Token::get("}")){
+							this->expected_but_got("\",\" at end of template argument or \"}\" at end of template pack", after_param_peek_tok);
+							return Result::Error;;
+						}
+
+						break;
+					}
+				};
+
+				if(this->get(this->peek()).kind != Token::get("(")){
+					this->source.error("Expected function parameter block after template pack", this->peek());
+					return Result::Error;
+				}
+
+
+				const evo::Result<std::vector<AST::Node::ID>> arguments = parse_arguments();
+				if(arguments.isError()){ return Result::Error; }
+
+				output = this->create_node(this->source.func_calls, AST::Kind::FuncCall,
+					output.value(), std::move(template_args), std::move(arguments.value())
+				);
+
+
+				continue;
 
 			}else{
 				break;
