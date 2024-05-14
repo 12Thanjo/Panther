@@ -957,44 +957,48 @@ namespace panther{
 									} break;
 
 									case PIR::Intrinsic::Kind::logicalAnd: {
-										llvm::Value* lhs = this->get_value(func_call.args[0]);
-
-										llvm::BasicBlock* current_block = this->builder->getInsertPoint();
+										llvm::BasicBlock* starting_block = this->builder->getInsertPoint();
 										llvm::BasicBlock* logical_and_rhs = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.rhs");
-										llvm::BasicBlock* logical_and_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.end");
 
-										this->builder->createCondBranch(lhs, logical_and_rhs, logical_and_end);
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
 
 										this->builder->setInsertionPoint(logical_and_rhs);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										llvm::BasicBlock* block_after_rhs = this->builder->getInsertPoint();
+										llvm::BasicBlock* logical_and_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.end");
 										this->builder->createBranch(logical_and_end);
+
+										this->builder->setInsertionPoint(starting_block);
+										this->builder->createCondBranch(lhs, logical_and_rhs, logical_and_end);
 
 										this->builder->setInsertionPoint(logical_and_end);
 
 										return this->builder->createPhi(llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool()), {
-											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(false)), current_block),
-											llvmint::IRBuilder::PhiIncoming(rhs, logical_and_rhs),
+											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(false)), starting_block),
+											llvmint::IRBuilder::PhiIncoming(rhs, block_after_rhs),
 										}, "logicalAnd");
 									} break;
 
 									case PIR::Intrinsic::Kind::logicalOr: {
-										llvm::Value* lhs = this->get_value(func_call.args[0]);
-
-										llvm::BasicBlock* current_block = this->builder->getInsertPoint();
+										llvm::BasicBlock* starting_block = this->builder->getInsertPoint();
 										llvm::BasicBlock* logical_or_rhs = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.rhs");
-										llvm::BasicBlock* logical_or_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.end");
 
-										this->builder->createCondBranch(lhs, logical_or_end, logical_or_rhs);
+										llvm::Value* lhs = this->get_value(func_call.args[0]);
 
 										this->builder->setInsertionPoint(logical_or_rhs);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
+										llvm::BasicBlock* block_after_rhs = this->builder->getInsertPoint();
+										llvm::BasicBlock* logical_or_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.end");
 										this->builder->createBranch(logical_or_end);
+
+										this->builder->setInsertionPoint(starting_block);
+										this->builder->createCondBranch(lhs, logical_or_end, logical_or_rhs);
 
 										this->builder->setInsertionPoint(logical_or_end);
 
 										return this->builder->createPhi(llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool()), {
-											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(true)), current_block),
-											llvmint::IRBuilder::PhiIncoming(rhs, logical_or_rhs),
+											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(true)), starting_block),
+											llvmint::IRBuilder::PhiIncoming(rhs, block_after_rhs),
 										}, "logicalOr");
 									} break;
 

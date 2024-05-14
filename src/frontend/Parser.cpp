@@ -231,15 +231,15 @@ namespace panther{
 
 	// TODO: add checking for EOF
 	auto Parser::parse_template_pack() noexcept -> Result {
-		// {
-		if(this->get(this->peek()).kind != Token::get("{")){ return Result::WrongType; }
+		// |
+		if(this->get(this->peek()).kind != Token::get("|")){ return Result::WrongType; }
 		this->skip(1);
 
 
 		auto templates = std::vector<AST::TemplatePack::Template>();
 
 		while(true){
-			if(this->get(this->peek()).kind == Token::get("}")){
+			if(this->get(this->peek()).kind == Token::get("|")){
 				this->skip(1);
 				break;
 			}
@@ -271,8 +271,8 @@ namespace panther{
 			const Token::ID after_param_peek = this->next();
 			const Token& after_param_peek_tok = this->get(after_param_peek);
 			if(after_param_peek_tok.kind != Token::get(",")){
-				if(after_param_peek_tok.kind != Token::get("}")){
-					this->expected_but_got("\",\" at end of template parameter or \"}\" at end of template pack block", after_param_peek);
+				if(after_param_peek_tok.kind != Token::get("|")){
+					this->expected_but_got("\",\" at end of template parameter or \"|\" at end of template pack block", after_param_peek);
 					return Result::Error;
 				}
 
@@ -578,7 +578,7 @@ namespace panther{
 
 
 		auto qualifiers = std::vector<AST::Type::Qualifier>();
-		while(this->get(this->peek()).kind == Token::get("^")){
+		while(this->get(this->peek()).kind == Token::get("&")){
 			this->skip(1);
 
 			bool is_const = false;
@@ -663,8 +663,8 @@ namespace panther{
 
 	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
 		switch(kind){
-			case Token::get("&&"):  return 1;
-			case Token::get("||"):  return 1;
+			case Token::KeywordAnd: return 1;
+			case Token::KeywordOr:  return 1;
 
 			case Token::get("=="):  return 3;
 			case Token::get("!="):  return 3;
@@ -780,7 +780,7 @@ namespace panther{
 
 				continue;
 				
-			}else if(peeked_kind == Token::get(".^")){
+			}else if(peeked_kind == Token::get(".&")){
 				const Token::ID op_token = this->next();
 
 				output = this->create_node(this->source.postfixes, AST::Kind::Postfix,
@@ -835,13 +835,13 @@ namespace panther{
 					output.value(), std::nullopt, std::move(arguments.value())
 				);
 
-			}else if(peeked_kind == Token::get("{")){
+			}else if(peeked_kind == Token::get("|")){
 				this->skip(1);
 
 				auto template_args = std::vector<AST::Node::ID>();
 
 				while(true){
-					if(this->get(this->peek()).kind == Token::get("}")){
+					if(this->get(this->peek()).kind == Token::get("|")){
 						this->skip(1);
 						break;
 					}
@@ -869,8 +869,8 @@ namespace panther{
 					const Token::ID after_param_peek_tok = this->next();
 					const Token& after_param_peek = this->get(after_param_peek_tok);
 					if(after_param_peek.kind != Token::get(",")){
-						if(after_param_peek.kind != Token::get("}")){
-							this->expected_but_got("\",\" at end of template argument or \"}\" at end of template pack", after_param_peek_tok);
+						if(after_param_peek.kind != Token::get("|")){
+							this->expected_but_got("\",\" at end of template argument or \"|\" at end of template pack", after_param_peek_tok);
 							return Result::Error;;
 						}
 

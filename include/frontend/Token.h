@@ -65,6 +65,8 @@ namespace panther{
 			KeywordCopy,
 			KeywordUninit,
 			KeywordAddr,
+			KeywordAnd,
+			KeywordOr,
 
 			KeywordRead,
 			KeywordWrite,
@@ -85,8 +87,6 @@ namespace panther{
 			GreaterThan, // <
 			GreaterThanEqual, // <=
 			LogicalNot, // !
-			LogicalAnd, // &&
-			LogicalOr, // ||
 
 			Plus, // +
 			PlusWrap, // +@
@@ -98,8 +98,8 @@ namespace panther{
 
 			RightArrow, // ->
 
-			Pointer, // ^
-			Dereference, // .^
+			Pointer, // &
+			Dereference, // .&
 			Accessor, // .
 
 
@@ -113,11 +113,11 @@ namespace panther{
 			OpenBrace, // {
 			CloseBrace, // }
 
+			Pipe, // |
+
 			Comma, // ,
 			SemiColon, // ;
 			Colon, // :
-
-			Pipe, // |
 		};
 
 		using enum class Kind;
@@ -194,11 +194,8 @@ namespace panther{
 			if(is_token("<=")){ return Token::LessThanEqual; }
 			if(is_token(">=")){ return Token::GreaterThanEqual; }
 
-			if(is_token("&&")){ return Token::LogicalAnd; }
-			if(is_token("||")){ return Token::LogicalOr; }
-
 			if(is_token("->")){ return Token::RightArrow; }
-			if(is_token(".^")){ return Token::Dereference; }
+			if(is_token(".&")){ return Token::Dereference; }
 
 			if(is_token("+@")){ return Token::PlusWrap; }
 			if(is_token("-@")){ return Token::MinusWrap; }
@@ -217,7 +214,7 @@ namespace panther{
 			if(is_token("*")){ return Token::Multiply; }
 			if(is_token("/")){ return Token::Divide; }
 
-			if(is_token("^")){ return Token::Pointer; }
+			if(is_token("&")){ return Token::Pointer; }
 
 			if(is_token(".")){ return Token::Accessor; }
 
@@ -228,11 +225,11 @@ namespace panther{
 			if(is_token("{")){ return Token::OpenBrace; }
 			if(is_token("}")){ return Token::CloseBrace; }
 
+			if(is_token("|")){ return Token::Pipe; }
+
 			if(is_token(",")){ return Token::Comma; }
 			if(is_token(";")){ return Token::SemiColon; }
 			if(is_token(":")){ return Token::Colon; }
-
-			if(is_token("|")){ return Token::Pipe; }
 
 
 			EVO_FATAL_BREAK(std::format("Unknown token kind ({}) => {}", token_str, __FUNCTION__));
@@ -293,6 +290,8 @@ namespace panther{
 				break; case Kind::KeywordCopy:        return "copy";
 				break; case Kind::KeywordUninit:      return "uninit";
 				break; case Kind::KeywordAddr:        return "addr";
+				break; case Kind::KeywordAnd:         return "and";
+				break; case Kind::KeywordOr:          return "or";
 
 				break; case Kind::KeywordRead:        return "read";
 				break; case Kind::KeywordWrite:       return "write";
@@ -313,8 +312,6 @@ namespace panther{
 				break; case Kind::GreaterThan:           return ">";
 				break; case Kind::GreaterThanEqual:      return ">=";
 				break; case Kind::LogicalNot:            return "!";
-				break; case Kind::LogicalAnd:            return "&&";
-				break; case Kind::LogicalOr:             return "||";
 
 				break; case Kind::Plus:                  return "+";
 				break; case Kind::PlusWrap:              return "+@";
@@ -326,8 +323,8 @@ namespace panther{
 
 				break; case Kind::RightArrow:            return "->";
 
-				break; case Kind::Pointer:               return "^";
-				break; case Kind::Dereference:           return ".^";
+				break; case Kind::Pointer:               return "&";
+				break; case Kind::Dereference:           return ".&";
 
 				break; case Kind::Accessor:              return ".";
 
@@ -338,6 +335,8 @@ namespace panther{
 				break; case Kind::OpenParen:    return "(";
 				break; case Kind::CloseParen:   return ")";
 				break; case Kind::OpenBracket:  return "[";
+				break; case Kind::Pipe:         return "|";
+
 				break; case Kind::CloseBracket: return "]";
 				break; case Kind::OpenBrace:    return "{";
 				break; case Kind::CloseBrace:   return "}";
@@ -346,7 +345,6 @@ namespace panther{
 				break; case Kind::SemiColon:    return ";";
 				break; case Kind::Colon:        return ":";
 
-				break; case Kind::Pipe:         return "|";
 				
 			};
 

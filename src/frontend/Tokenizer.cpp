@@ -179,6 +179,8 @@ namespace panther{
 			else if(ident_name == "copy")   { this->create_token(Token::Kind::KeywordCopy); }
 			else if(ident_name == "uninit") { this->create_token(Token::Kind::KeywordUninit); }
 			else if(ident_name == "addr")   { this->create_token(Token::Kind::KeywordAddr); }
+			else if(ident_name == "and")    { this->create_token(Token::Kind::KeywordAnd); }
+			else if(ident_name == "or")     { this->create_token(Token::Kind::KeywordOr); }
 
 			else if(ident_name == "read")  { this->create_token(Token::Kind::KeywordRead); }
 			else if(ident_name == "write") { this->create_token(Token::Kind::KeywordWrite); }
@@ -259,11 +261,8 @@ namespace panther{
 		if(is_op("<=")){ set_op("<="); return true; }
 		if(is_op(">=")){ set_op(">="); return true; }
 
-		if(is_op("&&")){ set_op("&&"); return true; }
-		if(is_op("||")){ set_op("||"); return true; }
-
 		if(is_op("->")){ set_op("->"); return true; }
-		if(is_op(".^")){ set_op(".^"); return true; }
+		if(is_op(".&")){ set_op(".&"); return true; }
 
 		if(is_op("+@")){ set_op("+@"); return true; }
 		if(is_op("-@")){ set_op("-@"); return true; }
@@ -283,7 +282,7 @@ namespace panther{
 		if(is_op("*")){ set_op("*"); return true; }
 		if(is_op("/")){ set_op("/"); return true; }
 
-		if(is_op("^")){ set_op("^"); return true; }
+		if(is_op("&")){ set_op("&"); return true; }
 
 		if(is_op(".")){ set_op("."); return true; }
 

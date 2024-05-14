@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.27.1
+- Changed operator `&&` to `and`
+- Changed operator `||` to `or`
+- Changed pointer (`^`) to `&`
+- Changed dereference (`.^`) to `.&`
+- Changed template packs from using `{`/`}` as delimiters to using `|` as the delmiter
+- Fixed logic with nested logical operators (for example: `true or (false and true)`)
+
 ### v0.27.0
 - Changed the name mangling prefix from "P" to "PTHR"
 - Added structs

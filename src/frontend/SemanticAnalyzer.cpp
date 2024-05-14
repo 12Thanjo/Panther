@@ -1670,7 +1670,7 @@ namespace panther{
 					case Token::get("=="): case Token::get("!="):
 					case Token::get("<"):  case Token::get("<="):
 					case Token::get(">"):  case Token::get(">="): 
-					case Token::get("&&"): case Token::get("||"): {
+					case Token::KeywordAnd: case Token::KeywordOr: {
 
 						///////////////////////////////////
 						// lhs
@@ -1693,22 +1693,22 @@ namespace panther{
 
 						const bool has_operator = [&]() noexcept {
 							switch(infix_op_kind){
-								case Token::get("+"):  return lhs_base_type.ops.add.empty() == false;
-								case Token::get("+@"): return lhs_base_type.ops.addWrap.empty() == false;
-								case Token::get("-"):  return lhs_base_type.ops.sub.empty() == false;
-								case Token::get("-@"): return lhs_base_type.ops.subWrap.empty() == false;
-								case Token::get("*"):  return lhs_base_type.ops.mul.empty() == false;
-								case Token::get("*@"): return lhs_base_type.ops.mulWrap.empty() == false;
-								case Token::get("/"):  return lhs_base_type.ops.div.empty() == false;
+								case Token::get("+"):   return lhs_base_type.ops.add.empty() == false;
+								case Token::get("+@"):  return lhs_base_type.ops.addWrap.empty() == false;
+								case Token::get("-"):   return lhs_base_type.ops.sub.empty() == false;
+								case Token::get("-@"):  return lhs_base_type.ops.subWrap.empty() == false;
+								case Token::get("*"):   return lhs_base_type.ops.mul.empty() == false;
+								case Token::get("*@"):  return lhs_base_type.ops.mulWrap.empty() == false;
+								case Token::get("/"):   return lhs_base_type.ops.div.empty() == false;
 
-								case Token::get("=="): return lhs_base_type.ops.logicalEqual.empty() == false;
-								case Token::get("!="): return lhs_base_type.ops.notEqual.empty() == false;
-								case Token::get("<"):  return lhs_base_type.ops.lessThan.empty() == false;
-								case Token::get("<="): return lhs_base_type.ops.lessThanEqual.empty() == false;
-								case Token::get(">"):  return lhs_base_type.ops.greaterThan.empty() == false;
-								case Token::get(">="): return lhs_base_type.ops.greaterThanEqual.empty() == false;
-								case Token::get("&&"): return lhs_base_type.ops.logicalAnd.empty() == false;
-								case Token::get("||"): return lhs_base_type.ops.logicalOr.empty() == false;
+								case Token::get("=="):  return lhs_base_type.ops.logicalEqual.empty() == false;
+								case Token::get("!="):  return lhs_base_type.ops.notEqual.empty() == false;
+								case Token::get("<"):   return lhs_base_type.ops.lessThan.empty() == false;
+								case Token::get("<="):  return lhs_base_type.ops.lessThanEqual.empty() == false;
+								case Token::get(">"):   return lhs_base_type.ops.greaterThan.empty() == false;
+								case Token::get(">="):  return lhs_base_type.ops.greaterThanEqual.empty() == false;
+								case Token::KeywordAnd: return lhs_base_type.ops.logicalAnd.empty() == false;
+								case Token::KeywordOr:  return lhs_base_type.ops.logicalOr.empty() == false;
 							};
 
 							evo::debugFatalBreak("Unknown intrinsic kind");
@@ -1788,8 +1788,8 @@ namespace panther{
 									case Token::get("<="): return base_type_to_use->ops.lessThanEqual[0].intrinsic;
 									case Token::get(">"):  return base_type_to_use->ops.greaterThan[0].intrinsic;
 									case Token::get(">="): return base_type_to_use->ops.greaterThanEqual[0].intrinsic;
-									case Token::get("&&"): return base_type_to_use->ops.logicalAnd[0].intrinsic;
-									case Token::get("||"): return base_type_to_use->ops.logicalOr[0].intrinsic;
+									case Token::KeywordAnd: return base_type_to_use->ops.logicalAnd[0].intrinsic;
+									case Token::KeywordOr: return base_type_to_use->ops.logicalOr[0].intrinsic;
 								};
 
 								evo::debugFatalBreak("Unknown intrinsic kind");
@@ -1811,7 +1811,7 @@ namespace panther{
 				const AST::Postfix& postfix = this->source.getPostfix(node);
 
 				switch(this->source.getToken(postfix.op).kind){
-					case Token::get(".^"): {
+					case Token::get(".&"): {
 						// get type of lhs
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
 						if(lhs_type_id.isError()){ return evo::resultError; }
@@ -2294,7 +2294,7 @@ namespace panther{
 					case Token::get("=="): case Token::get("!="):
 					case Token::get("<"):  case Token::get("<="):
 					case Token::get(">"):  case Token::get(">="): 
-					case Token::get("&&"): case Token::get("||"): {
+					case Token::KeywordAnd: case Token::KeywordOr: {
 						///////////////////////////////////
 						// lhs
 
@@ -2359,8 +2359,8 @@ namespace panther{
 									case Token::get("<="): return base_type_to_use.ops.lessThanEqual[0].intrinsic;
 									case Token::get(">"):  return base_type_to_use.ops.greaterThan[0].intrinsic;
 									case Token::get(">="): return base_type_to_use.ops.greaterThanEqual[0].intrinsic;
-									case Token::get("&&"): return base_type_to_use.ops.logicalAnd[0].intrinsic;
-									case Token::get("||"): return base_type_to_use.ops.logicalOr[0].intrinsic;
+									case Token::KeywordAnd: return base_type_to_use.ops.logicalAnd[0].intrinsic;
+									case Token::KeywordOr: return base_type_to_use.ops.logicalOr[0].intrinsic;
 								};
 
 								evo::debugFatalBreak("Unknown intrinsic kind");
@@ -2389,7 +2389,7 @@ namespace panther{
 				const AST::Postfix& postfix = this->source.getPostfix(value_node);
 
 				switch(this->source.getToken(postfix.op).kind){
-					case Token::get(".^"): {
+					case Token::get(".&"): {
 						// get deref type
 						const evo::Result<PIR::Type::ID> ptr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
 						evo::debugAssert(ptr_type_id.isSuccess(), "Failed to get deref type - should have caught error earlier");
@@ -2668,8 +2668,8 @@ namespace panther{
 					case Token::get("<="): return ExprValueType::Ephemeral;
 					case Token::get(">"):  return ExprValueType::Ephemeral;
 					case Token::get(">="): return ExprValueType::Ephemeral;
-					case Token::get("&&"): return ExprValueType::Ephemeral;
-					case Token::get("||"): return ExprValueType::Ephemeral;
+					case Token::KeywordAnd: return ExprValueType::Ephemeral;
+					case Token::KeywordOr: return ExprValueType::Ephemeral;
 				};
 				evo::debugFatalBreak("Unknown infix kind");
 			}break;
@@ -2678,7 +2678,7 @@ namespace panther{
 				const AST::Postfix& postfix = this->source.getPostfix(value_node);
 
 				switch(this->source.getToken(postfix.op).kind){
-					break; case Token::get(".^"): return ExprValueType::Concrete;
+					break; case Token::get(".&"): return ExprValueType::Concrete;
 				};
 				evo::debugFatalBreak("Unknown postfix kind");
 			} break;
@@ -2756,7 +2756,7 @@ namespace panther{
 				const AST::Postfix& postfix = this->source.getPostfix(value_node);
 
 				switch(this->source.getToken(postfix.op).kind){
-					case Token::get(".^"): {
+					case Token::get(".&"): {
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
 						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
 
