@@ -1,8 +1,30 @@
 
+def test2 = @import("test2.pthr");
 
-func main = () #entry -> Int {
 
 
-	return 0;
+struct SomeStruct = {
+	var int: Int;
+
+	var vec: test2.Vec2;
+
+	var ptr: SomeStruct^;
 }
 
+
+func main = () #entry -> Int {
+	var ss: SomeStruct = uninit;
+	var t2ss: test2.SomeStruct = uninit;
+
+	// var vec2: test2.Vec2^ = addr ss.vec;
+
+	test2.set_vec2(ss.vec);
+	test2.set_vec2(t2ss.vec);
+
+	@__printInt(ss.int);
+	@__printUInt(t2ss.uint);
+
+
+
+	return ss.vec.y;
+}

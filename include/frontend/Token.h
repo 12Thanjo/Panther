@@ -53,6 +53,7 @@ namespace panther{
 			KeywordVar,
 			KeywordDef,
 			KeywordFunc,
+			KeywordStruct,
 
 			KeywordType,
 
@@ -280,6 +281,7 @@ namespace panther{
 				break; case Kind::KeywordVar:         return "var";
 				break; case Kind::KeywordDef:         return "def";
 				break; case Kind::KeywordFunc:        return "func";
+				break; case Kind::KeywordStruct:      return "struct";
 
 				break; case Kind::KeywordType:        return "Type";
 

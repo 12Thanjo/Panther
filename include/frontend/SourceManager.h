@@ -105,10 +105,8 @@ namespace panther{
 			// If an equivalent type already exists, return its ID instead
 			EVO_NODISCARD auto createBaseType(PIR::BaseType&& base_type) noexcept -> PIR::BaseType::ID;
 
-			EVO_NODISCARD inline auto getBaseType(PIR::BaseType::ID id) const noexcept -> const PIR::BaseType& {
-				return this->base_types[id.id];
-			};
-
+			EVO_NODISCARD inline auto getBaseType(PIR::BaseType::ID id) const noexcept -> const PIR::BaseType& { return this->base_types[id.id]; };
+			EVO_NODISCARD inline auto getBaseType(PIR::BaseType::ID id)       noexcept ->       PIR::BaseType& { return this->base_types[id.id]; };
 			EVO_NODISCARD auto getBaseType(Token::Kind tok_kind) noexcept -> PIR::BaseType&;
 			EVO_NODISCARD auto getBaseTypeID(Token::Kind tok_kind) const noexcept -> PIR::BaseType::ID;
 

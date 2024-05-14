@@ -27,6 +27,10 @@ namespace panther{
 		return this->semantic_analyzer->semantic_analysis_declarations();
 	};
 
+	auto Source::semantic_analysis_structs() noexcept -> bool {
+		return this->semantic_analyzer->semantic_analysis_structs();
+	};
+
 	auto Source::semantic_analysis() noexcept -> bool {
 		const bool result = this->semantic_analyzer->semantic_analysis();
 
@@ -65,6 +69,14 @@ namespace panther{
 	auto Source::getFunc(const AST::Node& node) const noexcept -> const AST::Func& {
 		evo::debugAssert(node.kind == AST::Kind::Func, "Node is not a Func");
 		return this->funcs[node.index];
+	};
+
+	auto Source::getStruct(AST::Node::ID node_id) const noexcept -> const AST::Struct& {
+		return this->getStruct(this->getNode(node_id));
+	};
+	auto Source::getStruct(const AST::Node& node) const noexcept -> const AST::Struct& {
+		evo::debugAssert(node.kind == AST::Kind::Struct, "Node is not a Struct");
+		return this->structs[node.index];
 	};
 
 	auto Source::getTemplatePack(AST::Node::ID node_id) const noexcept -> const AST::TemplatePack& {

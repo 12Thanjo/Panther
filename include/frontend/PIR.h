@@ -9,6 +9,8 @@
 
 #include "LLVM_interface/llvm_protos.h"
 
+#include <variant>
+
 namespace panther{
 	class Source;
 
@@ -81,6 +83,7 @@ namespace panther{
 					Import, // for the unnameable type that is returned by @import()
 					Builtin,
 					Function,
+					Struct,
 				};
 
 
@@ -100,9 +103,39 @@ namespace panther{
 				};
 
 
-				union OverloadedOperator {
+				union OverloadedOperator{
 					IntrinsicID intrinsic;
 					FuncID func;
+				};
+
+
+
+
+				struct ImportData{
+					
+				};
+
+				struct BuiltinData{
+					Token::Kind kind;
+				};
+
+				struct FuncData{
+					
+				};
+
+
+				struct StructData{
+					std::string_view name;
+					const Source* source;
+
+					struct MemberVar{
+						std::string_view name;
+						bool isDef;
+						TypeID type;
+					};
+					std::vector<MemberVar> memberVars{};
+
+					llvm::StructType* llvm_type = nullptr;
 				};
 
 			public:
@@ -111,12 +144,22 @@ namespace panther{
 				BaseType(Kind _kind, Token::Kind builtin_kind) : kind(_kind){
 					evo::debugAssert(_kind == Kind::Builtin, "This constructor must be only used for builtin kind");
 
-					this->builtin.kind = builtin_kind;
+					this->data.emplace<BuiltinData>(builtin_kind);
 				}
 
 				// function / import
 				explicit BaseType(Kind _kind) : kind(_kind){
-					evo::debugAssert(_kind == Kind::Function || _kind == Kind::Import, "This constructor must be only used for function or import kind");
+					evo::debugAssert(
+						_kind == Kind::Function || _kind == Kind::Import,
+						"This constructor must be only used for function, or import kind"
+					);
+				}
+
+				// struct
+				BaseType(Kind _kind, std::string_view name, const Source* source) : kind(_kind){
+					evo::debugAssert(_kind == Kind::Struct, "This constructor must be only used for struct kind");
+
+					this->data.emplace<StructData>(name, source);
 				}
 
 				~BaseType() = default;
@@ -130,20 +173,7 @@ namespace panther{
 			public:
 				Kind kind;
 
-
-				union {
-					struct /* import */ {
-											
-					} import;
-
-					struct /* builtin */ {
-						Token::Kind kind;
-					} builtin;
-
-					struct /* function */ {
-											
-					} function;
-				};
+				std::variant<ImportData, BuiltinData, FuncData, StructData> data;
 
 
 
@@ -169,14 +199,6 @@ namespace panther{
 					std::vector<OverloadedOperator> logicalAnd{};
 					std::vector<OverloadedOperator> logicalOr{};
 				} ops;
-
-
-
-
-
-
-			private:
-				
 		};
 
 
@@ -223,10 +245,16 @@ namespace panther{
 			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
 		};
 
+		struct AccessorID{ // typesafe identifier
+			uint32_t id;
+			explicit AccessorID(uint32_t _id) noexcept : id(_id) {};
+		};
+
 		struct FuncCallID{
 			uint32_t id;
 			explicit FuncCallID(uint32_t _id) noexcept : id(_id){};
 		};
+
 
 
 
@@ -236,32 +264,38 @@ namespace panther{
 
 		struct Expr{
 			enum class Kind{
+				None, // might not need this eventually
 				Var,
 				Param,
 				ASTNode,
 				FuncCall,
 				Prefix,
 				Deref,
+				Accessor,
 				Import,
 			} kind;
 
 			union {
+				evo::byte dummy; // might not need this eventually
 				VarID var;
 				ParamID param;
 				AST::Node::ID astNode;
 				FuncCallID funcCall;
 				PrefixID prefix;
 				DerefID deref;
+				AccessorID accessor;
 				SourceID import;
 			};
 
-			explicit Expr(VarID id) : kind(Kind::Var), var(id) {};
-			explicit Expr(ParamID id) : kind(Kind::Param), param(id) {};
-			explicit Expr(AST::Node::ID node) : kind(Kind::ASTNode), astNode(node) {};
+			explicit Expr()                        : kind(Kind::None), dummy(0) {}; // might not need this eventually
+			explicit Expr(VarID id)                : kind(Kind::Var), var(id) {};
+			explicit Expr(ParamID id)              : kind(Kind::Param), param(id) {};
+			explicit Expr(AST::Node::ID node)      : kind(Kind::ASTNode), astNode(node) {};
 			explicit Expr(FuncCallID func_call_id) : kind(Kind::FuncCall), funcCall(func_call_id) {};
-			explicit Expr(PrefixID prefix_id) : kind(Kind::Prefix), prefix(prefix_id) {};
-			explicit Expr(DerefID deref_id) : kind(Kind::Deref), deref(deref_id) {};
-			explicit Expr(SourceID src_id) : kind(Kind::Import), import(src_id) {};
+			explicit Expr(PrefixID prefix_id)      : kind(Kind::Prefix), prefix(prefix_id) {};
+			explicit Expr(DerefID deref_id)        : kind(Kind::Deref), deref(deref_id) {};
+			explicit Expr(AccessorID accessor_id)  : kind(Kind::Accessor), accessor(accessor_id) {};			
+			explicit Expr(SourceID src_id)         : kind(Kind::Import), import(src_id) {};
 		};
 
 
@@ -299,6 +333,15 @@ namespace panther{
 
 			Expr ptr;
 			Type::ID type;
+		};
+
+
+		struct Accessor{
+			using ID = AccessorID;
+
+			Expr lhs;
+			Type::ID lhsType;
+			std::string_view rhs;
 		};
 
 
@@ -472,6 +515,21 @@ namespace panther{
 		};
 
 
+		struct Struct{
+			struct ID{ // typesafe identifier
+				Source& source;
+				uint32_t id;
+				explicit ID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
+			};
+
+
+			Token::ID ident;
+			
+			BaseType::ID baseType;
+			bool isPacked = false;
+		};
+
+
 
 
 		struct Intrinsic{
@@ -549,6 +607,7 @@ namespace panther{
 				__printSeparator,
 				__printInt,
 				__printUInt,
+				__printBool,
 
 
 				_MAX_, // not an actual intrinsic
@@ -562,5 +621,13 @@ namespace panther{
 
 
 
+	};
+};
+
+
+template<>
+struct std::hash<panther::PIR::Type::ID>{
+	auto operator()(const panther::PIR::Type::ID& id) const noexcept -> size_t {
+		return std::hash<uint32_t>{}(id.id);
 	};
 };

@@ -289,6 +289,7 @@ namespace panther{
 			switch(node.kind){
 				break; case AST::Kind::VarDecl: this->print_var_decl(node);
 				break; case AST::Kind::Func: this->print_func(node);
+				break; case AST::Kind::Struct: this->print_struct(node);
 				break; case AST::Kind::Conditional: this->print_conditional(node);
 				break; case AST::Kind::Return: this->print_return(node);
 				break; case AST::Kind::Alias: this->print_alias(node);
@@ -357,13 +358,16 @@ namespace panther{
 			}
 
 			this->indenter_print_end();
-			this->info("Expr:\n");
-			this->indenter_push();
-				this->indenter_set_end();
-				this->print_expr(this->ast_source->getNode(var_decl.expr));
-			this->indenter_pop();
-
-
+			if(var_decl.expr.has_value()){
+				this->info("Expr:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_expr(this->ast_source->getNode(*var_decl.expr));
+				this->indenter_pop();
+			}else{
+				this->info("Expr:");
+				this->debug(" [NONE]\n");
+			}
 
 			this->indenter_pop();
 		};
@@ -418,6 +422,50 @@ namespace panther{
 				this->indenter_push();
 					this->indenter_set_end();
 					this->print_block(this->ast_source->getNode(func.block));
+				this->indenter_pop();
+
+			this->indenter_pop();
+		};
+
+		auto Printer::print_struct(const AST::Node& node) noexcept -> void {
+			const AST::Struct& struct_decl = this->ast_source->getStruct(node);
+
+			this->indenter_print();
+			this->info("Struct:\n");
+			this->indenter_push();
+
+				this->indenter_print();
+				this->info("Ident: ");
+				this->print_ident(this->ast_source->getNode(struct_decl.ident));
+
+
+				this->indenter_print_arrow();
+				if(struct_decl.attributes.empty()){
+					this->info("Attributes: ");
+					this->debug("[NONE]\n");
+				}else{
+					this->info("Attributes:\n");
+
+					this->indenter_push();
+					for(size_t i = 0; i < struct_decl.attributes.size(); i+=1){
+						if(i < struct_decl.attributes.size() - 1){
+							this->indenter_set_arrow();
+						}else{
+							this->indenter_set_end();
+						}
+
+						this->indenter_print();
+
+						this->debug( std::format("#{}\n", this->ast_source->getToken(struct_decl.attributes[i]).value.string) );
+					}
+					this->indenter_pop();
+				}
+
+				this->indenter_print_end();
+				this->info("Block:\n");
+				this->indenter_push();
+					this->indenter_set_end();
+					this->print_block(this->ast_source->getNode(struct_decl.block));
 				this->indenter_pop();
 
 			this->indenter_pop();

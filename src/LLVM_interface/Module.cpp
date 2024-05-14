@@ -17,9 +17,11 @@ namespace panther{
 		
 
 
-		auto Module::createFunction(evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage, bool nothrow, bool fast_call_conv) noexcept -> llvm::Function* {
+		auto Module::createFunction(
+			evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage, bool nothrow, bool fast_call_conv
+		) noexcept -> llvm::Function* {
 			llvm::Function* func = llvm::Function::Create(
-				prototype, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), name.data(), this->module
+				prototype, static_cast<llvm::GlobalValue::LinkageTypes>(linkage), name.c_str(), this->module
 			);
 
 			if(nothrow){ func->setDoesNotThrow(); }
@@ -27,6 +29,24 @@ namespace panther{
 
 			return func; 
 		};
+
+
+		auto Module::createStructType(evo::ArrayProxy<llvm::Type*> elements, bool is_packed, evo::CStrProxy name) noexcept -> llvm::StructType* {
+		    return llvm::StructType::create(this->module->getContext(), {elements.data(), elements.size()}, name.c_str(), is_packed);
+		};
+
+		auto Module::createStructType(evo::CStrProxy name) noexcept -> llvm::StructType* {
+		    return llvm::StructType::create(this->module->getContext(), name.c_str());
+		};
+
+		auto Module::setStructBody(llvm::StructType* struct_type, evo::ArrayProxy<llvm::Type*> elements, bool is_packed) noexcept -> void {
+		    struct_type->setBody({elements.data(), elements.size()}, is_packed);
+		};
+
+		auto Module::createStructLiteral(evo::ArrayProxy<llvm::Type*> elements, bool is_packed) noexcept -> llvm::StructType* {
+		    return llvm::StructType::get(this->module->getContext(), {elements.data(), elements.size()}, is_packed);
+		};
+
 
 
 

@@ -45,7 +45,7 @@ namespace panther{
 
 				if(data_layout_err.empty() == false){
 					// TODO: maybe handle this more?
-					EVO_FATAL_BREAK(data_layout_err);
+					evo::debugFatalBreak(data_layout_err);
 				}
 
 
@@ -70,8 +70,21 @@ namespace panther{
 
 				std::vector<Source>& sources = source_manager.getSources();
 
+
 				for(Source& source_ref : sources){
 					this->source = &source_ref;
+
+					for(PIR::Struct& struct_decl : source_ref.pir.structs){
+						this->lower_struct_declaration(struct_decl);
+					}
+				}
+
+				for(Source& source_ref : sources){
+					this->source = &source_ref;
+
+					for(PIR::Struct& struct_decl : source_ref.pir.structs){
+						this->lower_struct_body(struct_decl);
+					}
 
 					for(PIR::Var::ID global_var_id : source_ref.pir.global_vars){
 						PIR::Var& var = Source::getVar(global_var_id);
@@ -200,7 +213,7 @@ namespace panther{
 					break; case PIR::Stmt::Kind::Assignment: this->lower_assignment(this->source->getAssignment(stmt.assignment));
 					break; case PIR::Stmt::Kind::FuncCall: this->lower_func_call(this->source->getFuncCall(stmt.funcCall));
 					break; case PIR::Stmt::Kind::Unreachable: this->lower_unreachable();
-					break; default: EVO_FATAL_BREAK("Unknown stmt kind");
+					break; default: evo::debugFatalBreak("Unknown stmt kind");
 				};
 			};
 
@@ -270,6 +283,33 @@ namespace panther{
 
 				}
 			};
+
+
+			inline auto lower_struct_declaration(const PIR::Struct& struct_decl) noexcept -> void {
+				const std::string mangled_name = PIRToLLVMIR::mangle_name(*this->source, struct_decl);
+
+				PIR::BaseType& base_type = this->src_manager->getBaseType(struct_decl.baseType);
+				PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(base_type.data);
+
+				llvm::StructType* struct_type = this->module->createStructType(mangled_name);
+				struct_data.llvm_type = struct_type;
+			};
+
+
+			inline auto lower_struct_body(const PIR::Struct& struct_decl) noexcept -> void {
+				PIR::BaseType& base_type = this->src_manager->getBaseType(struct_decl.baseType);
+				PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(base_type.data);
+
+				auto member_types = std::vector<llvm::Type*>();
+				for(auto& member : struct_data.memberVars){
+					member_types.emplace_back(this->get_type(this->src_manager->getType(member.type)));
+				}
+
+				this->module->setStructBody(struct_data.llvm_type, member_types, struct_decl.isPacked);
+			};
+
+
+
 
 
 			inline auto lower_func(PIR::Func& func) noexcept -> void {
@@ -476,6 +516,30 @@ namespace panther{
 								);
 							} break;
 
+							case PIR::Intrinsic::Kind::__printBool: {
+								evo::debugAssert(this->libc.printf != nullptr, "libc was not initialized");
+
+								llvm::Value* bool_value = this->get_value(func_call.args[0]);
+
+								llvm::BasicBlock* true_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "__printBool.true");
+								llvm::BasicBlock* false_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "__printBool.true");
+								llvm::BasicBlock* end_block = this->builder->createBasicBlock(this->current_func->llvmFunc, "__printBool.end");
+
+								this->builder->createCondBranch(bool_value, true_block, false_block);
+
+								this->builder->setInsertionPoint(true_block);
+								static llvm::GlobalVariable* true_str = this->builder->valueString("Bool: true");
+								this->builder->createCall(this->libc.puts, { llvmint::ptrcast<llvm::Value>(true_str) });
+								this->builder->createBranch(end_block);
+
+								this->builder->setInsertionPoint(false_block);
+								static llvm::GlobalVariable* false_str = this->builder->valueString("Bool: false");
+								this->builder->createCall(this->libc.puts, { llvmint::ptrcast<llvm::Value>(false_str) });
+								this->builder->createBranch(end_block);
+
+								this->builder->setInsertionPoint(end_block);
+							} break;
+
 							case PIR::Intrinsic::Kind::__printSeparator: {
 								evo::debugAssert(this->libc.puts != nullptr, "libc was not initialized");
 
@@ -484,13 +548,13 @@ namespace panther{
 							} break;
 
 							default: {
-								EVO_FATAL_BREAK("Unknown intrinsic");
+								evo::debugFatalBreak("Unknown intrinsic");
 							};
 						};
 					} break;
 
 
-					default: EVO_FATAL_BREAK("Unknown func call kind");
+					default: evo::debugFatalBreak("Unknown func call kind");
 				};
 			};
 
@@ -508,25 +572,39 @@ namespace panther{
 					if(type.qualifiers.back().isPtr){
 						return llvmint::ptrcast<llvm::Type>(this->builder->getTypePtr());
 					}else{
-						EVO_FATAL_BREAK("Unsupported qualifiers");
+						evo::debugFatalBreak("Unsupported qualifiers");
 					}
 				}
 
 				const PIR::BaseType& base_type = this->src_manager->getBaseType(type.baseType);
 
+				switch(base_type.kind){
+					case PIR::BaseType::Kind::Builtin: {
+						const Token::Kind builtin_kind = std::get<PIR::BaseType::BuiltinData>(base_type.data).kind;
 
-				if(base_type.builtin.kind == Token::TypeInt){
-					// TODO: make sure is register sized
-					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
+						if(builtin_kind == Token::TypeInt){
+							// TODO: make sure is register sized
+							return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
 
-				}else if(base_type.builtin.kind == Token::TypeUInt){
-					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
+						}else if(builtin_kind == Token::TypeUInt){
+							return llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
+						
+						}else if(builtin_kind == Token::TypeBool){
+							return llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
+						}
+
+						evo::debugFatalBreak("Unknown builtin type");
+					} break;
+
+					case PIR::BaseType::Kind::Struct: {
+						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(base_type.data);
+						return llvmint::ptrcast<llvm::Type>(struct_data.llvm_type);
+					} break;
+				};
+
 				
-				}else if(base_type.builtin.kind == Token::TypeBool){
-					return llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
-				}
 
-				EVO_FATAL_BREAK("Unknown type");
+				evo::debugFatalBreak("Unknown type");
 			};
 
 
@@ -545,7 +623,7 @@ namespace panther{
 								return llvmint::ptrcast<llvm::Constant>(this->builder->valueBool(token.value.boolean));
 							} break;
 
-							default: EVO_FATAL_BREAK("Invalid literal value kind");
+							default: evo::debugFatalBreak("Invalid literal value kind");
 						};
 					} break;
 
@@ -555,7 +633,7 @@ namespace panther{
 
 						switch(this->source->getToken(prefix.op).kind){
 							case Token::KeywordCopy: {
-								EVO_FATAL_BREAK("Should have been figured out in semantic analysis");
+								evo::debugFatalBreak("Should have been figured out in semantic analysis");
 							} break;
 
 							case Token::KeywordAddr: {
@@ -565,18 +643,18 @@ namespace panther{
 								return llvmint::ptrcast<llvm::Constant>(var.llvm.global);
 							} break;
 
-							default: EVO_FATAL_BREAK("Invalid or unknown prefix operator");
+							default: evo::debugFatalBreak("Invalid or unknown prefix operator");
 						};
 					} break;
 
 
-					default: EVO_FATAL_BREAK("Invalid value kind");
+					default: evo::debugFatalBreak("Invalid value kind");
 				};
 			};
 
 
-
-			EVO_NODISCARD inline auto get_value(PIR::Expr value) noexcept -> llvm::Value* {
+			// should_load = false is useful when you just need the pointer to the thing(for example, GEP instructions)
+			EVO_NODISCARD inline auto get_value(PIR::Expr value, bool should_load = true) noexcept -> llvm::Value* {
 				switch(value.kind){
 					case PIR::Expr::Kind::ASTNode: {
 						const AST::Node& node = this->source->getNode(value.astNode);
@@ -598,7 +676,7 @@ namespace panther{
 							
 
 							default: {
-								EVO_FATAL_BREAK("Unknown AST::Kind");
+								evo::debugFatalBreak("Unknown AST::Kind");
 							} break;
 						};
 					} break;
@@ -606,15 +684,24 @@ namespace panther{
 					case PIR::Expr::Kind::Var: {
 						const PIR::Var& var = Source::getVar(value.var);
 
-						std::string load_name = std::format("{}.load", value.var.source.getToken(var.ident).value.string);
-						if(var.is_alloca){
-							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca, load_name));
+						if(should_load){
+							std::string load_name = std::format("{}.load", value.var.source.getToken(var.ident).value.string);
+							if(var.is_alloca){
+								return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(var.llvm.alloca, load_name));
+							}else{
+								llvm::Type* var_type = this->get_type(this->src_manager->getType(var.type));
+								return llvmint::ptrcast<llvm::Value>(
+									this->builder->createLoad(llvmint::ptrcast<llvm::Value>(var.llvm.global), var_type, load_name)
+								);
+							}
 						}else{
-							llvm::Type* var_type = this->get_type(this->src_manager->getType(var.type));
-							return llvmint::ptrcast<llvm::Value>(
-								this->builder->createLoad(llvmint::ptrcast<llvm::Value>(var.llvm.global), var_type, load_name)
-							);
+							if(var.is_alloca){
+								return llvmint::ptrcast<llvm::Value>(var.llvm.alloca);
+							}else{
+								return llvmint::ptrcast<llvm::Value>(var.llvm.global);
+							}
 						}
+
 					} break;
 
 					case PIR::Expr::Kind::Param: {
@@ -626,10 +713,14 @@ namespace panther{
 						std::string load_addr_name = std::format("{}.loadAddr", this->source->getToken(param.ident).value.string);
 						llvm::LoadInst* load_addr = this->builder->createLoad(param.alloca, load_addr_name);
 
-						std::string load_val_name = std::format("{}.loadVal", this->source->getToken(param.ident).value.string);
-						llvm::LoadInst* load_value = this->builder->createLoad(llvmint::ptrcast<llvm::Value>(load_addr), param_type, load_val_name);
+						if(should_load){
+							std::string load_val_name = std::format("{}.loadVal", this->source->getToken(param.ident).value.string);
+							llvm::LoadInst* load_value = this->builder->createLoad(llvmint::ptrcast<llvm::Value>(load_addr), param_type, load_val_name);
 
-						return llvmint::ptrcast<llvm::Value>(load_value);
+							return llvmint::ptrcast<llvm::Value>(load_value);
+						}else{
+							return llvmint::ptrcast<llvm::Value>(load_addr);
+						}
 					} break;
 
 					case PIR::Expr::Kind::FuncCall: {
@@ -914,11 +1005,11 @@ namespace panther{
 
 								};
 
-								EVO_FATAL_BREAK("Unkown intrinsic");
+								evo::debugFatalBreak("Unkown intrinsic");
 							} break;
 						};
 
-						EVO_FATAL_BREAK("Unkown func call kind");
+						evo::debugFatalBreak("Unkown func call kind");
 
 					} break;
 
@@ -939,6 +1030,9 @@ namespace panther{
 										return llvmint::ptrcast<llvm::Value>(var.llvm.global);
 									}
 									
+								}else if(prefix.rhs.kind == PIR::Expr::Kind::Accessor){
+									return this->get_value(prefix.rhs, false);
+									
 								}else{
 									evo::debugAssert(prefix.rhs.kind == PIR::Expr::Kind::Param, "unknown rhs of addr stmt");
 
@@ -954,7 +1048,7 @@ namespace panther{
 
 						};
 
-						EVO_FATAL_BREAK("Invalid or unknown prefix operator");
+						evo::debugFatalBreak("Invalid or unknown prefix operator");
 					} break;
 
 
@@ -967,10 +1061,46 @@ namespace panther{
 						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type, ".deref"));
 					} break;
 
+
+					case PIR::Expr::Kind::Accessor: {
+						const PIR::Accessor& accessor = this->source->getAccessor(value.accessor);
+						const PIR::Type& lhs_type = this->src_manager->getType(accessor.lhsType);
+						const PIR::BaseType& lhs_base_type = this->src_manager->getBaseType(lhs_type.baseType);
+						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
+
+						int32_t member_index = std::numeric_limits<int32_t>::max(); // gave it a value to make it stop complaining
+						auto member_type_id = std::optional<PIR::Type::ID>();
+						for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+							const PIR::BaseType::StructData::MemberVar& member = struct_data.memberVars[i];
+							if(member.name == accessor.rhs){
+								member_index = int32_t(i);
+								member_type_id = member.type;
+								break;
+							}
+						}
+						evo::debugAssert(member_type_id.has_value(), "uncaught unknown member");
+
+
+						llvm::Value* lhs_value = this->get_value(accessor.lhs, false);
+						llvm::Type* lhs_llvm_type = this->get_type(lhs_type);
+						const std::string gep_name = std::format("{}.GEP", accessor.rhs);
+
+						llvm::Value* gep_value = this->builder->createGEP(lhs_value, lhs_llvm_type, {0, member_index}, gep_name);
+
+						if(should_load){
+							const PIR::Type& member_type = this->src_manager->getType(*member_type_id);
+							llvm::Type* member_llvm_type = this->get_type(member_type);
+							const std::string load_name = std::format("{}.load", accessor.rhs);
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(gep_value, member_llvm_type, load_name));
+						}else{
+							return gep_value;
+						}
+					} break;
+
 				};
 
 
-				EVO_FATAL_BREAK("Invalid value kind");
+				evo::debugFatalBreak("Invalid value kind");
 			};
 
 
@@ -999,7 +1129,29 @@ namespace panther{
 						return this->get_value(deref.ptr);
 					} break;
 
-					default: EVO_FATAL_BREAK("Unknown or unsupported concrete expr kind");
+					case PIR::Expr::Kind::Accessor: {
+						const PIR::Accessor& accessor = this->source->getAccessor(expr.accessor);
+						const PIR::Type& lhs_type = this->src_manager->getType(accessor.lhsType);
+						const PIR::BaseType& lhs_base_type = this->src_manager->getBaseType(lhs_type.baseType);
+						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
+
+						const int32_t member_index = [&]() noexcept {
+							for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+								if(struct_data.memberVars[i].name == accessor.rhs){
+									return int32_t(i);
+								}
+							}
+
+							evo::debugFatalBreak("uncaught unknown member");
+						}();
+
+						llvm::Value* lhs_value = this->get_value(accessor.lhs, false);
+						llvm::Type* lhs_llvm_type = this->get_type(lhs_type);
+
+						return this->builder->createGEP(lhs_value, lhs_llvm_type, {0, member_index}, std::format("{}.GEP", accessor.rhs));
+					} break;
+
+					default: evo::debugFatalBreak("Unknown or unsupported concrete expr kind");
 				};
 			};
 
@@ -1069,7 +1221,7 @@ namespace panther{
 
 						};
 
-						EVO_FATAL_BREAK("Invalid or unknown prefix operator");
+						evo::debugFatalBreak("Invalid or unknown prefix operator");
 					} break;
 
 					case PIR::Expr::Kind::Deref: {
@@ -1077,9 +1229,13 @@ namespace panther{
 						
 						return this->get_value(deref.ptr);
 					} break;
+
+					case PIR::Expr::Kind::Accessor: {
+						return this->get_value(arg, false);
+					} break;
 				};
 
-				EVO_FATAL_BREAK("Unknown or unsupported arg valye type");
+				evo::debugFatalBreak("Unknown or unsupported arg value type");
 			};
 
 
@@ -1095,7 +1251,7 @@ namespace panther{
 				if(func.isExport){
 					return ident;
 				}else{
-					std::string base_name = std::format("P.{}.{}", source.getID().id, ident);
+					std::string base_name = std::format("PTHR.{}.{}", source.getID().id, ident);
 
 					if(func.params.empty()){
 						return base_name;
@@ -1113,7 +1269,7 @@ namespace panther{
 						switch(param.kind){
 							break; case AST::FuncParams::Param::Kind::Read: base_name += 'r';
 							break; case AST::FuncParams::Param::Kind::Write: base_name += 'w';
-							break; default: EVO_FATAL_BREAK("Unknown param kind");
+							break; default: evo::debugFatalBreak("Unknown param kind");
 						};
 
 						if(i < func.params.size() - 1){
@@ -1126,6 +1282,14 @@ namespace panther{
 			};
 
 
+			
+			EVO_NODISCARD inline static auto mangle_name(const Source& source, const PIR::Struct& struct_decl) noexcept -> std::string {
+				const std::string ident = std::string(source.getToken(struct_decl.ident).value.string);
+
+				return std::format("PTHR.{}.{}", source.getID().id, ident);
+			};
+
+
 			// should only be used for globals
 			EVO_NODISCARD inline static auto mangle_name(const Source& source, const PIR::Var& var) noexcept -> std::string {
 				evo::debugAssert(var.isGlobal(), "Variable name mangling should only be used on globals");
@@ -1135,7 +1299,7 @@ namespace panther{
 				if(var.isExport){
 					return ident;
 				}else{
-					return std::format("P.{}.{}", source.getID().id, ident);
+					return std::format("PTHR.{}.{}", source.getID().id, ident);
 				}
 			};
 

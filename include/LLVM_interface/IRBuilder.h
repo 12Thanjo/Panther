@@ -38,6 +38,9 @@ namespace panther{
 				auto createRet(llvm::Value* value) noexcept -> llvm::ReturnInst*;
 				auto createRet() noexcept -> llvm::ReturnInst*;
 
+				auto createGEP(llvm::AllocaInst* alloca, evo::ArrayProxy<int32_t> indices, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createGEP(llvm::Value* value, llvm::Type* type, evo::ArrayProxy<int32_t> indices, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+
 				auto createUnreachable() noexcept -> llvm::UnreachableInst*;
 
 				auto createBranch(llvm::BasicBlock* block) noexcept -> llvm::BranchInst*;
@@ -101,7 +104,6 @@ namespace panther{
 
 				EVO_NODISCARD auto valueString(evo::CStrProxy str, evo::CStrProxy name = '\0') noexcept -> llvm::GlobalVariable*;
 
-				// TODO: linkage
 				EVO_NODISCARD auto valueGlobal(
 					class Module& module,
 					llvm::Constant* value,

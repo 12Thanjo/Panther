@@ -1,0 +1,56 @@
+
+
+
+struct SomeStruct = #pub {
+	var uint: UInt;
+
+	var vec: Vec2;
+}
+
+struct Vec2 = #pub {
+	var x: Int;
+	var y: Int;
+}
+
+
+func set_int = (num: Int write) -> Void {
+	num = 12;
+}
+
+
+func set_vec2 = (vec2: Vec2 write) #pub -> Void {
+	// vec2.x = 12;
+	// vec2.y = 12;
+
+	set_int(vec2.y);
+
+}
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// circular member testing
+
+
+struct Circ1 = {
+	var foo: Int;
+	var circ: Circ2;
+}
+
+struct Circ2 = {
+	var foo: Int = 12;
+	var circ: Circ3;
+}
+
+struct Circ3 = {
+	var foo: Int;
+	// var circ: Circ1;
+}
+
+func circ_test = () -> Void {
+	var foo: Circ3 = uninit;
+}
+
+

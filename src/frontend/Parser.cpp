@@ -37,6 +37,9 @@ namespace panther{
 		result = this->parse_func();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
+		result = this->parse_struct();
+		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
+
 		result = this->parse_conditional();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 
@@ -109,6 +112,17 @@ namespace panther{
 
 			type = type_result.value();
 		}
+
+		// no value given
+		if(this->get(this->peek()).kind == Token::get(";")){
+			this->skip(1);
+			
+			return this->create_node(
+				this->source.var_decls, AST::Kind::VarDecl,
+				is_def, ident.value(), std::move(attributes), type, std::nullopt
+			);			
+		}
+
 
 		// =
 		if(this->expect_token(Token::get("="), "in variable declaration") == false){ return Result::Error; }
@@ -183,6 +197,34 @@ namespace panther{
 		return this->create_node(
 			this->source.funcs, AST::Kind::Func,
 			ident.value(), template_pack_value, func_params.value(), std::move(attributes), return_type.value(), block.value()
+		);
+	};
+
+
+	// TODO: add checking for EOF
+	auto Parser::parse_struct() noexcept -> Result {
+		if(this->get(this->peek()).kind != Token::KeywordStruct){ return Result::WrongType; }
+		this->skip(1);
+
+		// ident
+		const Result ident = this->parse_ident();
+		if(this->check_result_fail(ident, "ident in struct declaration")){ return Result::Error; }
+
+		// =
+		if(this->expect_token(Token::get("="), "in struct declaration") == false){ return Result::Error; }
+
+		// attributes
+		auto attributes = std::vector<Token::ID>();
+		while(this->get(this->peek()).kind == Token::Attribute){
+			attributes.emplace_back(this->next());
+		};
+
+		const Result block = this->parse_block();
+		if(this->check_result_fail(block, "statement block in struct declaration")){ return Result::Error; }
+
+		return this->create_node(
+			this->source.structs, AST::Kind::Struct,
+			ident.value(), std::move(attributes), block.value()
 		);
 	};
 

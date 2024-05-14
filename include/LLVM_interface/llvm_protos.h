@@ -31,6 +31,7 @@ namespace llvm{
 	class BranchInst;
 	class UnreachableInst;
 	class Argument;
+	class StructType;
 
 	class ExecutionEngine;
 };
@@ -81,6 +82,7 @@ namespace panther{
 
 		EVO_NODISCARD auto _ptrcast_to_type(llvm::IntegerType* from) noexcept -> llvm::Type*;
 		EVO_NODISCARD auto _ptrcast_to_type(llvm::PointerType* from) noexcept -> llvm::Type*;
+		EVO_NODISCARD auto _ptrcast_to_type(llvm::StructType* from) noexcept -> llvm::Type*;
 
 
 
@@ -96,6 +98,7 @@ namespace panther{
 
 		template<> inline auto ptrcast(llvm::IntegerType* from) noexcept -> llvm::Type* { return _ptrcast_to_type(from); };
 		template<> inline auto ptrcast(llvm::PointerType* from) noexcept -> llvm::Type* { return _ptrcast_to_type(from); };
+		template<> inline auto ptrcast(llvm::StructType* from) noexcept -> llvm::Type* { return _ptrcast_to_type(from); };
 
 
 	};

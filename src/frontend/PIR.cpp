@@ -19,7 +19,7 @@ namespace panther{
 		auto BaseType::operator==(Token::Kind tok_kind) const noexcept -> bool {
 			if(this->kind != Kind::Builtin){ return false; }
 
-			return tok_kind == this->builtin.kind;
+			return tok_kind == std::get<BuiltinData>(this->data).kind;
 		};
 
 
@@ -27,14 +27,28 @@ namespace panther{
 		auto BaseType::operator==(const BaseType& rhs) const noexcept -> bool {
 			if(this->kind != rhs.kind){ return false; }
 
-			if(this->kind == BaseType::Kind::Builtin){
-				if(this->builtin.kind != rhs.builtin.kind){ return false; }
 
-			}else if(this->kind == BaseType::Kind::Function){
-				if(this->callOperator != rhs.callOperator){ return false; }
-				
-			}
+			switch(this->kind){
+				case BaseType::Kind::Builtin: {
+					if(std::get<BuiltinData>(this->data).kind != std::get<BuiltinData>(rhs.data).kind){ return false; }
+				} break;
 
+				case BaseType::Kind::Function: {
+					if(this->callOperator != rhs.callOperator){ return false; }
+				} break;
+
+				case BaseType::Kind::Struct: {
+					const StructData& this_data = std::get<StructData>(this->data);
+					const StructData& rhs_data = std::get<StructData>(rhs.data);
+
+					if(this_data.name != rhs_data.name){ return false; }
+					if(this_data.source != rhs_data.source){ return false; }
+				} break;
+
+				default: {
+					evo::debugFatalBreak("unknown BaseType::Kind");
+				} break;
+			};
 
 			return true;
 		};

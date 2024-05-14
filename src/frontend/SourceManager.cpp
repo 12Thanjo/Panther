@@ -373,6 +373,18 @@ namespace panther{
 		}
 
 
+		{ // __printBool()
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeBool(), ParamKind::Read} },
+				PIR::Type::VoidableID::Void()
+			);
+
+			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printBool, "__printBool", base_type_id);
+		}
+
+
 
 		///////////////////////////////////
 		// debug checking of ordering
@@ -471,7 +483,13 @@ namespace panther{
 				total_fails += 1;
 			}
 		}
+		if(total_fails != 0){ return total_fails; }
 
+		for(Source& source : this->sources){
+			if(source.semantic_analysis_structs() == false){
+				total_fails += 1;
+			}
+		}
 		if(total_fails != 0){ return total_fails; }
 
 		for(Source& source : this->sources){
@@ -569,12 +587,17 @@ namespace panther{
 				} break;
 
 				case PIR::BaseType::Kind::Builtin: {
-					return std::string( Token::printKind(base_type.builtin.kind) );
+					return std::string( Token::printKind(std::get<PIR::BaseType::BuiltinData>(base_type.data).kind) );
 				} break;
 
 				case PIR::BaseType::Kind::Function: {
 					// TODO:
 					return std::string("[[FUNCTION]]");
+				} break;
+
+				case PIR::BaseType::Kind::Struct: {
+					// TODO:
+					return std::string(std::get<PIR::BaseType::StructData>(base_type.data).name);
 				} break;
 
 				default: EVO_FATAL_BREAK("Unknown base-type kind");

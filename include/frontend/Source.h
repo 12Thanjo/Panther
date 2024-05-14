@@ -47,6 +47,7 @@ namespace panther{
 
 			// returns true if successful (no errors)
 			EVO_NODISCARD auto semantic_analysis_declarations() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_structs() noexcept -> bool;
 			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
 
 
@@ -65,6 +66,9 @@ namespace panther{
 
 			EVO_NODISCARD auto getFunc(AST::Node::ID node_id) const noexcept -> const AST::Func&;
 			EVO_NODISCARD auto getFunc(const AST::Node& node) const noexcept -> const AST::Func&;
+
+			EVO_NODISCARD auto getStruct(AST::Node::ID node_id) const noexcept -> const AST::Struct&;
+			EVO_NODISCARD auto getStruct(const AST::Node& node) const noexcept -> const AST::Struct&;
 
 			EVO_NODISCARD auto getTemplatePack(AST::Node::ID node_id) const noexcept -> const AST::TemplatePack&;
 			EVO_NODISCARD auto getTemplatePack(const AST::Node& node) const noexcept -> const AST::TemplatePack&;
@@ -147,6 +151,19 @@ namespace panther{
 				return id.source.pir.funcs[size_t(id.id)];
 			};
 
+
+			EVO_NODISCARD inline auto createStruct(auto&&... args) noexcept -> PIR::Struct::ID {
+				this->pir.structs.emplace_back(std::forward<decltype(args)>(args)...);
+				return PIR::Struct::ID(*this, uint32_t(this->pir.structs.size() - 1));
+			};
+
+			// EVO_NODISCARD static inline auto getStruct(const PIR::Struct::ID& id) noexcept -> const PIR::Struct& {
+			// 	return id.source.pir.structs[size_t(id.id)];
+			// };
+			EVO_NODISCARD static inline auto getStruct(PIR::Struct::ID id) noexcept -> PIR::Struct& {
+				return id.source.pir.structs[size_t(id.id)];
+			};
+			
 
 
 			EVO_NODISCARD inline auto createParam(auto&&... args) noexcept -> PIR::Param::ID {
@@ -244,6 +261,19 @@ namespace panther{
 			};
 
 
+			EVO_NODISCARD inline auto createAccessor(auto&&... args) noexcept -> PIR::Accessor::ID {
+				this->pir.accessors.emplace_back(std::forward<decltype(args)>(args)...);
+				return PIR::Accessor::ID( uint32_t(this->pir.accessors.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getAccessor(PIR::Accessor::ID id) const noexcept -> const PIR::Accessor& {
+				return this->pir.accessors[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getAccessor(PIR::Accessor::ID id) noexcept -> PIR::Accessor& {
+				return this->pir.accessors[size_t(id.id)];
+			};
+
+
 
 			EVO_NODISCARD inline auto getGlobalVar(PIR::Var::ID id) const noexcept -> const PIR::Var& {
 				return this->pir.vars[size_t(id.id)];
@@ -268,9 +298,13 @@ namespace panther{
 			inline auto addPublicVar(std::string_view ident, PIR::Var::ID id) noexcept -> void {
 				this->pir.pub_vars.emplace(ident, id);
 			};
+			inline auto addPublicStruct(std::string_view ident, PIR::Struct::ID id) noexcept -> void {
+				this->pir.pub_structs.emplace(ident, id);
+			};
 			inline auto addPublicImport(std::string_view ident, Source::ID id) noexcept -> void {
 				this->pir.pub_imports.emplace(ident, id);
 			};
+
 
 
 
@@ -308,6 +342,7 @@ namespace panther{
 			std::vector<AST::Node> nodes{};
 			std::vector<AST::VarDecl> var_decls{};
 			std::vector<AST::Func> funcs{};
+			std::vector<AST::Struct> structs{};
 			std::vector<AST::TemplatePack> template_packs{};
 			std::vector<AST::FuncParams> func_params{};
 			std::vector<AST::Conditional> conditionals{};
@@ -326,17 +361,20 @@ namespace panther{
 				std::vector<PIR::Var> vars{};
 				std::vector<PIR::Param> params{};
 				std::vector<PIR::Func> funcs{};
+				std::vector<PIR::Struct> structs{};
 				std::vector<PIR::Conditional> conditionals{};
 				std::vector<PIR::Return> returns{};
 				std::vector<PIR::Assignment> assignments{};
 				std::vector<PIR::FuncCall> func_calls{};
 				std::vector<PIR::Prefix> prefixes{};
 				std::vector<PIR::Deref> derefs{};
+				std::vector<PIR::Accessor> accessors{};
 
 				std::vector<PIR::Var::ID> global_vars{};
 
 				std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> pub_funcs{};
 				std::unordered_map<std::string_view, PIR::Var::ID> pub_vars{};
+				std::unordered_map<std::string_view, PIR::Struct::ID> pub_structs{};
 				std::unordered_map<std::string_view, Source::ID> pub_imports{};
 				std::unordered_map<std::string_view, PIR::Type::VoidableID> pub_aliases{};
 			} pir;

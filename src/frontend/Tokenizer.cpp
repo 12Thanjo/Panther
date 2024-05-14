@@ -164,9 +164,10 @@ namespace panther{
 			///////////////////////////////////
 			// keywords
 
-			else if(ident_name == "var")  { this->create_token(Token::Kind::KeywordVar); }
-			else if(ident_name == "def")  { this->create_token(Token::Kind::KeywordDef); }
-			else if(ident_name == "func") { this->create_token(Token::Kind::KeywordFunc); }
+			else if(ident_name == "var")    { this->create_token(Token::Kind::KeywordVar); }
+			else if(ident_name == "def")    { this->create_token(Token::Kind::KeywordDef); }
+			else if(ident_name == "func")   { this->create_token(Token::Kind::KeywordFunc); }
+			else if(ident_name == "struct") { this->create_token(Token::Kind::KeywordStruct); }
 
 			else if(ident_name == "Type") { this->create_token(Token::Kind::KeywordType); }
 

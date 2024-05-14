@@ -19,6 +19,13 @@ namespace panther{
 					evo::CStrProxy name, llvm::FunctionType* prototype, llvmint::LinkageTypes linkage, bool nothrow, bool fast_call_conv
 				) noexcept -> llvm::Function*;
 
+				EVO_NODISCARD auto createStructType(evo::ArrayProxy<llvm::Type*> elements, bool is_packed = false, evo::CStrProxy name = '\0') noexcept
+				-> llvm::StructType*;
+				EVO_NODISCARD auto createStructType(evo::CStrProxy name = '\0') noexcept -> llvm::StructType*; // creates an opaque type
+				EVO_NODISCARD auto setStructBody(llvm::StructType* struct_type, evo::ArrayProxy<llvm::Type*> elements, bool is_packed = false) noexcept
+				-> void;
+				EVO_NODISCARD auto createStructLiteral(evo::ArrayProxy<llvm::Type*> elements, bool is_packed = false) noexcept -> llvm::StructType*;
+
 
 				EVO_NODISCARD auto getPointerSize() const noexcept -> unsigned;
 				EVO_NODISCARD auto getTypeSize(llvm::Type* type) const noexcept -> uint64_t;

@@ -68,6 +68,21 @@ namespace panther{
 			return this->builder->CreateRetVoid();
 		};
 
+		auto IRBuilder::createGEP(llvm::AllocaInst* alloca, evo::ArrayProxy<int32_t> indices, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->createGEP(static_cast<llvm::Value*>(alloca), alloca->getAllocatedType(), indices, name);
+		};
+
+		auto IRBuilder::createGEP(llvm::Value* value, llvm::Type* type, evo::ArrayProxy<int32_t> indices, evo::CStrProxy name) noexcept -> llvm::Value* {
+			auto indices_values = std::vector<llvm::Value*>{};
+			indices_values.reserve(indices.size());
+			for(int32_t index : indices){
+			    indices_values.emplace_back(this->valueUI32(uint32_t(index)));
+			}
+
+			return this->builder->CreateGEP(type, value, indices_values, name.c_str(), true);
+		};
+
+
 		auto IRBuilder::createUnreachable() noexcept -> llvm::UnreachableInst* {
 			return this->builder->CreateUnreachable();
 		};

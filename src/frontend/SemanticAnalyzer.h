@@ -20,16 +20,23 @@ namespace panther{
 
 
 			EVO_NODISCARD auto semantic_analysis_declarations() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_structs() noexcept -> bool;
 			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
 
 
 		private:
 			EVO_NODISCARD auto analyze_stmt(const AST::Node& node) noexcept -> bool;
 			EVO_NODISCARD auto analyze_var(const AST::VarDecl& var_decl) noexcept -> bool;
+
 			EVO_NODISCARD auto analyze_func(const AST::Func& func) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func) noexcept -> bool;
+
+			EVO_NODISCARD auto analyze_struct(const AST::Struct& struct_decl) noexcept -> bool;
+			EVO_NODISCARD auto analyze_struct_block(PIR::Struct& pir_struct, const AST::Struct& ast_struct) noexcept -> bool;
+
 			EVO_NODISCARD auto analyze_conditional(const AST::Conditional& cond) noexcept -> bool;
 			EVO_NODISCARD auto analyze_conditional_recursive(const AST::Conditional& cond) noexcept -> bool;
+
 			EVO_NODISCARD auto analyze_return(const AST::Return& return_stmt) noexcept -> bool;
 			EVO_NODISCARD auto analyze_infix(const AST::Infix& infix) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool;
@@ -97,6 +104,7 @@ namespace panther{
 
 			auto add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void;
 			auto add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void;
+			auto add_struct_to_scope(std::string_view str, PIR::Struct::ID id) noexcept -> void;
 			auto add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void;
 			auto add_import_to_scope(std::string_view str, Import import) noexcept -> void;
 			auto add_alias_to_scope(std::string_view str, Alias alias) noexcept -> void;
@@ -122,18 +130,33 @@ namespace panther{
 			///////////////////////////////////
 			// func scope
 
-			struct FuncScope{
-				PIR::Func& func;
+			struct TypeScope{
+				enum class Kind{
+					Func,
+					Struct,
+				} kind;
+
+				union{
+					PIR::Func* func;
+					PIR::Struct* struct_decl;
+				};
+
+				TypeScope(Kind _kind, PIR::Func* _func) : kind(_kind), func(_func) {};
+				TypeScope(Kind _kind, PIR::Struct* _struct_decl) : kind(_kind), struct_decl(_struct_decl) {};
 			};
 
-			EVO_NODISCARD auto in_func_scope() const noexcept -> bool;
-			auto enter_func_scope(PIR::Func& func) noexcept -> void;
-			auto leave_func_scope() noexcept -> void;
-			EVO_NODISCARD auto get_current_func() noexcept -> FuncScope&;
-			EVO_NODISCARD auto get_current_func() const noexcept -> const FuncScope&;
+			auto enter_type_scope(TypeScope::Kind kind, PIR::Func& func) noexcept -> void;
+			auto enter_type_scope(TypeScope::Kind kind, PIR::Struct& struct_decl) noexcept -> void;
+			auto leave_type_scope() noexcept -> void;
+			EVO_NODISCARD auto in_type_scope() const noexcept -> bool;
 
-			// auto set_current_func_terminated() noexcept -> void;
-			// EVO_NODISCARD auto current_func_is_terminated() const noexcept -> bool;
+			EVO_NODISCARD auto in_func_scope() const noexcept -> bool;
+			EVO_NODISCARD auto get_current_func() noexcept -> PIR::Func&;
+			EVO_NODISCARD auto get_current_func() const noexcept -> const PIR::Func&;
+
+			EVO_NODISCARD auto in_struct_scope() const noexcept -> bool;
+			EVO_NODISCARD auto get_current_struct() noexcept -> PIR::Struct&;
+			EVO_NODISCARD auto get_current_struct() const noexcept -> const PIR::Struct&;
 
 
 			///////////////////////////////////
@@ -155,6 +178,7 @@ namespace panther{
 
 				std::unordered_map<std::string_view, PIR::Var::ID> vars{};
 				std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> funcs{};
+				std::unordered_map<std::string_view, PIR::Struct::ID> structs{};
 				std::unordered_map<std::string_view, PIR::Param::ID> params{};
 				std::unordered_map<std::string_view, Import> imports{};
 				std::unordered_map<std::string_view, Alias> aliases{};
@@ -171,8 +195,14 @@ namespace panther{
 			};
 			std::vector<GlobalFunc> global_funcs{};
 
+			struct GlobalStruct{
+				PIR::Struct::ID pir_id;
+				const AST::Struct& ast;
+			};
+			std::vector<GlobalStruct> global_structs{};
+
 			
-			std::vector<FuncScope> func_scopes{};
+			std::vector<TypeScope> type_scopes{};
 
 
 			struct ScopeLevel{

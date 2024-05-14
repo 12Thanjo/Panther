@@ -2,21 +2,31 @@
 
 #include "frontend/SourceManager.h"
 
+#include <queue>
+#include <unordered_set>
+
 namespace panther{
 	
 
 	auto SemanticAnalyzer::semantic_analysis_declarations() noexcept -> bool {
 		this->enter_scope(nullptr);
 
+		// analyze global structs
+		for(AST::Node::ID global_stmt : this->source.global_stmts){
+			const AST::Node& node = this->source.getNode(global_stmt);
+
+			if(node.kind == AST::Kind::Struct){
+				if(this->analyze_struct(this->source.getStruct(node)) == false){ return false; }
+			}
+		}
+
 		// analyze global aliases
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			switch(node.kind){
-				case AST::Kind::Alias: {
-					if(this->analyze_alias(this->source.getAlias(node)) == false){ return false; }
-				} break;
-			};
+			if(node.kind == AST::Kind::Alias){
+				if(this->analyze_alias(this->source.getAlias(node)) == false){ return false; }
+			}
 		}
 
 
@@ -24,17 +34,16 @@ namespace panther{
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			switch(node.kind){
-				case AST::Kind::VarDecl: {
-					if(this->analyze_var(this->source.getVarDecl(node)) == false){ return false; }
-				} break;
-			};
+			if(node.kind == AST::Kind::VarDecl){
+				if(this->analyze_var(this->source.getVarDecl(node)) == false){ return false; }
+			}
 		}
 
+		// everything else at global scope
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			if(node.kind != AST::Kind::VarDecl && node.kind != AST::Kind::Alias){
+			if(node.kind != AST::Kind::VarDecl && node.kind != AST::Kind::Alias && node.kind != AST::Kind::Struct){
 				if(this->analyze_stmt(node) == false){
 					return false;
 				}
@@ -44,6 +53,17 @@ namespace panther{
 		return true;
 	};
 
+
+	auto SemanticAnalyzer::semantic_analysis_structs() noexcept -> bool {
+		for(const GlobalStruct& global_struct : this->global_structs){
+			PIR::Struct& pir_struct = this->source.pir.structs[global_struct.pir_id.id];
+			if(this->analyze_struct_block(pir_struct, global_struct.ast) == false){
+				return false;
+			}
+		}
+
+		return true;
+	};
 
 	auto SemanticAnalyzer::semantic_analysis() noexcept -> bool {
 		for(const GlobalFunc& global_func : this->global_funcs){
@@ -69,6 +89,7 @@ namespace panther{
 		switch(node.kind){
 			break; case AST::Kind::VarDecl: return this->analyze_var(this->source.getVarDecl(node));
 			break; case AST::Kind::Func: return this->analyze_func(this->source.getFunc(node));
+			break; case AST::Kind::Struct: return this->analyze_struct(this->source.getStruct(node));
 			break; case AST::Kind::Conditional: return this->analyze_conditional(this->source.getConditional(node));
 			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node));
 			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node));
@@ -162,71 +183,94 @@ namespace panther{
 		///////////////////////////////////
 		// type checking
 
-		const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(var_decl.expr);
-		if(expr_value_type.isError()){ return false; }
-		if(expr_value_type.value() != ExprValueType::Ephemeral && expr_value_type.value() != ExprValueType::Import){
-			// TODO: better messaging
-			this->source.error("Variables must be assigned with an ephemeral value", var_decl.expr);
-			return false;
-		}
-		const AST::Node& expr_node = this->source.getNode(var_decl.expr);
-
 		auto var_type_id = std::optional<PIR::Type::ID>();
-		if(var_decl.type.has_value()){
+
+		if(var_decl.expr.has_value()){
+			const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(*var_decl.expr);
+			if(expr_value_type.isError()){ return false; }
+			if(expr_value_type.value() != ExprValueType::Ephemeral && expr_value_type.value() != ExprValueType::Import){
+				// TODO: better messaging
+				this->source.error("Variables must be assigned with an ephemeral value", *var_decl.expr);
+				return false;
+			}
+
+
+			const AST::Node& expr_node = this->source.getNode(*var_decl.expr);
+			if(var_decl.type.has_value()){
+				const evo::Result<PIR::Type::VoidableID> var_type_id_result = this->get_type_id(*var_decl.type);
+				if(var_type_id_result.isError()){ return false; }
+
+				if(var_type_id_result.value().isVoid()){
+					this->source.error("Variable cannot be of type Void", *var_decl.type);
+					return false;
+				}
+
+				var_type_id = var_type_id_result.value().typeID();
+
+
+				if(expr_node.kind != AST::Kind::Uninit){
+					const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
+					if(expr_type_id.isError()){ return false; }
+
+					if(*var_type_id != expr_type_id.value()){
+						const PIR::Type& var_type = this->src_manager.getType(*var_type_id);
+						const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
+
+						if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
+							this->source.error(
+								"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
+								expr_node,
+
+								std::vector<Message::Info>{
+									{std::string("Variable is of type:   ") + this->src_manager.printType(*var_type_id)},
+									{std::string("Expression is of type: ") + this->src_manager.printType(expr_type_id.value())}
+								}
+							);
+							return false;
+						}
+
+					}
+				}
+
+			}else{
+				// type inference
+
+				if(expr_node.kind == AST::Kind::Uninit){
+					this->source.error("The type of [uninit] cannot be inferenced", expr_node);
+					return false;
+				}
+
+				const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
+				if(expr_type_id.isError()){ return false; }
+
+				if(expr_type_id.value() == SourceManager::getTypeString()){
+					this->source.error("String literal values (outside of calls to `@import()`) are not supported yet", expr_node);
+					return false;
+
+				}
+
+				var_type_id = expr_type_id.value();
+			}
+
+
+		}else{
+			if(this->in_struct_scope() == false){
+				// TODO: better messaging
+				this->source.error("Variable must be given an initial value", ident);
+				return false;
+			}
+
 			const evo::Result<PIR::Type::VoidableID> var_type_id_result = this->get_type_id(*var_decl.type);
 			if(var_type_id_result.isError()){ return false; }
 
 			if(var_type_id_result.value().isVoid()){
-				this->source.error("Variable cannot be of type Void", *var_decl.type);
+				this->source.error("Struct member cannot be of type Void", *var_decl.type);
 				return false;
 			}
 
 			var_type_id = var_type_id_result.value().typeID();
-
-
-			if(expr_node.kind != AST::Kind::Uninit){
-				const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-				if(expr_type_id.isError()){ return false; }
-
-				if(*var_type_id != expr_type_id.value()){
-					const PIR::Type& var_type = this->src_manager.getType(*var_type_id);
-					const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
-
-					if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
-						this->source.error(
-							"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
-							expr_node,
-
-							std::vector<Message::Info>{
-								{std::string("Variable is of type:   ") + this->src_manager.printType(*var_type_id)},
-								{std::string("Expression is of type: ") + this->src_manager.printType(expr_type_id.value())}
-							}
-						);
-						return false;
-					}
-
-				}
-			}
-
-		}else{
-			// type inference
-
-			if(expr_node.kind == AST::Kind::Uninit){
-				this->source.error("The type of [uninit] cannot be inferenced", expr_node);
-				return false;
-			}
-
-			const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-			if(expr_type_id.isError()){ return false; }
-
-			if(expr_type_id.value() == SourceManager::getTypeString()){
-				this->source.error("String literal values (outside of calls to `@import()`) are not supported yet", expr_node);
-				return false;
-
-			}
-
-			var_type_id = expr_type_id.value();
 		}
+
 
 
 
@@ -235,10 +279,13 @@ namespace panther{
 
 		const evo::Result<PIR::Expr> var_value = [&]() noexcept {
 			if(this->is_global_scope()){
-				return this->get_const_expr_value(var_decl.expr);
+				return this->get_const_expr_value(*var_decl.expr);
+
+			}else if(var_decl.expr.has_value() == false){
+				return evo::Result<PIR::Expr>(PIR::Expr());
 
 			}else{
-				return this->get_expr_value(var_decl.expr);
+				return this->get_expr_value(*var_decl.expr);
 			}
 		}();
 
@@ -248,6 +295,11 @@ namespace panther{
 		// handle imports differently
 		if(var_type_id == SourceManager::getTypeImport()){
 			evo::debugAssert(var_value.value().kind == PIR::Expr::Kind::Import, "should be import");
+
+			if(this->in_struct_scope()){
+				this->source.error("Struct members cannot be imports", var_decl.ident);
+				return false;
+			}
 
 			if(var_decl.isDef == false){
 				this->source.error("import variables must be marked [def] not [var]", var_decl.ident);
@@ -271,13 +323,13 @@ namespace panther{
 
 			if(var_value_node.kind == AST::Kind::Uninit){
 				if(this->is_global_scope()){
-					this->source.error("Global variables cannot be initialized with the value \"uninit\"", var_decl.expr);
+					this->source.error("Global variables cannot be initialized with the value \"uninit\"", *var_decl.expr);
 					return false;
 				}
 
 				if(var_decl.isDef){
 					this->source.warning(
-						"Declared a def variable with the value \"uninit\"", var_decl.expr,
+						"Declared a def variable with the value \"uninit\"", *var_decl.expr,
 						std::vector<Message::Info>{ {"Any use of this variable would be undefined behavior"} }
 					);
 				}
@@ -294,8 +346,51 @@ namespace panther{
 
 		if(this->is_global_scope()){
 			this->source.pir.global_vars.emplace_back(var_id);
-		}else{
+
+		}else if(this->in_func_scope()){
 			this->get_stmts_entry().emplace_back(var_id);
+
+		}else if(this->in_struct_scope()){
+			PIR::Struct& current_struct = this->get_current_struct();
+
+
+			// look for circular members in type of newly added member
+			auto types_seen = std::unordered_set<PIR::Type::ID>();
+			types_seen.emplace(this->src_manager.getOrCreateTypeID(PIR::Type(current_struct.baseType)));
+			auto types_queue = std::queue<PIR::Type::ID>();
+			types_queue.push(*var_type_id);
+
+			while(types_queue.empty() == false){
+				const PIR::Type::ID type_id_to_look_at = types_queue.front();
+				types_queue.pop();
+
+				const PIR::Type& type_to_look_at = this->src_manager.getType(type_id_to_look_at);
+				if(type_to_look_at.qualifiers.empty() == false){ continue; }
+
+				const PIR::BaseType& base_type_to_look_at = this->src_manager.getBaseType(type_to_look_at.baseType);
+				if(base_type_to_look_at.kind == PIR::BaseType::Kind::Builtin){ continue; }
+
+				if(types_seen.contains(type_id_to_look_at)){
+					// TODO: better messaging
+					this->source.error("Detected circular type dependancy", ident_tok_id);
+					return false;
+				}
+
+				for(const PIR::BaseType::StructData::MemberVar& member : std::get<PIR::BaseType::StructData>(base_type_to_look_at.data).memberVars){
+					types_queue.push(member.type);
+				}
+
+				types_seen.emplace(type_id_to_look_at);
+			};
+
+
+			// if no circular members found, add the new member to the type
+			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
+			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
+			struct_data.memberVars.emplace_back(ident.value.string, var_decl.isDef, *var_type_id);
+
+		}else{
+			evo::debugFatalBreak("Unknown scope type");
 		}
 
 
@@ -496,18 +591,18 @@ namespace panther{
 		///////////////////////////////////
 		// analyze block
 
-		if(this->is_global_scope() == false){
-			PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
-			if(this->analyze_func_block(pir_func, func) == false){
-				return false;
-			};
-
-		}else{
+		if(this->is_global_scope()){
 			this->global_funcs.emplace_back(func_id, func);
 
 			if(is_pub){
 				this->source.addPublicFunc(ident.value.string, func_id);
 			}
+
+		}else{
+			PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
+			if(this->analyze_func_block(pir_func, func) == false){
+				return false;
+			};
 		}
 
 
@@ -520,7 +615,7 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func) noexcept -> bool {
-		this->enter_func_scope(pir_func);
+		this->enter_type_scope(TypeScope::Kind::Func, pir_func);
 
 			this->enter_scope(&pir_func.stmts);
 				this->enter_scope_level();
@@ -551,7 +646,7 @@ namespace panther{
 			}
 
 			this->leave_scope();
-		this->leave_func_scope();
+		this->leave_type_scope();
 
 
 		for(PIR::Param::ID param_id : pir_func.params){
@@ -567,6 +662,67 @@ namespace panther{
 		return true;
 	};
 
+
+
+	auto SemanticAnalyzer::analyze_struct(const AST::Struct& struct_decl) noexcept -> bool {
+		const Token::ID ident_tok_id = this->source.getNode(struct_decl.ident).token;
+		const Token& ident = this->source.getToken(ident_tok_id);
+
+		if(this->is_global_scope() == false){
+			this->source.error("Structs can only be declared in global scope", ident);
+			return false;
+		}
+
+		if(this->has_in_scope(ident.value.string)){
+			this->already_defined(ident);
+			return false;
+		}
+
+		///////////////////////////////////
+		// attributes
+
+		bool is_pub = false;
+		for(Token::ID attribute_id : struct_decl.attributes){
+			const Token& attribute = this->source.getToken(attribute_id);
+
+			if(attribute.value.string == "pub"){
+				is_pub = true;
+			}
+		}
+
+
+		///////////////////////////////////
+		// type
+
+		const PIR::BaseType::ID base_type_id = this->src_manager.createBaseType(
+			PIR::BaseType(PIR::BaseType::Kind::Struct, ident.value.string, &this->source)
+		);
+		const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, base_type_id);
+
+		this->add_struct_to_scope(ident.value.string, struct_id);
+
+		this->global_structs.emplace_back(struct_id, struct_decl);
+
+		if(is_pub){
+			this->source.addPublicStruct(ident.value.string, struct_id);
+		}
+
+		return true;
+	};
+
+
+	auto SemanticAnalyzer::analyze_struct_block(PIR::Struct& pir_struct, const AST::Struct& ast_struct) noexcept -> bool {
+		this->enter_type_scope(TypeScope::Kind::Struct, pir_struct);
+			this->enter_scope(nullptr);
+
+				const AST::Block& block = this->source.getBlock(ast_struct.block);
+				if(this->analyze_block(block) == false){ return false; }
+
+			this->leave_scope();
+		this->leave_type_scope();
+
+		return true;
+	};
 
 
 
@@ -682,14 +838,14 @@ namespace panther{
 			return false;
 		}
 
-		const PIR::Type::VoidableID func_return_type_id = this->get_current_func().func.returnType;
+		const PIR::Type::VoidableID func_return_type_id = this->get_current_func().returnType;
 
 		std::optional<PIR::Expr> return_value = std::nullopt;
 
 		if(return_stmt.value.has_value()){
 			// "return expr;"
 
-			if(this->get_current_func().func.returnType.isVoid()){
+			if(this->get_current_func().returnType.isVoid()){
 				this->source.error("Return statement has value when function's return type is \"Void\"", return_stmt.keyword);
 				return false;	
 			}
@@ -738,7 +894,7 @@ namespace panther{
 		this->get_stmts_entry().emplace_back(ret_id);
 		this->get_stmts_entry().setTerminated();
 		if(this->is_in_func_base_scope()){
-			this->get_current_func().func.terminatesInBaseScope = true;
+			this->get_current_func().terminatesInBaseScope = true;
 		}
 
 		this->set_scope_terminated();
@@ -790,6 +946,20 @@ namespace panther{
 		if(lhs_value.value().kind == PIR::Expr::Kind::Param){
 			PIR::Param& param = this->source.getParam(lhs_value.value().param);
 			param.mayHaveBeenEdited = true;
+
+		}else if(lhs_value.value().kind == PIR::Expr::Kind::Accessor){
+			PIR::Accessor& accessor = this->source.getAccessor(lhs_value.value().accessor);
+			PIR::Expr* lhs = &accessor.lhs;
+
+			while(lhs->kind == PIR::Expr::Kind::Accessor){
+				PIR::Accessor& lhs_accessor = this->source.getAccessor(lhs->accessor);
+				lhs = &lhs_accessor.lhs;
+			};
+
+			if(lhs->kind == PIR::Expr::Kind::Param){
+				PIR::Param& param = this->source.getParam(lhs->param);
+				param.mayHaveBeenEdited = true;
+			}
 		}
 
 
@@ -958,7 +1128,7 @@ namespace panther{
 		this->get_stmts_entry().emplace_back(PIR::Stmt::getUnreachable());
 		this->get_stmts_entry().setTerminated();
 		if(this->is_in_func_base_scope()){
-			this->get_current_func().func.terminatesInBaseScope = true;
+			this->get_current_func().terminatesInBaseScope = true;
 		}
 
 		return true;
@@ -1143,13 +1313,34 @@ namespace panther{
 
 
 			// if param is write and arg is a param, mark it as edited
-			if(arg_node.kind == AST::Kind::Ident && param.kind == ParamKind::Write){
-				std::string_view param_ident_str = this->source.getIdent(arg_node).value.string;
+			if(param.kind == ParamKind::Write){
+				if(arg_node.kind == AST::Kind::Ident){
+					std::string_view param_ident_str = this->source.getIdent(arg_node).value.string;
 
-				for(const Scope& scope : this->scopes){
- 					if(scope.params.contains(param_ident_str)){
-						PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
-						pir_param.mayHaveBeenEdited = true;
+					for(const Scope& scope : this->scopes){
+	 					if(scope.params.contains(param_ident_str)){
+							PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
+							pir_param.mayHaveBeenEdited = true;
+						}
+					}
+				}else if(arg_node.kind == AST::Kind::Infix){
+					const AST::Infix& infix = this->source.getInfix(arg_node);
+					if(this->source.getToken(infix.op).kind == Token::get(".")){
+						const AST::Node* lhs_node = &this->source.getNode(infix.lhs);
+						
+						while(lhs_node->kind == AST::Kind::Infix){
+							const AST::Infix& lhs_infix = this->source.getInfix(*lhs_node);	
+							lhs_node = &this->source.getNode(lhs_infix.lhs);
+						};
+
+						std::string_view param_ident_str = this->source.getIdent(*lhs_node).value.string;
+
+						for(const Scope& scope : this->scopes){
+		 					if(scope.params.contains(param_ident_str)){
+								PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
+								pir_param.mayHaveBeenEdited = true;
+							}
+						}
 					}
 				}
 			}
@@ -1230,6 +1421,10 @@ namespace panther{
 
 						const PIR::Func& lookup_func = this->source.getFunc(lookup_func_id.value());
 						return this->src_manager.getOrCreateTypeID(PIR::Type(lookup_func.baseType));
+
+					}else if(scope.structs.contains(ident_str)){
+						this->source.error("Types cannot be used as expressions", node);
+						return evo::resultError;
 
 					}else if(scope.params.contains(ident_str)){
 						const PIR::Param& param = this->source.getParam(scope.params.at(ident_str));
@@ -1391,60 +1586,80 @@ namespace panther{
 
 				switch(infix_op_kind){
 					case Token::get("."): {
-						const evo::Result<PIR::Type::ID> type_id_of_lhs = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-						if(type_id_of_lhs.isError()){ return evo::resultError; }
+						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
+						if(lhs_type_id.isError()){ return evo::resultError; }
 
-						if(type_id_of_lhs.value() != SourceManager::getTypeImport()){
-							this->source.error("Expression does not have valid accessor operator", infix.lhs);
-							return evo::resultError;
-						}
-
-						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-						if(value_of_lhs.isError()){ return evo::resultError; }
-						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
-
-						const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
-						if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-							const std::vector<PIR::Func::ID>& imported_func_list = import_source.pir.pub_funcs.at(rhs_ident.value.string);
+						if(lhs_type_id.value() == SourceManager::getTypeImport()){
+							const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
+							if(value_of_lhs.isError()){ return evo::resultError; }
+							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-							if(imported_func_list.size() == 1){
-								const PIR::Func& imported_func = Source::getFunc(imported_func_list[0]);
+							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 
-								return this->src_manager.getOrCreateTypeID(
-									PIR::Type(imported_func.baseType)
-								);
+							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
+								const std::vector<PIR::Func::ID>& imported_func_list = import_source.pir.pub_funcs.at(rhs_ident.value.string);
+
+								if(imported_func_list.size() == 1){
+									const PIR::Func& imported_func = Source::getFunc(imported_func_list[0]);
+
+									return this->src_manager.getOrCreateTypeID(
+										PIR::Type(imported_func.baseType)
+									);
+								}
+
+								if(lookup_func_call != nullptr){
+									const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
+										rhs_ident.value.string, import_source, *lookup_func_call
+									);
+									if(imported_func_id.isError()){ return evo::resultError; }
+
+									const PIR::Func& imported_func = Source::getFunc(imported_func_id.value());
+
+									return this->src_manager.getOrCreateTypeID(
+										PIR::Type(imported_func.baseType)
+									);
+								}
+
+								this->source.error("Cannot get overloaded function", infix.rhs);
+								return evo::resultError;
+
+							}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
+								const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
+								const PIR::Var& imported_var = Source::getVar(imported_var_id);
+
+								return imported_var.type;
+
+							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
+								return this->src_manager.getTypeImport();
 							}
 
-							if(lookup_func_call != nullptr){
-								const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
-									rhs_ident.value.string, import_source, *lookup_func_call
-								);
-								if(imported_func_id.isError()){ return evo::resultError; }
-
-								const PIR::Func& imported_func = Source::getFunc(imported_func_id.value());
-
-								return this->src_manager.getOrCreateTypeID(
-									PIR::Type(imported_func.baseType)
-								);
-							}
-
-							this->source.error("Cannot get overloaded function", infix.rhs);
+							// TODO: better messaging
+							this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
 							return evo::resultError;
-
-						}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
-							const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
-							const PIR::Var& imported_var = Source::getVar(imported_var_id);
-
-							return imported_var.type;
-
-						}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-							return this->src_manager.getTypeImport();
 						}
 
+
+
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
+						if(lhs_type.qualifiers.empty() == false){
+							// TODO: better messaging
+							this->source.error("Type does not have a valid accessor operator", infix.lhs);
+							return evo::resultError;
+						}
+
+						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
+						for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
+							if(member.name == rhs_ident.value.string){
+								return member.type;
+							}
+						}
+
+
 						// TODO: better messaging
-						this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
+						this->source.error(std::format("Type does not have memeber variable \"{}\"", rhs_ident.value.string), infix.rhs);
 						return evo::resultError;
 					} break;
 
@@ -1461,39 +1676,39 @@ namespace panther{
 						// lhs
 
 						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
-						const evo::Result<PIR::Type::ID> type_id_of_lhs = this->analyze_and_get_type_of_expr(lhs_node);
-						if(type_id_of_lhs.isError()){ return evo::resultError; }
+						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
+						if(lhs_type_id.isError()){ return evo::resultError; }
 
-						const PIR::Type& type_of_lhs = this->src_manager.getType(type_id_of_lhs.value());
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
 
-						if(type_of_lhs.qualifiers.empty() == false){
+						if(lhs_type.qualifiers.empty() == false){
 							this->source.error(
 								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
 							);
 							return evo::resultError;
 						}
 
-						const PIR::BaseType& base_type_of_lhs = this->src_manager.getBaseType(type_of_lhs.baseType);
+						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
 
 
 						const bool has_operator = [&]() noexcept {
 							switch(infix_op_kind){
-								case Token::get("+"):  return base_type_of_lhs.ops.add.empty() == false;
-								case Token::get("+@"): return base_type_of_lhs.ops.addWrap.empty() == false;
-								case Token::get("-"):  return base_type_of_lhs.ops.sub.empty() == false;
-								case Token::get("-@"): return base_type_of_lhs.ops.subWrap.empty() == false;
-								case Token::get("*"):  return base_type_of_lhs.ops.mul.empty() == false;
-								case Token::get("*@"): return base_type_of_lhs.ops.mulWrap.empty() == false;
-								case Token::get("/"):  return base_type_of_lhs.ops.div.empty() == false;
+								case Token::get("+"):  return lhs_base_type.ops.add.empty() == false;
+								case Token::get("+@"): return lhs_base_type.ops.addWrap.empty() == false;
+								case Token::get("-"):  return lhs_base_type.ops.sub.empty() == false;
+								case Token::get("-@"): return lhs_base_type.ops.subWrap.empty() == false;
+								case Token::get("*"):  return lhs_base_type.ops.mul.empty() == false;
+								case Token::get("*@"): return lhs_base_type.ops.mulWrap.empty() == false;
+								case Token::get("/"):  return lhs_base_type.ops.div.empty() == false;
 
-								case Token::get("=="): return base_type_of_lhs.ops.logicalEqual.empty() == false;
-								case Token::get("!="): return base_type_of_lhs.ops.notEqual.empty() == false;
-								case Token::get("<"):  return base_type_of_lhs.ops.lessThan.empty() == false;
-								case Token::get("<="): return base_type_of_lhs.ops.lessThanEqual.empty() == false;
-								case Token::get(">"):  return base_type_of_lhs.ops.greaterThan.empty() == false;
-								case Token::get(">="): return base_type_of_lhs.ops.greaterThanEqual.empty() == false;
-								case Token::get("&&"): return base_type_of_lhs.ops.logicalAnd.empty() == false;
-								case Token::get("||"): return base_type_of_lhs.ops.logicalOr.empty() == false;
+								case Token::get("=="): return lhs_base_type.ops.logicalEqual.empty() == false;
+								case Token::get("!="): return lhs_base_type.ops.notEqual.empty() == false;
+								case Token::get("<"):  return lhs_base_type.ops.lessThan.empty() == false;
+								case Token::get("<="): return lhs_base_type.ops.lessThanEqual.empty() == false;
+								case Token::get(">"):  return lhs_base_type.ops.greaterThan.empty() == false;
+								case Token::get(">="): return lhs_base_type.ops.greaterThanEqual.empty() == false;
+								case Token::get("&&"): return lhs_base_type.ops.logicalAnd.empty() == false;
+								case Token::get("||"): return lhs_base_type.ops.logicalOr.empty() == false;
 							};
 
 							evo::debugFatalBreak("Unknown intrinsic kind");
@@ -1503,7 +1718,7 @@ namespace panther{
 							this->source.error(
 								std::format("This type does not have a [{}] operator", Token::printKind(infix_op_kind)), infix.lhs,
 								std::vector<Message::Info>{ 
-									Message::Info(std::format("Type of left-hand-side: {}", this->src_manager.printType(type_id_of_lhs.value()))),
+									Message::Info(std::format("Type of left-hand-side: {}", this->src_manager.printType(lhs_type_id.value()))),
 								}
 							);
 							return evo::resultError;
@@ -1533,18 +1748,18 @@ namespace panther{
 						///////////////////////////////////
 						// op checking
 
-						evo::debugAssert(base_type_of_lhs.kind != PIR::BaseType::Kind::Import, "should have been caught already");
-						evo::debugAssert(base_type_of_lhs.kind != PIR::BaseType::Kind::Function, "should have been caught already");
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
 
-						if(base_type_of_lhs.kind == PIR::BaseType::Kind::Builtin){
-							const PIR::BaseType* base_type_to_use = &base_type_of_lhs;
+						if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
+							const PIR::BaseType* base_type_to_use = &lhs_base_type;
 
-							if(type_id_of_lhs.value() != type_id_of_rhs.value()){
-								if(this->is_implicitly_convertable_to(type_of_lhs, type_of_rhs, lhs_node)){
+							if(lhs_type_id.value() != type_id_of_rhs.value()){
+								if(this->is_implicitly_convertable_to(lhs_type, type_of_rhs, lhs_node)){
 									base_type_to_use = &base_type_of_rhs;
 									// do conversion (when needed/implemented)
 
-								}else if(this->is_implicitly_convertable_to(type_of_rhs, type_of_lhs, rhs_node)){
+								}else if(this->is_implicitly_convertable_to(type_of_rhs, lhs_type, rhs_node)){
 									// do conversion (when needed/implemented)
 									
 								}else{
@@ -1598,16 +1813,16 @@ namespace panther{
 				switch(this->source.getToken(postfix.op).kind){
 					case Token::get(".^"): {
 						// get type of lhs
-						const evo::Result<PIR::Type::ID> type_of_lhs = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
-						if(type_of_lhs.isError()){ return evo::resultError; }
+						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
+						if(lhs_type_id.isError()){ return evo::resultError; }
 
 						// check that type of lhs is pointer
-						const PIR::Type& lhs_type = this->src_manager.getType(type_of_lhs.value());
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
 						if(lhs_type.qualifiers.empty() || lhs_type.qualifiers.back().isPtr == false){
 							this->source.error(
 								"left-hand-side of dereference expression must be of a pointer type", postfix.op,
 								std::vector<Message::Info>{
-									{std::string("expression is of type: ") + this->src_manager.printType(type_of_lhs.value())},
+									{std::string("expression is of type: ") + this->src_manager.printType(lhs_type_id.value())},
 								}
 							);
 							return evo::resultError;
@@ -1629,7 +1844,8 @@ namespace panther{
 
 
 			case AST::Kind::Uninit: {
-				evo::debugFatalBreak("[uninit] exprs should not be analyzed with this function");
+				this->source.error("[uninit] expressions are only allowed for assignment", node);
+				return evo::resultError;
 			} break;
 		};
 
@@ -1694,6 +1910,14 @@ namespace panther{
 							for(const AST::Type::Qualifier& qualifier : type.qualifiers){
 								type_qualifiers.push_back(qualifier);
 							}
+
+						}else if(scope.structs.contains(ident)){
+							const PIR::Struct::ID struct_id = scope.structs.at(ident);
+							const PIR::Struct& struct_info = this->source.getStruct(struct_id);
+
+							base_type_id = struct_info.baseType;
+							type_qualifiers = type.qualifiers;
+
 						}
 					}
 				} break;
@@ -1716,11 +1940,30 @@ namespace panther{
 					const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 					if(import_source.pir.pub_aliases.contains(rhs_ident.value.string)){
-						return import_source.pir.pub_aliases.at(rhs_ident.value.string);
-					}
+						const PIR::Type::VoidableID type_id =  import_source.pir.pub_aliases.at(rhs_ident.value.string);
 
-					this->source.error(std::format("Import does not have a public type \"{}\"", rhs_ident.value.string), rhs_ident);
-					return evo::resultError;
+						if(type.qualifiers.empty() == false && type_id.isVoid()){
+							this->source.error("Void type cannot have qualifiers", node_id); 
+							return evo::resultError;
+						}
+
+						const PIR::Type& alias_type = this->src_manager.getType(type_id.typeID());
+
+						base_type_id = alias_type.baseType;
+						type_qualifiers = alias_type.qualifiers;
+
+						for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+							type_qualifiers.push_back(qualifier);
+						}
+
+					}else if(import_source.pir.pub_structs.contains(rhs_ident.value.string)){
+						const PIR::Struct::ID struct_id = import_source.pir.pub_structs.at(rhs_ident.value.string);
+						const PIR::Struct& struct_info = struct_id.source.getStruct(struct_id);
+
+						base_type_id = struct_info.baseType;
+						type_qualifiers = type.qualifiers;
+
+					}
 
 				} break;
 
@@ -1731,10 +1974,13 @@ namespace panther{
 					return evo::resultError;
 				} break;
 			};
-
 		}
 
-		evo::debugAssert(base_type_id.has_value(), "base type id was not set");
+
+		if(base_type_id.has_value() == false){
+			this->source.error("Type does not exist", node_id);
+			return evo::resultError;
+		}
 
 
 		// checking const-ness of type levels
@@ -1821,9 +2067,11 @@ namespace panther{
 					}
 
 					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in expression");
+					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in expression");
 				}
 
-				evo::debugFatalBreak("Didn't find value_ident");
+				this->source.error(std::format("Identifier \"{}\" does not exist", value_ident_str), value_ident);
+				return evo::resultError;
 			} break;
 
 
@@ -1960,9 +2208,29 @@ namespace panther{
 
 				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, rhs_value.value());
 
-				if(rhs_value.value().kind == PIR::Expr::Kind::Param && this->source.getToken(prefix.op).kind == Token::KeywordAddr){
-					this->source.getParam(rhs_value.value().param).mayHaveBeenEdited = true;
+
+
+				if(this->source.getToken(prefix.op).kind == Token::KeywordAddr){
+					if(rhs_value.value().kind == PIR::Expr::Kind::Param){
+						PIR::Param& param = this->source.getParam(rhs_value.value().param);
+						param.mayHaveBeenEdited = true;
+
+					}else if(rhs_value.value().kind == PIR::Expr::Kind::Accessor){
+						PIR::Accessor& accessor = this->source.getAccessor(rhs_value.value().accessor);
+						PIR::Expr* lhs = &accessor.lhs;
+
+						while(lhs->kind == PIR::Expr::Kind::Accessor){
+							PIR::Accessor& lhs_accessor = this->source.getAccessor(lhs->accessor);
+							lhs = &lhs_accessor.lhs;
+						};
+
+						if(lhs->kind == PIR::Expr::Kind::Param){
+							PIR::Param& param = this->source.getParam(lhs->param);
+							param.mayHaveBeenEdited = true;
+						}
+					}
 				}
+
 
 				return PIR::Expr(prefix_id);
 			} break;
@@ -1976,27 +2244,46 @@ namespace panther{
 					case Token::get("."): {
 						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
 						if(value_of_lhs.isError()){ return evo::resultError; }
-						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-						const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
+						if(value_of_lhs.value().kind == PIR::Expr::Kind::Import){
+							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
 
-						if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
-							const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
-							return PIR::Expr(imported_var_id);
+							if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
+								const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
+								return PIR::Expr(imported_var_id);
 
-						}else if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-							this->source.error("Functions as values are not supported yet", infix.rhs);
-							return evo::resultError;
-							
-						}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-							const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
-							return PIR::Expr(imported_source_id);
+							}else if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
+								this->source.error("Functions as values are not supported yet", infix.rhs);
+								return evo::resultError;
+								
+							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
+								const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
+								return PIR::Expr(imported_source_id);
+							}
+
+							evo::debugFatalBreak("should have already caught that it's non-existant");
+						}else{
+							const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
+							if(lhs_type_id.isError()){ return evo::resultError; }
+
+							const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
+							evo::debugAssert(lhs_type.qualifiers.empty(), "uncaught invalid accessor operator");
+
+							const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+							const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
+							for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
+								if(member.name == rhs_ident.value.string){
+									const PIR::Accessor::ID accessor_id = this->source.createAccessor(
+										value_of_lhs.value(), lhs_type_id.value(), rhs_ident.value.string
+									);
+									return PIR::Expr(accessor_id);
+								}
+							}
+
+							evo::debugFatalBreak("uncaught non-existant ident");
 						}
-
-
-						evo::debugFatalBreak("should have already caught that it's non-existant");
 					} break;
 
 
@@ -2012,13 +2299,13 @@ namespace panther{
 						// lhs
 
 						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
-						const evo::Result<PIR::Type::ID> type_id_of_lhs = this->analyze_and_get_type_of_expr(lhs_node);
-						if(type_id_of_lhs.isError()){ return evo::resultError; }
+						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
+						if(lhs_type_id.isError()){ return evo::resultError; }
 
-						const PIR::Type& type_of_lhs = this->src_manager.getType(type_id_of_lhs.value());
-						evo::debugAssert(type_of_lhs.qualifiers.empty(), "uncaught qualifiers");
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
+						evo::debugAssert(lhs_type.qualifiers.empty(), "uncaught qualifiers");
 
-						const PIR::BaseType& base_type_of_lhs = this->src_manager.getBaseType(type_of_lhs.baseType);
+						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
 
 
 						///////////////////////////////////
@@ -2037,22 +2324,22 @@ namespace panther{
 						///////////////////////////////////
 						// create func call
 
-						evo::debugAssert(base_type_of_lhs.kind != PIR::BaseType::Kind::Import, "uncaught import");
-						evo::debugAssert(base_type_of_lhs.kind != PIR::BaseType::Kind::Function, "uncaught function");
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "uncaught import");
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "uncaught function");
 
-						if(base_type_of_lhs.kind == PIR::BaseType::Kind::Builtin){
-							// evo::debugAssert(type_id_of_lhs.value() == type_id_of_rhs.value(), "uncaught type mismatch");
+						if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
+							// evo::debugAssert(lhs_type_id.value() == type_id_of_rhs.value(), "uncaught type mismatch");
 
 							const PIR::BaseType& base_type_to_use = [&]() noexcept {
-								if(type_id_of_lhs.value() == type_id_of_rhs.value()){
-									return base_type_of_lhs;
+								if(lhs_type_id.value() == type_id_of_rhs.value()){
+									return lhs_base_type;
 
-								}else if(this->is_implicitly_convertable_to(type_of_lhs, type_of_rhs, lhs_node)){
+								}else if(this->is_implicitly_convertable_to(lhs_type, type_of_rhs, lhs_node)){
 									return base_type_of_rhs;
 
 								}else{
-									evo::debugAssert(this->is_implicitly_convertable_to(type_of_rhs, type_of_lhs, rhs_node), "uncaught invalid op");
-									return base_type_of_lhs;
+									evo::debugAssert(this->is_implicitly_convertable_to(type_of_rhs, lhs_type, rhs_node), "uncaught invalid op");
+									return lhs_base_type;
 								}
 							}();
 
@@ -2072,8 +2359,8 @@ namespace panther{
 									case Token::get("<="): return base_type_to_use.ops.lessThanEqual[0].intrinsic;
 									case Token::get(">"):  return base_type_to_use.ops.greaterThan[0].intrinsic;
 									case Token::get(">="): return base_type_to_use.ops.greaterThanEqual[0].intrinsic;
-									case Token::get("&&"): return base_type_of_lhs.ops.logicalAnd[0].intrinsic;
-									case Token::get("||"): return base_type_of_lhs.ops.logicalOr[0].intrinsic;
+									case Token::get("&&"): return base_type_to_use.ops.logicalAnd[0].intrinsic;
+									case Token::get("||"): return base_type_to_use.ops.logicalOr[0].intrinsic;
 								};
 
 								evo::debugFatalBreak("Unknown intrinsic kind");
@@ -2187,6 +2474,7 @@ namespace panther{
 					}
 
 					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in const expr");
+					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in const expr");
 				}
 
 				evo::debugFatalBreak("Unkown ident");
@@ -2338,12 +2626,11 @@ namespace panther{
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
 						if(lhs_type_id.isError()){ return evo::resultError; }
 
-						const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() ? 
-							this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
-						if(value_of_lhs.isError()){ return evo::resultError; } // TODO: make this a debug assert when globals can be variables
-
-
 						if(lhs_type_id.value() == SourceManager::getTypeImport()){
+							const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() ? 
+								this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
+							if(value_of_lhs.isError()){ return evo::resultError; } // TODO: make this a debug assert when globals can be variables
+
 							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
 							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
@@ -2361,9 +2648,10 @@ namespace panther{
 
 							this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
 							return evo::resultError;
-						}
 
-						evo::debugFatalBreak("Invalid lhs type");
+						}else{
+							return ExprValueType::Concrete;
+						}
 					} break;
 
 					case Token::get("+"):  return ExprValueType::Ephemeral;
@@ -2421,14 +2709,14 @@ namespace panther{
 						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
 						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
 
-						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-						evo::debugAssert(value_of_lhs.isSuccess(), "Should have caught this error already");
+						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 						if(lhs_type_id.value() == SourceManager::getTypeImport()){
+							const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
+							evo::debugAssert(value_of_lhs.isSuccess(), "Should have caught this error already");
 							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
 							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
-							const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
 								return false;
@@ -2444,7 +2732,19 @@ namespace panther{
 							}
 						}
 
-						evo::debugFatalBreak("Invalid lhs type");
+
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
+						evo::debugAssert(lhs_type.qualifiers.empty(), "uncaught invalid accessor operator");
+
+						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
+						for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
+							if(member.name == rhs_ident.value.string){
+								return !member.isDef;
+							}
+						}
+
+						evo::debugFatalBreak("uncaught unknown member");
 					} break;
 
 					default: evo::debugFatalBreak("Unknown infix kind");
@@ -2504,6 +2804,7 @@ namespace panther{
 					}
 
 					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in expression");
+					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in expression");
 				}
 
 				evo::debugFatalBreak("Didn't find value_ident");
@@ -2554,6 +2855,17 @@ namespace panther{
 				this->source.error(
 					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
 					std::vector<Message::Info>{ Message::Info("First defined as a function") }
+				);
+				return;
+			}
+
+			if(scope.structs.contains(ident_str)){
+				const PIR::Struct& struct_decl = this->source.getStruct(scope.structs.at(ident_str));
+				const Location location = this->source.getToken(struct_decl.ident).location;
+
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					std::vector<Message::Info>{ Message::Info("First defined here:", location) }
 				);
 				return;
 			}
@@ -2628,6 +2940,10 @@ namespace panther{
 		}
 	};
 
+	auto SemanticAnalyzer::add_struct_to_scope(std::string_view str, PIR::Struct::ID id) noexcept -> void {
+		this->scopes.back().structs.emplace(str, id);
+	};
+
 	auto SemanticAnalyzer::add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void {
 		this->scopes.back().params.emplace(str, id);
 	};
@@ -2662,6 +2978,7 @@ namespace panther{
 		for(const Scope& scope : this->scopes){
 			if(scope.vars.contains(ident)){ return true; }
 			if(scope.funcs.contains(ident)){ return true; }
+			if(scope.structs.contains(ident)){ return true; }
 			if(scope.params.contains(ident)){ return true; }
 			if(scope.imports.contains(ident)){ return true; }
 			if(scope.aliases.contains(ident)){ return true; }
@@ -2672,7 +2989,7 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::is_in_func_base_scope() const noexcept -> bool {
-		return this->scopes.back().stmts_entry == &this->get_current_func().func.stmts;
+		return this->scopes.back().stmts_entry == &this->get_current_func().stmts;
 	};
 
 
@@ -2846,42 +3163,59 @@ namespace panther{
 
 
 	//////////////////////////////////////////////////////////////////////
-	// func scope
+	// type scope
+
+	auto SemanticAnalyzer::enter_type_scope(TypeScope::Kind kind, PIR::Func& func) noexcept -> void {
+		evo::debugAssert(kind == TypeScope::Kind::Func, "incorrect kind for pir type");
+		this->type_scopes.emplace_back(kind, &func);
+	};
+
+	auto SemanticAnalyzer::enter_type_scope(TypeScope::Kind kind, PIR::Struct& struct_decl) noexcept -> void {
+		evo::debugAssert(kind == TypeScope::Kind::Struct, "incorrect kind for pir type");
+		this->type_scopes.emplace_back(kind, &struct_decl);
+	};
+
+	auto SemanticAnalyzer::leave_type_scope() noexcept -> void {
+		evo::debugAssert(this->in_type_scope(), "Not in a type scope");
+		this->type_scopes.pop_back();
+	};
+
+
+	auto SemanticAnalyzer::in_type_scope() const noexcept -> bool {
+		return this->type_scopes.empty() == false;
+	};
+
+
 
 	auto SemanticAnalyzer::in_func_scope() const noexcept -> bool {
-		return this->func_scopes.empty() == false;
+		return this->in_type_scope() && this->type_scopes.back().kind == TypeScope::Kind::Func;
 	};
 
-	auto SemanticAnalyzer::enter_func_scope(PIR::Func& func) noexcept -> void {
-		this->func_scopes.emplace_back(func);
-	};
-
-	auto SemanticAnalyzer::leave_func_scope() noexcept -> void {
+	auto SemanticAnalyzer::get_current_func() noexcept -> PIR::Func& {
 		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		this->func_scopes.pop_back();
+		return *this->type_scopes.back().func;
 	};
 
-
-	auto SemanticAnalyzer::get_current_func() noexcept -> FuncScope& {
+	auto SemanticAnalyzer::get_current_func() const noexcept -> const PIR::Func& {
 		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		return this->func_scopes.back();
-	};
-
-	auto SemanticAnalyzer::get_current_func() const noexcept -> const FuncScope& {
-		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		return this->func_scopes.back();
+		return *this->type_scopes.back().func;
 	};
 
 
-	// auto SemanticAnalyzer::set_current_func_terminated() noexcept -> void {
-	// 	evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-	// 	this->func_scopes.back().is_terminated = true;
-	// };
 
-	// auto SemanticAnalyzer::current_func_is_terminated() const noexcept -> bool {
-	// 	evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-	// 	return this->func_scopes.back().is_terminated;
-	// };
+	auto SemanticAnalyzer::in_struct_scope() const noexcept -> bool {
+		return this->in_type_scope() && this->type_scopes.back().kind == TypeScope::Kind::Struct;
+	};
+
+	auto SemanticAnalyzer::get_current_struct() noexcept -> PIR::Struct& {
+		evo::debugAssert(this->in_struct_scope(), "Not in a struct scope");
+		return *this->type_scopes.back().struct_decl;
+	};
+
+	auto SemanticAnalyzer::get_current_struct() const noexcept -> const PIR::Struct& {
+		evo::debugAssert(this->in_struct_scope(), "Not in a struct scope");
+		return *this->type_scopes.back().struct_decl;
+	};
 
 
 

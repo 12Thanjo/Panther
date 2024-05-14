@@ -1,5 +1,14 @@
 # Changelog
 
+### v0.27.0
+- Changed the name mangling prefix from "P" to "PTHR"
+- Added structs
+	- members can be `var` or `def`
+- Added accessor (`.`) operator to access struct members
+- added `@__printBool`
+	- This existence of this is just temporary
+- Added checking for usage of `uninit` in not an assignment operation
+
 ### v0.26.1
 - Added parsing of function parameter packs
 - Fixed fatal error caused by not properly checking that an identifier can be called like a function

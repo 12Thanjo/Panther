@@ -11,6 +11,7 @@ namespace panther{
 			TemplatePack,
 			FuncParams,
 			Func,
+			Struct,
 			Return,
 			Conditional,
 			Alias,
@@ -55,7 +56,7 @@ namespace panther{
 			Node::ID ident;
 			std::vector<Token::ID> attributes;
 			std::optional<Node::ID> type;
-			Node::ID expr;
+			std::optional<Node::ID> expr;
 		};
 
 		struct TemplatePack{
@@ -98,6 +99,12 @@ namespace panther{
 			std::vector<Token::ID> attributes;
 			Node::ID returnType;
 			
+			Node::ID block;
+		};
+
+		struct Struct{
+			Node::ID ident;
+			std::vector<Token::ID> attributes;
 			Node::ID block;
 		};
 
