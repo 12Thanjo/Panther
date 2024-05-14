@@ -248,6 +248,68 @@ namespace panther{
 		}();
 
 
+		const PIR::BaseType::ID Int_in_UInt_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read} },
+				this->getTypeUInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		const PIR::BaseType::ID Int_in_Bool_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeInt(), ParamKind::Read} },
+				this->getTypeBool()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+		const PIR::BaseType::ID UInt_in_Int_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeUInt(), ParamKind::Read} },
+				this->getTypeInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		const PIR::BaseType::ID UInt_in_Bool_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeUInt(), ParamKind::Read} },
+				this->getTypeBool()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+
+		const PIR::BaseType::ID Bool_in_Int_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeBool(), ParamKind::Read} },
+				this->getTypeInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		const PIR::BaseType::ID Bool_in_UInt_out_type = [&]() noexcept {
+			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
+			base_type.callOperator = PIR::BaseType::Operator(
+				std::vector<PIR::BaseType::Operator::Param>{ {this->getTypeBool(), ParamKind::Read} },
+				this->getTypeUInt()
+			);
+
+			return this->createBaseType(std::move(base_type));
+		}();
+		
+
+
+
+
+
 		const PIR::BaseType::ID no_in_no_out_type = [&]() noexcept {
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
@@ -285,7 +347,7 @@ namespace panther{
 
 
 		///////////////////////////////////
-		// math
+		// arithmetic
 
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::addInt, "addInt", math_ops_Int_type);
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::addUInt, "addUInt", math_ops_UInt_type);
@@ -340,6 +402,18 @@ namespace panther{
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::logicalAnd, "logicalAnd", logical_Bool_type);
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::logicalOr, "logicalOr", logical_Bool_type);
 		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::logicalNot, "logicalNot", Bool_in_Bool_out_type);
+
+
+		///////////////////////////////////
+		// type conversion
+
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::convIntToUInt, "convIntToUInt", Int_in_UInt_out_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::convIntToBool, "convIntToBool", Int_in_Bool_out_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::convUIntToInt, "convUIntToInt", UInt_in_Int_out_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::convUIntToBool, "convUIntToBool", UInt_in_Bool_out_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::convBoolToInt, "convBoolToInt", Bool_in_Int_out_type);
+		this->intrinsics.emplace_back(PIR::Intrinsic::Kind::convBoolToUInt, "convBoolToUInt", Bool_in_UInt_out_type);
+
 
 
 		///////////////////////////////////
@@ -466,6 +540,17 @@ namespace panther{
 		type_Bool.ops.logicalOr.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::logicalOr));
 
 
+		///////////////////////////////////
+		// casting
+
+		type_Int.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToUInt));
+		type_Int.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToBool));
+
+		type_UInt.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToInt));
+		type_UInt.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToBool));
+
+		type_Bool.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convBoolToInt));
+		type_Bool.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convBoolToUInt));
 
 	};
 
@@ -616,7 +701,7 @@ namespace panther{
 				}
 			}
 
-			if(qualifier.isPtr){ base_type_str += '^'; }
+			if(qualifier.isPtr){ base_type_str += '&'; }
 			if(qualifier.isConst){ base_type_str += '|'; }
 		}
 

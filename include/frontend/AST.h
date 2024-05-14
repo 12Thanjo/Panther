@@ -15,6 +15,7 @@ namespace panther{
 			Return,
 			Conditional,
 			Alias,
+			Cast,
 			
 			Type,
 			Block,
@@ -125,6 +126,17 @@ namespace panther{
 			Node::ID ident;
 			std::vector<Token::ID> attributes;
 			Node::ID type;
+		};
+
+
+		struct Cast{
+			Node::ID value;
+			Node::ID type;
+
+			enum class Kind{
+				As,
+				Cast,
+			} kind;
 		};
 
 

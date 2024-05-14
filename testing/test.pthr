@@ -1,20 +1,12 @@
-
-func get_true = () -> Bool {
-	@__printBool(true);
-	return true;
-}
-
-func get_false = () -> Bool {
-	@__printBool(false);
-	return false;
+struct Struct = {
+	
 }
 
 func main = () #entry -> Int {
-	var cond: Bool = get_true() and (get_false() or get_true());
+	def bool: Bool = false;
 
-	@__printSeparator();
-
-	@__printBool(cond);
+	// @__printBool(@castIntToBool(int));
+	@__printInt(true as Int);
 
 	return 0;
 }

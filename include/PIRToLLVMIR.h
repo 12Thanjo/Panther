@@ -1007,6 +1007,41 @@ namespace panther{
 										return this->builder->createNot(rhs, "logicalNot");
 									} break;
 
+
+									///////////////////////////////////
+									// casting
+
+									case PIR::Intrinsic::Kind::convIntToUInt: {
+										return this->get_value(func_call.args[0]);
+									} break;
+
+									case PIR::Intrinsic::Kind::convIntToBool: {
+										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
+										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
+										return this->builder->createTrunc(conversion_value, type, "convIntToBool");
+									} break;
+
+									case PIR::Intrinsic::Kind::convUIntToInt: {
+										return this->get_value(func_call.args[0]);
+									} break;
+
+									case PIR::Intrinsic::Kind::convUIntToBool: {
+										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
+										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
+										return this->builder->createTrunc(conversion_value, type, "convUIntToBool");
+									} break;
+
+									case PIR::Intrinsic::Kind::convBoolToInt: {
+										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
+										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
+										return this->builder->createZExt(conversion_value, type, "convBoolToInt");
+									} break;
+
+									case PIR::Intrinsic::Kind::convBoolToUInt: {
+										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
+										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
+										return this->builder->createZExt(conversion_value, type, "convBoolToUInt");
+									} break;
 								};
 
 								evo::debugFatalBreak("Unkown intrinsic");

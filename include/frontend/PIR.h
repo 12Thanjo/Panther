@@ -47,6 +47,7 @@ namespace panther{
 				EVO_NODISCARD static inline auto Void() noexcept -> TypeVoidableID { return TypeVoidableID(); };
 
 				EVO_NODISCARD inline auto operator==(const TypeVoidableID& rhs) const noexcept -> bool { return this->id == rhs.id; };
+				// EVO_NODISCARD inline auto operator==(const TypeID& rhs) const noexcept -> bool { return this->isVoid() == false && this->id->id == rhs.id; };
 
 				EVO_NODISCARD inline auto typeID() const noexcept -> const TypeID& {
 					evo::debugAssert(this->isVoid() == false, "type is void");
@@ -198,6 +199,9 @@ namespace panther{
 					std::vector<OverloadedOperator> logicalNot{};
 					std::vector<OverloadedOperator> logicalAnd{};
 					std::vector<OverloadedOperator> logicalOr{};
+
+					std::vector<OverloadedOperator> as{};
+					std::vector<OverloadedOperator> cast{};					
 				} ops;
 		};
 
@@ -543,8 +547,14 @@ namespace panther{
 			//////////////////////////////////////////////////////////////////////
 
 			enum class Kind{
+				///////////////////////////////////
+				// misc
+
 				import,
 				breakpoint,
+
+				///////////////////////////////////
+				// arithmetic
 
 				// add
 				addInt,
@@ -578,6 +588,9 @@ namespace panther{
 				negateInt,
 
 
+				///////////////////////////////////
+				// logical
+
 				// Logical Int
 				equalInt,
 				notEqualInt,
@@ -602,6 +615,24 @@ namespace panther{
 				logicalNot,
 
 
+				///////////////////////////////////
+				// type conversion
+
+				// Int
+				convIntToUInt,
+				convIntToBool,
+
+				// UInt
+				convUIntToInt,
+				convUIntToBool,
+
+				// Bool
+				convBoolToInt,
+				convBoolToUInt,
+
+
+				///////////////////////////////////
+				// temporary
 
 				__printHelloWorld,
 				__printSeparator,

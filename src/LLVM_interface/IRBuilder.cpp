@@ -130,8 +130,25 @@ namespace panther{
 		};
 
 
+		//////////////////////////////////////////////////////////////////////
+		// type conversion
 
-		///////////////////////////////////
+		auto IRBuilder::createTrunc(llvm::Value* value, llvm::Type* dstType, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateTrunc(value, dstType, name.c_str());
+		};
+
+		auto IRBuilder::createZExt(llvm::Value* value, llvm::Type* dstType, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateZExt(value, dstType, name.c_str());
+		};
+
+		auto IRBuilder::createSExt(llvm::Value* value, llvm::Type* dstType, evo::CStrProxy name) noexcept -> llvm::Value* {
+			return this->builder->CreateSExt(value, dstType, name.c_str());
+		};
+
+
+
+
+		//////////////////////////////////////////////////////////////////////
 		// operators
 
 		auto IRBuilder::createAdd(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name) noexcept -> llvm::Value* {

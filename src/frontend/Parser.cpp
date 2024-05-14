@@ -663,24 +663,27 @@ namespace panther{
 
 	EVO_NODISCARD static constexpr auto get_infix_op_precedence(Token::Kind kind) noexcept -> int {
 		switch(kind){
-			case Token::KeywordAnd: return 1;
-			case Token::KeywordOr:  return 1;
+			case Token::KeywordAnd:  return 1;
+			case Token::KeywordOr:   return 1;
 
-			case Token::get("=="):  return 3;
-			case Token::get("!="):  return 3;
-			case Token::get("<"):   return 3;
-			case Token::get("<="):  return 3;
-			case Token::get(">"):   return 3;
-			case Token::get(">="):  return 3;
+			case Token::get("=="):   return 3;
+			case Token::get("!="):   return 3;
+			case Token::get("<"):    return 3;
+			case Token::get("<="):   return 3;
+			case Token::get(">"):    return 3;
+			case Token::get(">="):   return 3;
 
-			case Token::get("+"):   return 5;
-			case Token::get("+@"):  return 5;
-			case Token::get("-"):   return 5;
-			case Token::get("-@"):  return 5;
+			case Token::get("+"):    return 5;
+			case Token::get("+@"):   return 5;
+			case Token::get("-"):    return 5;
+			case Token::get("-@"):   return 5;
 
-			case Token::get("*"):   return 6;
-			case Token::get("*@"):  return 6;
-			case Token::get("/"):   return 6;
+			case Token::get("*"):    return 6;
+			case Token::get("*@"):   return 6;
+			case Token::get("/"):    return 6;
+
+			case Token::KeywordAs:	 return 7;
+			case Token::KeywordCast: return 7;
 		};
 
 		return -1;
@@ -701,11 +704,19 @@ namespace panther{
 		// skip operator
 		this->skip(1);
 
-		const Result next_term = this->parse_prefix_expr();
-		if(next_term.code() == Result::WrongType || next_term.code() == Result::Error){ return next_term; }
+		const Result rhs_result = [&]() noexcept {
+			if(peeked_kind == Token::KeywordAs || peeked_kind == Token::KeywordCast){
+				return this->parse_type();
+			}
 
-		const Result rhs_result = this->parse_infix_expr_impl(next_term.value(), next_op_prec);
-		if(next_term.code() == Result::WrongType || next_term.code() == Result::Error){ return next_term; }
+
+			const Result next_term = this->parse_prefix_expr();
+			if(next_term.code() == Result::WrongType || next_term.code() == Result::Error){ return next_term; }
+
+			return this->parse_infix_expr_impl(next_term.value(), next_op_prec);
+		}();
+
+		if(rhs_result.code() == Result::WrongType || rhs_result.code() == Result::Error){ return rhs_result; }
 
 
 		const AST::Node::ID created_infix_expr = this->create_node(

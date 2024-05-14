@@ -721,7 +721,8 @@ namespace panther{
 			this->indenter_push();
 				this->indenter_print();
 				this->info("op: ");
-				this->debug( std::format("{}\n", Token::printKind(this->ast_source->getToken(infix.op).kind)) );
+				const Token::Kind op_kind = this->ast_source->getToken(infix.op).kind;
+				this->debug(std::format("{}\n", Token::printKind(op_kind)));
 
 				this->indenter_print_arrow();
 				this->info("lhs:\n");
@@ -734,7 +735,11 @@ namespace panther{
 				this->info("rhs:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					this->print_expr(this->ast_source->getNode(infix.rhs));
+					if(op_kind == Token::KeywordAs || op_kind == Token::KeywordCast){
+						this->print_type(this->ast_source->getNode(infix.rhs));
+					}else{
+						this->print_expr(this->ast_source->getNode(infix.rhs));
+					}
 				this->indenter_pop();
 
 			this->indenter_pop();
@@ -757,7 +762,7 @@ namespace panther{
 							qualifier_str += ' ';
 						}
 					}
-					if(qualifier.isPtr){ qualifier_str += '^'; }
+					if(qualifier.isPtr){ qualifier_str += '&'; }
 					if(qualifier.isConst){ qualifier_str += '|'; }
 				}
 
@@ -925,7 +930,8 @@ namespace panther{
 
 						this->indenter_print();
 						this->info("Op: ");
-						this->debug( std::format("{}\n", Token::printKind(this->ast_source->getToken(infix.op).kind)) );
+						const Token::Kind op_kind = this->ast_source->getToken(infix.op).kind;
+						this->debug(std::format("{}\n", Token::printKind(op_kind)));
 
 						this->indenter_print_arrow();
 						this->info("LHS:\n");
@@ -938,7 +944,12 @@ namespace panther{
 						this->info("RHS:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							this->print_expr(this->ast_source->getNode(infix.rhs));
+							if(op_kind == Token::KeywordAs || op_kind == Token::KeywordCast){
+								this->indenter_print();
+								this->print_type(this->ast_source->getNode(infix.rhs));
+							}else{
+								this->print_expr(this->ast_source->getNode(infix.rhs));
+							}
 						this->indenter_pop();
 
 					this->indenter_pop();

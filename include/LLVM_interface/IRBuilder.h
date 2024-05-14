@@ -58,6 +58,14 @@ namespace panther{
 
 
 				///////////////////////////////////
+				// type conversion
+
+				auto createTrunc(llvm::Value* value, llvm::Type* dstType, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createZExt(llvm::Value* value, llvm::Type* dstType, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+				auto createSExt(llvm::Value* value, llvm::Type* dstType, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;
+
+
+				///////////////////////////////////
 				// operators
 
 				auto createAdd(llvm::Value* lhs, llvm::Value* rhs, bool nuw, bool nsw, evo::CStrProxy name = '\0') noexcept -> llvm::Value*;

@@ -188,6 +188,9 @@ namespace panther{
 
 			else if(ident_name == "alias")    { this->create_token(Token::Kind::KeywordAlias); }
 
+			else if(ident_name == "as")   { this->create_token(Token::Kind::KeywordAs); }
+			else if(ident_name == "cast") { this->create_token(Token::Kind::KeywordCast); }
+
 
 			///////////////////////////////////
 			// else

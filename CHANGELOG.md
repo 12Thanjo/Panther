@@ -1,5 +1,18 @@
 # Changelog
 
+### v0.28.0
+- Added the following intrinsic functions:
+	- `@convIntToUInt(Int read) -> UInt`
+	- `@convIntToBool(Int read) -> Bool`
+	- `@convUIntToInt(UInt read) -> Int`
+	- `@convUIntToBool(UInt read) -> Bool`
+	- `@convBoolToInt(Bool read) -> Int`
+	- `@convBoolToUInt(Bool read) -> UInt`
+- Added the following operators:
+	- `as`
+	- `cast`
+- Fixed printing of pointer types to reflect the change from `^` to `&`
+
 ### v0.27.1
 - Changed operator `&&` to `and`
 - Changed operator `||` to `or`

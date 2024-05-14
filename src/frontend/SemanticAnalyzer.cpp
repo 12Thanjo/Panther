@@ -1045,7 +1045,9 @@ namespace panther{
 
 		if(this->check_func_call(func_call, target_type_id.value()) == false){ return false; }
 
-		const std::vector<PIR::Expr> args = this->get_func_call_args(func_call);
+		const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
+		if(args.isError()){ return false; }
+
 		switch(this->source.getNode(func_call.target).kind){
 			case AST::Kind::Ident: {
 				const Token& ident_tok = this->source.getIdent(func_call.target);
@@ -1056,7 +1058,7 @@ namespace panther{
 
 
 				// create object
-				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args));
+				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
 				this->get_stmts_entry().emplace_back(func_call_id);
 
 				return true;
@@ -1071,7 +1073,7 @@ namespace panther{
 
 					if(intrinsic.ident == intrinsic_tok.value.string){
 						// create object
-						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(PIR::Intrinsic::ID(uint32_t(i)), std::move(args));
+						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(PIR::Intrinsic::ID(uint32_t(i)), std::move(args.value()));
 						this->get_stmts_entry().emplace_back(func_call_id);
 						
 						return true;
@@ -1099,7 +1101,7 @@ namespace panther{
 						if(imported_func_id.isError()){ return false; }
 						
 						// create object
-						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args));
+						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
 						this->get_stmts_entry().emplace_back(func_call_id);
 
 						return true;
@@ -1350,12 +1352,14 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::get_func_call_args(const AST::FuncCall& func_call) const noexcept -> std::vector<PIR::Expr> {
+	auto SemanticAnalyzer::get_func_call_args(const AST::FuncCall& func_call) const noexcept -> evo::Result<std::vector<PIR::Expr>> {
 		auto args = std::vector<PIR::Expr>();
 
 		for(AST::Node::ID arg_id : func_call.args){
+			if(this->analyze_and_get_type_of_expr(this->source.getNode(arg_id)).isError()){ return evo::resultError; }
+
 			const evo::Result<PIR::Expr> expr = this->is_global_scope() ? this->get_const_expr_value(arg_id) : this->get_expr_value(arg_id);
-			evo::debugAssert(expr.isSuccess(), "uncaught error");
+			if(expr.isError()){ return evo::resultError; }
 
 			args.emplace_back(expr.value());
 		}
@@ -1801,6 +1805,77 @@ namespace panther{
 
 						evo::debugFatalBreak("Unknown base type kind");
 					} break;
+
+
+
+					case Token::KeywordAs: case Token::KeywordCast: {
+
+						///////////////////////////////////
+						// lhs
+
+						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
+						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
+						if(lhs_type_id.isError()){ return evo::resultError; }
+
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
+
+						if(lhs_type.qualifiers.empty() == false){
+							this->source.error(
+								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
+							);
+							return evo::resultError;
+						}
+
+						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+
+
+						///////////////////////////////////
+						// rhs
+
+						const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs);
+						if(rhs_type_id.isError()){ return evo::resultError; }
+
+
+						///////////////////////////////////
+						// op checking
+
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
+
+
+						const std::vector<PIR::BaseType::OverloadedOperator>& op_list = [&]() noexcept {
+							switch(infix_op_kind){
+								case Token::KeywordAs:   return lhs_base_type.ops.as;
+								case Token::KeywordCast: return lhs_base_type.ops.cast;
+							};
+
+							evo::debugFatalBreak("invalid op for this infix case");
+						}();
+
+						for(const PIR::BaseType::OverloadedOperator& op : op_list){
+							if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
+								const PIR::Intrinsic& intrinsic = this->src_manager.getIntrinsic(op.intrinsic);
+								const PIR::BaseType& intrinsic_base_type = this->src_manager.getBaseType(intrinsic.baseType);
+
+								if(intrinsic_base_type.callOperator->returnType == rhs_type_id.value()){
+									return rhs_type_id.value().typeID();
+								}
+
+							}else{
+								evo::fatalBreak("Overloaded operators on user-defined types are not supported");
+							}
+						}
+						
+						// TODO: better messaging
+						this->source.error(
+							std::format("This type does not have a valid [{}] operator to that type", Token::printKind(infix_op_kind)), infix.rhs,
+							std::vector<Message::Info>{
+								Message::Info(std::format("From: {}", this->src_manager.printType(lhs_type_id.value()))),
+								Message::Info(std::format("To:   {}", this->src_manager.printType(rhs_type_id.value().typeID())))
+							}
+						);
+						return evo::resultError;
+					} break;
 				};
 
 				evo::debugFatalBreak("Unknown infix kind");
@@ -2079,7 +2154,8 @@ namespace panther{
 				const AST::FuncCall& func_call = this->source.getFuncCall(value_node);
 				const AST::Node& target_node = this->source.getNode(func_call.target);
 
-				const std::vector<PIR::Expr> args = this->get_func_call_args(func_call);
+				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
+				if(args.isError()){ return evo::resultError; }
 
 				if(target_node.kind == AST::Kind::Ident){
 					const std::string_view ident = this->source.getIdent(func_call.target).value.string;
@@ -2089,7 +2165,7 @@ namespace panther{
 					if(func_id.isError()){ return evo::resultError; }
 
 
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args));
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
 					return PIR::Expr(func_call_id);
 
 				}else if(target_node.kind == AST::Kind::Intrinsic){
@@ -2112,14 +2188,14 @@ namespace panther{
 
 					// imports
 					if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
-						const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args[0], func_call.target);
+						const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
 						if(import_source_id.isError()){ return evo::resultError; }
 
 						return PIR::Expr(import_source_id.value());
 					}
 
 					// function calls normally
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args));	
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
 					return PIR::Expr(func_call_id);
 
 				}else if(target_node.kind == AST::Kind::Infix){
@@ -2142,7 +2218,7 @@ namespace panther{
 
 							
 							// create object
-							const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args));
+							const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
 							return PIR::Expr(func_call_id);
 						} break;
 
@@ -2379,6 +2455,78 @@ namespace panther{
 
 					} break;
 
+
+					case Token::KeywordAs: case Token::KeywordCast: {
+
+						///////////////////////////////////
+						// lhs
+
+						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
+						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
+						if(lhs_type_id.isError()){ return evo::resultError; }
+
+						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
+
+						if(lhs_type.qualifiers.empty() == false){
+							this->source.error(
+								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
+							);
+							return evo::resultError;
+						}
+
+						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+
+
+						///////////////////////////////////
+						// rhs
+
+						const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs);
+						if(rhs_type_id.isError()){ return evo::resultError; }
+
+
+						///////////////////////////////////
+						// op checking
+
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
+						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
+
+
+						const std::vector<PIR::BaseType::OverloadedOperator>& op_list = [&]() noexcept {
+							switch(infix_op_kind){
+								case Token::KeywordAs:   return lhs_base_type.ops.as;
+								case Token::KeywordCast: return lhs_base_type.ops.cast;
+							};
+
+							evo::debugFatalBreak("invalid op for this infix case");
+						}();
+
+						for(const PIR::BaseType::OverloadedOperator& op : op_list){
+							if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
+								const PIR::Intrinsic& intrinsic = this->src_manager.getIntrinsic(op.intrinsic);
+								const PIR::BaseType& intrinsic_base_type = this->src_manager.getBaseType(intrinsic.baseType);
+
+								if(intrinsic_base_type.callOperator->returnType == rhs_type_id.value()){
+									const evo::Result<PIR::Expr> lhs_expr = this->get_expr_value(infix.lhs);
+									if(lhs_expr.isError()){ return evo::resultError; }
+
+									const PIR::FuncCall::ID func_call_id = 
+										this->source.createFuncCall(op.intrinsic, std::vector<PIR::Expr>{lhs_expr.value()});
+									return PIR::Expr(func_call_id);
+								}
+
+							}else{
+								evo::fatalBreak("Overloaded operators on user-defined types are not supported");
+							}
+						}
+						
+						// TODO: better messaging
+						this->source.error(
+							std::format("This type does not have a valid [{}] operator to that type", Token::printKind(infix_op_kind)),
+							infix.rhs
+						);
+						return evo::resultError;
+					} break;
+
 				};
 
 				evo::debugFatalBreak("Unknown or unsupported infix type");
@@ -2497,7 +2645,8 @@ namespace panther{
 				if(target_type_id.isError()){ return evo::resultError; }
 
 
-				const std::vector<PIR::Expr> args = this->get_func_call_args(func_call);
+				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
+				if(args.isError()){ return evo::resultError; }
 
 				// get the intrinsic id
 				const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
@@ -2517,14 +2666,14 @@ namespace panther{
 
 				// imports
 				if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
-					const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args[0], func_call.target);
+					const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
 					if(import_source_id.isError()){ return evo::resultError; }
 
 					return PIR::Expr(import_source_id.value());
 				}
 
 				// function calls normally
-				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args));	
+				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
 				return PIR::Expr(func_call_id);
 			} break;
 
@@ -2662,14 +2811,17 @@ namespace panther{
 					case Token::get("*@"): return ExprValueType::Ephemeral;
 					case Token::get("/"):  return ExprValueType::Ephemeral;
 
-					case Token::get("=="): return ExprValueType::Ephemeral;
-					case Token::get("!="): return ExprValueType::Ephemeral;
-					case Token::get("<"):  return ExprValueType::Ephemeral;
-					case Token::get("<="): return ExprValueType::Ephemeral;
-					case Token::get(">"):  return ExprValueType::Ephemeral;
-					case Token::get(">="): return ExprValueType::Ephemeral;
+					case Token::get("=="):  return ExprValueType::Ephemeral;
+					case Token::get("!="):  return ExprValueType::Ephemeral;
+					case Token::get("<"):   return ExprValueType::Ephemeral;
+					case Token::get("<="):  return ExprValueType::Ephemeral;
+					case Token::get(">"):   return ExprValueType::Ephemeral;
+					case Token::get(">="):  return ExprValueType::Ephemeral;
 					case Token::KeywordAnd: return ExprValueType::Ephemeral;
-					case Token::KeywordOr: return ExprValueType::Ephemeral;
+					case Token::KeywordOr:  return ExprValueType::Ephemeral;
+
+					case Token::KeywordAs:   return ExprValueType::Ephemeral;
+					case Token::KeywordCast: return ExprValueType::Ephemeral;
 				};
 				evo::debugFatalBreak("Unknown infix kind");
 			}break;
