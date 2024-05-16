@@ -154,6 +154,14 @@ namespace panther{
 		return this->func_calls[node.index];
 	};
 
+	auto Source::getInitializer(AST::Node::ID node_id) const noexcept -> const AST::Initializer& {
+		return this->getInitializer(this->getNode(node_id));
+	};
+	auto Source::getInitializer(const AST::Node& node) const noexcept -> const AST::Initializer& {
+		evo::debugAssert(node.kind == AST::Kind::Initializer, "Node is not a Initializer");
+		return this->initializers[node.index];
+	};
+
 
 
 	auto Source::getType(AST::Node::ID node_id) const noexcept -> const AST::Type& {
@@ -356,15 +364,24 @@ namespace panther{
 				return this->get_node_location(var_decl.ident);
 			} break;
 
+			case AST::Kind::TemplatePack: {
+				const AST::TemplatePack& template_pack = this->getTemplatePack(node);
+				return this->getToken(template_pack.startTok).location;
+			} break;
+
+			case AST::Kind::FuncParams: {
+				const AST::FuncParams& func_params_block = this->getFuncParams(node);
+				return this->getToken(func_params_block.startTok).location;
+			} break;
+
 			case AST::Kind::Func: {
 				const AST::Func& func = this->getFunc(node);
 				return this->get_node_location(func.ident);
 			} break;
 
-			case AST::Kind::Conditional: {
-				const AST::Conditional& conditional = this->getConditional(node);
-				const Token& token = this->getToken(conditional.ifTok);
-				return token.location;
+			case AST::Kind::Struct: {
+				const AST::Struct& struct_decl = this->getStruct(node);
+				return this->get_node_location(struct_decl.ident);
 			} break;
 
 			case AST::Kind::Return: {
@@ -372,7 +389,20 @@ namespace panther{
 				const Token& token = this->getToken(return_stmt.keyword);
 				return token.location;
 			} break;
+
+			case AST::Kind::Conditional: {
+				const AST::Conditional& conditional = this->getConditional(node);
+				const Token& token = this->getToken(conditional.ifTok);
+				return token.location;
+			} break;
 			
+			case AST::Kind::Alias: {
+				const AST::Alias& alias = this->getAlias(node);
+				return this->get_node_location(alias.ident);
+			} break;
+
+
+
 			case AST::Kind::Type: {
 				const AST::Type& type = this->getType(node);
 				if(type.isBuiltin){
@@ -384,9 +414,8 @@ namespace panther{
 			} break;
 
 			case AST::Kind::Block: {
-				EVO_FATAL_BREAK("Cannot get location of AST::Block");
+				evo::debugFatalBreak("Cannot get location of AST::Block");
 			} break;
-
 
 			case AST::Kind::Prefix: {
 				const AST::Prefix& prefix = this->getPrefix(node);
@@ -412,11 +441,16 @@ namespace panther{
 				return op_token.location;
 			} break;
 
-
 			case AST::Kind::FuncCall: {
 				const AST::FuncCall& func_call = this->getFuncCall(node);
 				return this->get_node_location(func_call.target);
 			} break;
+
+			case AST::Kind::Initializer: {
+				const AST::Initializer& initializer = this->getInitializer(node);
+				return this->get_node_location(initializer.type);
+			} break;
+
 
 
 			case AST::Kind::Ident: {

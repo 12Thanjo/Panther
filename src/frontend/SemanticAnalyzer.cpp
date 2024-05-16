@@ -387,7 +387,7 @@ namespace panther{
 			// if no circular members found, add the new member to the type
 			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
 			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
-			struct_data.memberVars.emplace_back(ident.value.string, var_decl.isDef, *var_type_id);
+			struct_data.memberVars.emplace_back(ident.value.string, var_decl.isDef, *var_type_id, var_value.value());
 
 		}else{
 			evo::debugFatalBreak("Unknown scope type");
@@ -1882,6 +1882,91 @@ namespace panther{
 			} break;
 
 
+			case AST::Kind::Initializer: {
+				const AST::Initializer& initializer = this->source.getInitializer(node);
+
+				const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type);
+				if(initializer_type_id.isError()){ return evo::resultError; }
+
+				if(initializer_type_id.value().isVoid()){
+					this->source.error("Struct initializer cannot be type Void", initializer.type);
+					return evo::resultError;
+				}
+
+				const PIR::Type& initializer_type = this->src_manager.getType(initializer_type_id.value().typeID());
+				evo::debugAssert(initializer_type.qualifiers.empty(), "Struct initializer should not have qualifiers");
+
+				const PIR::BaseType& initializer_base_type = this->src_manager.getBaseType(initializer_type.baseType);
+				evo::debugAssert(initializer_base_type.kind == PIR::BaseType::Kind::Struct, "Expected struct type in initializer");
+
+				const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(initializer_base_type.data);
+
+				// check which members have values and type-check the members
+				auto members_with_value = std::vector<bool>(struct_data.memberVars.size(), false);
+				for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+					if(struct_data.memberVars[i].defaultValue.kind != PIR::Expr::Kind::None){
+						members_with_value[i] = true;
+					}
+				}
+
+				for(const AST::Initializer::Member& member_val : initializer.members){
+					const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
+
+					bool found_member = false;
+					for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+
+						if(struct_data.memberVars[i].name == member_ident){
+							members_with_value[i] = true;
+							found_member = true;
+
+							const AST::Node& member_val_node = this->source.getNode(member_val.value);
+
+							if(member_val_node.kind == AST::Kind::Uninit){ break; }
+
+
+							const evo::Result<PIR::Type::ID> member_val_type_id = this->analyze_and_get_type_of_expr(member_val_node);
+							if(member_val_type_id.isError()){ return evo::resultError; }
+
+							if(this->is_implicitly_convertable_to(
+								this->src_manager.getType(member_val_type_id.value()), 
+								this->src_manager.getType(struct_data.memberVars[i].type),
+								member_val_node
+							) == false){
+								this->source.error(
+									"Member cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
+									member_val_node,
+									std::vector<Message::Info>{
+										{std::string("Member is of type:     ") + this->src_manager.printType(struct_data.memberVars[i].type)},
+										{std::string("Expression is of type: ") + this->src_manager.printType(member_val_type_id.value())}
+									}
+								);
+								return evo::resultError;	
+							}
+
+							break;
+						}
+					}
+
+					if(found_member == false){
+						// TODO: better messaging
+						this->source.error(std::format("Member \"{}\" does not exist", member_ident), member_val.ident);
+						return evo::resultError;
+					}
+				}
+
+				// check that all members have values
+				for(size_t i = 0; i < members_with_value.size(); i+=1){
+					if(members_with_value[i] == false){
+						const std::string_view member_ident = struct_data.memberVars[i].name;
+						this->source.error(std::format("In struct initializer, member \"{}\" was not given a value", member_ident), node);
+						return evo::resultError;
+					}
+				}
+
+				return initializer_type_id.value().typeID();
+			} break;
+
+
 			case AST::Kind::Postfix: {
 				const AST::Postfix& postfix = this->source.getPostfix(node);
 
@@ -1930,7 +2015,18 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID> {
-		const AST::Type& type = this->source.getType(node_id);
+		const AST::Node& node = this->source.getNode(node_id);
+
+		const AST::Type type = [&]() noexcept {
+			if(node.kind == AST::Kind::Type){
+				return this->source.getType(node);
+
+			}else if(node.kind == AST::Kind::Ident || node.kind == AST::Kind::Infix){
+				return AST::Type(AST::Type::Base{ .node = node_id }, false, {});
+			}else{
+				evo::debugFatalBreak("Unknown node kind");
+			}
+		}();
 
 		auto base_type_id = std::optional<PIR::BaseType::ID>();
 		auto type_qualifiers = std::vector<AST::Type::Qualifier>();
@@ -1941,7 +2037,7 @@ namespace panther{
 
 			if(type_token.kind == Token::TypeVoid){
 				if(type.qualifiers.empty() == false){
-					this->source.error("Void type cannot have qualifiers", node_id);
+					this->source.error("Void type cannot have qualifiers", node);
 					return evo::resultError;
 				}
 
@@ -1949,7 +2045,7 @@ namespace panther{
 			}
 
 			if(type_token.kind == Token::TypeString){
-				this->source.error("String type is not supported yet", node_id);
+				this->source.error("String type is not supported yet", node);
 				return evo::resultError;
 			}
 
@@ -1973,7 +2069,7 @@ namespace panther{
 							const Alias& alias = scope.aliases.at(ident);
 
 							if(type.qualifiers.empty() == false && alias.type_id.isVoid()){
-								this->source.error("Void type cannot have qualifiers", node_id); 
+								this->source.error("Void type cannot have qualifiers", node); 
 								return evo::resultError;
 							}
 
@@ -2007,7 +2103,8 @@ namespace panther{
 						return evo::resultError;
 					}
 
-					const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
+					const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() 
+						? this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
 					if(value_of_lhs.isError()){ return evo::resultError; }
 					evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
@@ -2229,6 +2326,68 @@ namespace panther{
 
 				evo::debugFatalBreak("Unknown func target kind");
 
+			} break;
+
+			case AST::Kind::Initializer: {
+				const AST::Initializer& initializer = this->source.getInitializer(value_node);
+
+				const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type);
+				if(initializer_type_id.isError()){ return evo::resultError; }
+
+				if(initializer_type_id.value().isVoid()){
+					this->source.error("Struct initializer cannot be type Void", initializer.type);
+					return evo::resultError;
+				}
+
+				const PIR::Type& initializer_type = this->src_manager.getType(initializer_type_id.value().typeID());
+				evo::debugAssert(initializer_type.qualifiers.empty(), "Struct initializer should not have qualifiers");
+
+				const PIR::BaseType& initializer_base_type = this->src_manager.getBaseType(initializer_type.baseType);
+				evo::debugAssert(initializer_base_type.kind == PIR::BaseType::Kind::Struct, "Expected struct type in initializer");
+
+				const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(initializer_base_type.data);
+
+				// get member values
+				auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr());
+				auto members_set = std::vector<bool>(struct_data.memberVars.size(), false);
+				for(const AST::Initializer::Member& member_val : initializer.members){
+					const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
+
+					for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+						if(struct_data.memberVars[i].name == member_ident){
+							members_set[i] = true;
+
+							if(this->source.getNode(member_val.value).kind == AST::Kind::Uninit){ break; }
+
+							const evo::Result<PIR::Expr> member_val_expr = this->get_expr_value(member_val.value);
+							if(member_val_expr.isError()){ return evo::resultError; }
+
+							member_values[i] = member_val_expr.value();
+
+							break;
+						}
+					}
+				}
+
+
+				// get defaults
+				for(size_t i = 0; i < member_values.size(); i+=1){
+					if(members_set[i]){ continue; }
+
+					const PIR::Expr& default_value = struct_data.memberVars[i].defaultValue;
+
+					if(default_value.kind != PIR::Expr::Kind::ASTNode){
+						member_values[i] = default_value;
+						continue;
+					}
+
+					const AST::Node& default_value_node = this->source.getNode(default_value.astNode);
+					if(default_value_node.kind != AST::Kind::Uninit){
+						member_values[i] = default_value;
+					}
+				}
+
+				return PIR::Expr(this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
 			} break;
 
 
@@ -2625,7 +2784,7 @@ namespace panther{
 					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in const expr");
 				}
 
-				evo::debugFatalBreak("Unkown ident");
+				evo::debugFatalBreak("Unknown ident: {}", value_ident_str);
 
 			} break;
 
@@ -2799,7 +2958,7 @@ namespace panther{
 							return evo::resultError;
 
 						}else{
-							return ExprValueType::Concrete;
+							return this->get_expr_value_type(infix.lhs);
 						}
 					} break;
 
@@ -2834,6 +2993,8 @@ namespace panther{
 				};
 				evo::debugFatalBreak("Unknown postfix kind");
 			} break;
+
+			break; case AST::Kind::Initializer: return ExprValueType::Ephemeral;
 
 			break; case AST::Kind::Ident: return ExprValueType::Concrete;
 			break; case AST::Kind::Intrinsic: return ExprValueType::Concrete;

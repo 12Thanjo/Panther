@@ -17,6 +17,100 @@ namespace panther{
 	namespace PIR{
 
 		//////////////////////////////////////////////////////////////////////
+		// statements / expressions
+
+		struct VarID{ // typesafe identifier
+			Source& source;
+			uint32_t id;
+			explicit VarID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
+		};
+
+		struct ParamID{ // typesafe identifier
+			uint32_t id;
+			explicit ParamID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+
+		struct PrefixID{ // typesafe identifier
+			uint32_t id;
+			explicit PrefixID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+		struct DerefID{ // typesafe identifier
+			uint32_t id;
+			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+		struct AccessorID{ // typesafe identifier
+			uint32_t id;
+			explicit AccessorID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+		struct FuncCallID{
+			uint32_t id;
+			explicit FuncCallID(uint32_t _id) noexcept : id(_id){};
+		};
+
+		struct InitializerID{ // typesafe identifier
+			uint32_t id;
+			explicit InitializerID(uint32_t _id) noexcept : id(_id) {};
+		};
+
+
+
+
+		///////////////////////////////////
+		// expressions
+
+
+		struct Expr{
+			enum class Kind{
+				None, // might not need this eventually
+				Var,
+				Param,
+				ASTNode,
+				FuncCall,
+				Initializer,
+				Prefix,
+				Deref,
+				Accessor,
+				Import,
+			} kind;
+
+			union {
+				evo::byte dummy;
+				VarID var;
+				ParamID param;
+				AST::Node::ID astNode;
+				FuncCallID funcCall;
+				InitializerID initializer;
+				PrefixID prefix;
+				DerefID deref;
+				AccessorID accessor;
+				SourceID import;
+			};
+
+			explicit Expr()                             : kind(Kind::None), dummy(0) {};
+			explicit Expr(VarID id)                     : kind(Kind::Var), var(id) {};
+			explicit Expr(ParamID id)                   : kind(Kind::Param), param(id) {};
+			explicit Expr(AST::Node::ID node)           : kind(Kind::ASTNode), astNode(node) {};
+			explicit Expr(FuncCallID func_call_id)      : kind(Kind::FuncCall), funcCall(func_call_id) {};
+			explicit Expr(InitializerID initializer_id) : kind(Kind::Initializer), initializer(initializer_id) {};
+			explicit Expr(PrefixID prefix_id)           : kind(Kind::Prefix), prefix(prefix_id) {};
+			explicit Expr(DerefID deref_id)             : kind(Kind::Deref), deref(deref_id) {};
+			explicit Expr(AccessorID accessor_id)       : kind(Kind::Accessor), accessor(accessor_id) {};
+			explicit Expr(SourceID src_id)              : kind(Kind::Import), import(src_id) {};
+
+			auto operator=(const Expr& rhs) noexcept -> Expr& {
+				std::memcpy(this, &rhs, sizeof(Expr));
+
+				return *this;
+			};
+		};
+
+
+
+		//////////////////////////////////////////////////////////////////////
 		// types
 
 		struct TypeID{ // typesafe identifier
@@ -133,6 +227,7 @@ namespace panther{
 						std::string_view name;
 						bool isDef;
 						TypeID type;
+						Expr defaultValue;
 					};
 					std::vector<MemberVar> memberVars{};
 
@@ -201,7 +296,7 @@ namespace panther{
 					std::vector<OverloadedOperator> logicalOr{};
 
 					std::vector<OverloadedOperator> as{};
-					std::vector<OverloadedOperator> cast{};					
+					std::vector<OverloadedOperator> cast{};
 				} ops;
 		};
 
@@ -225,83 +320,7 @@ namespace panther{
 
 
 		//////////////////////////////////////////////////////////////////////
-		// statements / expressions
-
-		struct VarID{ // typesafe identifier
-			Source& source;
-			uint32_t id;
-			explicit VarID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
-		};
-
-		struct ParamID{ // typesafe identifier
-			uint32_t id;
-			explicit ParamID(uint32_t _id) noexcept : id(_id) {};
-		};
-
-
-		struct PrefixID{ // typesafe identifier
-			uint32_t id;
-			explicit PrefixID(uint32_t _id) noexcept : id(_id) {};
-		};
-
-		struct DerefID{ // typesafe identifier
-			uint32_t id;
-			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
-		};
-
-		struct AccessorID{ // typesafe identifier
-			uint32_t id;
-			explicit AccessorID(uint32_t _id) noexcept : id(_id) {};
-		};
-
-		struct FuncCallID{
-			uint32_t id;
-			explicit FuncCallID(uint32_t _id) noexcept : id(_id){};
-		};
-
-
-
-
-		///////////////////////////////////
-		// expressions
-
-
-		struct Expr{
-			enum class Kind{
-				None, // might not need this eventually
-				Var,
-				Param,
-				ASTNode,
-				FuncCall,
-				Prefix,
-				Deref,
-				Accessor,
-				Import,
-			} kind;
-
-			union {
-				evo::byte dummy; // might not need this eventually
-				VarID var;
-				ParamID param;
-				AST::Node::ID astNode;
-				FuncCallID funcCall;
-				PrefixID prefix;
-				DerefID deref;
-				AccessorID accessor;
-				SourceID import;
-			};
-
-			explicit Expr()                        : kind(Kind::None), dummy(0) {}; // might not need this eventually
-			explicit Expr(VarID id)                : kind(Kind::Var), var(id) {};
-			explicit Expr(ParamID id)              : kind(Kind::Param), param(id) {};
-			explicit Expr(AST::Node::ID node)      : kind(Kind::ASTNode), astNode(node) {};
-			explicit Expr(FuncCallID func_call_id) : kind(Kind::FuncCall), funcCall(func_call_id) {};
-			explicit Expr(PrefixID prefix_id)      : kind(Kind::Prefix), prefix(prefix_id) {};
-			explicit Expr(DerefID deref_id)        : kind(Kind::Deref), deref(deref_id) {};
-			explicit Expr(AccessorID accessor_id)  : kind(Kind::Accessor), accessor(accessor_id) {};			
-			explicit Expr(SourceID src_id)         : kind(Kind::Import), import(src_id) {};
-		};
-
+		// statements / expressions data
 
 		struct FuncCall{
 			using ID = FuncCallID;
@@ -321,6 +340,14 @@ namespace panther{
 
 			FuncCall(FuncID func_id, std::vector<Expr> _args) : kind(Kind::Func), func(func_id), args(_args) {};
 			FuncCall(IntrinsicID intrinsic_id, std::vector<Expr> _args) : kind(Kind::Intrinsic), intrinsic(intrinsic_id), args(_args) {};
+		};
+
+
+		struct Initializer{
+			using ID = InitializerID;
+
+			Type::ID type;
+			std::vector<Expr> memberVals;
 		};
 
 

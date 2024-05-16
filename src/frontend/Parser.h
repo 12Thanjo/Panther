@@ -84,12 +84,9 @@ namespace panther{
 			EVO_NODISCARD auto parse_prefix_expr() noexcept -> Result;
 			EVO_NODISCARD auto parse_postfix_expr() noexcept -> Result;
 
-			EVO_NODISCARD auto parse_accessor_expr() noexcept -> Result;
-
+			EVO_NODISCARD auto parse_term(bool is_type_term = false) noexcept -> Result;
 			EVO_NODISCARD auto parse_paren_expr() noexcept -> Result;
-
-
-			EVO_NODISCARD auto parse_term() noexcept -> Result;
+			EVO_NODISCARD auto parse_atom() noexcept -> Result;
 
 			EVO_NODISCARD auto parse_ident() noexcept -> Result;
 			EVO_NODISCARD auto parse_literal() noexcept -> Result;

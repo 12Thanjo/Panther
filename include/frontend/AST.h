@@ -15,7 +15,6 @@ namespace panther{
 			Return,
 			Conditional,
 			Alias,
-			Cast,
 			
 			Type,
 			Block,
@@ -23,6 +22,7 @@ namespace panther{
 			Infix,
 			Postfix,
 			FuncCall,
+			Initializer,
 
 			// tokens
 			Ident,
@@ -46,8 +46,8 @@ namespace panther{
 				Token::ID token;
 			};
 
-			Node(Kind node_kind, uint32_t node_index) : kind(node_kind), index(node_index){};
-			Node(Kind node_kind, Token::ID token_id) : kind(node_kind), token(token_id){};
+			Node(Kind node_kind, uint32_t node_index) noexcept : kind(node_kind), index(node_index){};
+			Node(Kind node_kind, Token::ID token_id) noexcept : kind(node_kind), token(token_id){};
 		};
 
 
@@ -61,6 +61,8 @@ namespace panther{
 		};
 
 		struct TemplatePack{
+			Token::ID startTok;
+
 			struct Template{
 				Node::ID ident;
 
@@ -78,6 +80,8 @@ namespace panther{
 		};
 
 		struct FuncParams{
+			Token::ID startTok;
+			
 			struct Param{
 				Node::ID ident;
 				Node::ID type;
@@ -129,18 +133,6 @@ namespace panther{
 		};
 
 
-		struct Cast{
-			Node::ID value;
-			Node::ID type;
-
-			enum class Kind{
-				As,
-				Cast,
-			} kind;
-		};
-
-
-
 
 		struct Type{
 			union Base{
@@ -187,6 +179,16 @@ namespace panther{
 			Node::ID target;
 			std::optional<std::vector<Node::ID>> template_args;
 			std::vector<Node::ID> args;
+		};
+
+		struct Initializer{
+			Node::ID type;
+
+			struct Member{
+				Node::ID ident;
+				Node::ID value;
+			};
+			std::vector<Member> members;
 		};
 
 

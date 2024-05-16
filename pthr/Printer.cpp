@@ -748,58 +748,72 @@ namespace panther{
 
 
 		auto Printer::print_type(const AST::Node& node) noexcept -> void {
-			const AST::Type& type = this->ast_source->getType(node);
+			if(node.kind == AST::Kind::Type){
+				const AST::Type& type = this->ast_source->getType(node);
 
-
-			auto print_qualifiers = [&]() noexcept -> void {
-				auto qualifier_str = std::string();
-				bool is_first_qualifer = true;
-				for(const AST::Type::Qualifier& qualifier : type.qualifiers){
-					if(type.qualifiers.size() > 1){
-						if(is_first_qualifer){
-							is_first_qualifer = false;
-						}else{
-							qualifier_str += ' ';
+				auto print_qualifiers = [&]() noexcept -> void {
+					auto qualifier_str = std::string();
+					bool is_first_qualifer = true;
+					for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+						if(type.qualifiers.size() > 1){
+							if(is_first_qualifer){
+								is_first_qualifer = false;
+							}else{
+								qualifier_str += ' ';
+							}
 						}
+						if(qualifier.isPtr){ qualifier_str += '&'; }
+						if(qualifier.isConst){ qualifier_str += '|'; }
 					}
-					if(qualifier.isPtr){ qualifier_str += '&'; }
-					if(qualifier.isConst){ qualifier_str += '|'; }
+
+					this->debug(qualifier_str);
+				};
+
+					
+				if(type.isBuiltin){
+					this->print(" ");
+					this->debug(Token::printKind(this->ast_source->getToken(type.base.token).kind));
+					print_qualifiers();
+					this->trace(" [BUILTIN]\n");
+
+				}else{
+					this->print("\n");
+
+					this->indenter_push();
+						this->indenter_print();
+						this->info("Base Type:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(this->ast_source->getNode(type.base.node));
+						this->indenter_pop();
+
+						this->indenter_set_end();
+						this->indenter_print();
+						this->info("Qualifiers: ");
+						if(type.qualifiers.empty()){
+							this->debug("[NONE]\n");
+						}else{
+							print_qualifiers();
+							this->print("\n");
+						}
+
+					this->indenter_pop();
 				}
 
-				this->debug(qualifier_str);
-			};
-
-				
-			if(type.isBuiltin){
-				this->print(" ");
-				this->debug(Token::printKind(this->ast_source->getToken(type.base.token).kind));
-				print_qualifiers();
-				this->trace(" [BUILTIN]\n");
-
-			}else{
+			}else if(node.kind == AST::Kind::Infix){
 				this->print("\n");
 
 				this->indenter_push();
-					this->indenter_print();
-					this->info("Base Type:\n");
-					this->indenter_push();
-						this->indenter_set_end();
-						this->print_expr(this->ast_source->getNode(type.base.node));
-					this->indenter_pop();
-
 					this->indenter_set_end();
-					this->indenter_print();
-					this->info("Qualifiers: ");
-					if(type.qualifiers.empty()){
-						this->debug("[NONE]\n");
-					}else{
-						print_qualifiers();
-						this->print("\n");
-					}
-
+					this->print_expr(node);
 				this->indenter_pop();
-			}
 
+			}else if(node.kind == AST::Kind::Ident){
+				this->print_ident(node);
+
+			}else{
+				evo::debugFatalBreak("Invalid type kind");
+			}
 		};
 
 
@@ -877,9 +891,9 @@ namespace panther{
 							this->indenter_push();
 								for(size_t i = 0; i < func_call.args.size(); i+=1){
 									if(i - 1 < func_call.args.size()){
-										this->indenter_set_arrow();
-									}else{
 										this->indenter_set_end();
+									}else{
+										this->indenter_set_arrow();
 									}
 									this->indenter_print();
 
@@ -893,6 +907,43 @@ namespace panther{
 						}
 
 					this->indenter_pop();
+				} break;
+
+				case AST::Kind::Initializer: {
+					const AST::Initializer& initializer = this->ast_source->getInitializer(node);
+
+					this->indenter_print();
+					this->info("Initializer:\n");
+
+					this->indenter_push();
+						this->indenter_print();
+						this->info("Type: ");
+						this->print_type(this->ast_source->getNode(initializer.type));
+
+						this->indenter_print_end();
+						this->info("Members:\n");
+						this->indenter_push();
+							for(size_t i = 0; i < initializer.members.size(); i+=1){
+								if(i - 1 < initializer.members.size()){
+									this->indenter_set_end();
+								}else{
+									this->indenter_set_arrow();
+								}
+								this->indenter_print();
+
+								this->info(std::format("member {}:\n", i));
+								this->indenter_push();
+									this->indenter_print();
+									this->info("ident: ");
+									this->print_ident(this->ast_source->getNode(initializer.members[i].ident));
+
+									this->indenter_set_end();
+									this->print_expr(this->ast_source->getNode(initializer.members[i].value));
+								this->indenter_pop();
+							}
+						this->indenter_pop();
+					this->indenter_pop();
+					
 				} break;
 
 

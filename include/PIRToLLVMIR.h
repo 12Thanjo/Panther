@@ -603,8 +603,18 @@ namespace panther{
 				};
 
 				
-
 				evo::debugFatalBreak("Unknown type");
+			};
+
+
+			EVO_NODISCARD inline auto type_has_members(const PIR::Type& type) noexcept -> bool {
+				if(type.qualifiers.empty() == false){
+					return !type.qualifiers.back().isPtr;
+				}
+
+				const PIR::BaseType& base_type = this->src_manager->getBaseType(type.baseType);
+
+				return base_type.kind == PIR::BaseType::Kind::Struct;
 			};
 
 
@@ -732,7 +742,16 @@ namespace panther{
 
 								const std::vector<llvm::Value*> args = this->create_func_call_args(func_call);
 
-								return llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvmFunc, args, '\0'));								
+								llvm::Value* return_register = llvmint::ptrcast<llvm::Value>(this->builder->createCall(func.llvmFunc, args, ".call"));
+
+								if(should_load){
+									return return_register;
+								}else{
+									const PIR::Type& return_type = this->src_manager->getType(func.returnType.typeID());
+									llvm::AllocaInst* alloca_val = this->builder->createAlloca(this->get_type(return_type), ".call.ret");
+									this->builder->createStore(alloca_val, return_register);
+									return llvmint::ptrcast<llvm::Value>(alloca_val);
+								}
 							} break;
 
 							case PIR::FuncCall::Kind::Intrinsic: {
@@ -745,13 +764,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::addInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createAdd(lhs, rhs, false, true, "addInt");
+										return this->builder->createAdd(lhs, rhs, false, true, ".addInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::addUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createAdd(lhs, rhs, true, false, "addUInt");
+										return this->builder->createAdd(lhs, rhs, true, false, ".addUInt");
 									} break;
 
 
@@ -761,13 +780,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::addWrapInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createAdd(lhs, rhs, false, false, "addWrapInt");
+										return this->builder->createAdd(lhs, rhs, false, false, ".addWrapInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::addWrapUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createAdd(lhs, rhs, false, false, "addWrapUInt");
+										return this->builder->createAdd(lhs, rhs, false, false, ".addWrapUInt");
 									} break;
 
 
@@ -777,13 +796,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::subInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSub(lhs, rhs, false, true, "subInt");
+										return this->builder->createSub(lhs, rhs, false, true, ".subInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::subUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSub(lhs, rhs, true, false, "subUInt");
+										return this->builder->createSub(lhs, rhs, true, false, ".subUInt");
 									} break;
 
 
@@ -793,13 +812,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::subWrapInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSub(lhs, rhs, false, false, "subWrapInt");
+										return this->builder->createSub(lhs, rhs, false, false, ".subWrapInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::subWrapUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSub(lhs, rhs, false, false, "subWrapUInt");
+										return this->builder->createSub(lhs, rhs, false, false, ".subWrapUInt");
 									} break;
 
 
@@ -809,13 +828,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::mulInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createMul(lhs, rhs, false, true, "mulInt");
+										return this->builder->createMul(lhs, rhs, false, true, ".mulInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::mulUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createMul(lhs, rhs, false, false, "mulUInt");
+										return this->builder->createMul(lhs, rhs, false, false, ".mulUInt");
 									} break;
 
 
@@ -825,13 +844,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::mulWrapInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSub(lhs, rhs, false, false, "mulWrapInt");
+										return this->builder->createSub(lhs, rhs, false, false, ".mulWrapInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::mulWrapUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSub(lhs, rhs, false, false, "mulWrapUInt");
+										return this->builder->createSub(lhs, rhs, false, false, ".mulWrapUInt");
 									} break;
 
 
@@ -841,13 +860,13 @@ namespace panther{
 									case PIR::Intrinsic::Kind::divInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createSDiv(lhs, rhs, "divInt");
+										return this->builder->createSDiv(lhs, rhs, ".divInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::divUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createUDiv(lhs, rhs, "divUInt");
+										return this->builder->createUDiv(lhs, rhs, ".divUInt");
 									} break;
 
 
@@ -857,7 +876,7 @@ namespace panther{
 									case PIR::Intrinsic::Kind::negateInt: {
 										llvm::Value* zero = llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(0));
 										llvm::Value* rhs = this->get_value(func_call.args[0]);
-										return this->builder->createSub(zero, rhs, false, true, "negateInt");
+										return this->builder->createSub(zero, rhs, false, true, ".negateInt");
 									} break;
 
 
@@ -867,37 +886,37 @@ namespace panther{
 									case PIR::Intrinsic::Kind::equalInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpEQ(lhs, rhs, "equalInt");
+										return this->builder->createICmpEQ(lhs, rhs, ".equalInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::notEqualInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpNE(lhs, rhs, "notEqualInt");
+										return this->builder->createICmpNE(lhs, rhs, ".notEqualInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::lessThanInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpSLT(lhs, rhs, "lessThanInt");
+										return this->builder->createICmpSLT(lhs, rhs, ".lessThanInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::lessThanEqualInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpSLE(lhs, rhs, "lessThanEqualInt");
+										return this->builder->createICmpSLE(lhs, rhs, ".lessThanEqualInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::greaterThanInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpSGT(lhs, rhs, "greaterThanInt");
+										return this->builder->createICmpSGT(lhs, rhs, ".greaterThanInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::greaterThanEqualInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpSGE(lhs, rhs, "greaterThanEqualInt");
+										return this->builder->createICmpSGE(lhs, rhs, ".greaterThanEqualInt");
 									} break;
 
 
@@ -907,37 +926,37 @@ namespace panther{
 									case PIR::Intrinsic::Kind::equalUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpEQ(lhs, rhs, "equalUInt");
+										return this->builder->createICmpEQ(lhs, rhs, ".equalUInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::notEqualUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpNE(lhs, rhs, "notEqualUInt");
+										return this->builder->createICmpNE(lhs, rhs, ".notEqualUInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::lessThanUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpULT(lhs, rhs, "lessThanUInt");
+										return this->builder->createICmpULT(lhs, rhs, ".lessThanUInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::lessThanEqualUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpULE(lhs, rhs, "lessThanEqualUInt");
+										return this->builder->createICmpULE(lhs, rhs, ".lessThanEqualUInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::greaterThanUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpUGT(lhs, rhs, "greaterThanUInt");
+										return this->builder->createICmpUGT(lhs, rhs, ".greaterThanUInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::greaterThanEqualUInt: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpUGE(lhs, rhs, "greaterThanEqualUInt");
+										return this->builder->createICmpUGE(lhs, rhs, ".greaterThanEqualUInt");
 									} break;
 
 
@@ -947,25 +966,29 @@ namespace panther{
 									case PIR::Intrinsic::Kind::equalBool: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpEQ(lhs, rhs, "equalBool");
+										return this->builder->createICmpEQ(lhs, rhs, ".equalBool");
 									} break;
 
 									case PIR::Intrinsic::Kind::notEqualBool: {
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
-										return this->builder->createICmpNE(lhs, rhs, "notEqualBool");
+										return this->builder->createICmpNE(lhs, rhs, ".notEqualBool");
 									} break;
 
 									case PIR::Intrinsic::Kind::logicalAnd: {
 										llvm::BasicBlock* starting_block = this->builder->getInsertPoint();
-										llvm::BasicBlock* logical_and_rhs = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.rhs");
+										llvm::BasicBlock* logical_and_rhs = this->builder->createBasicBlock(
+											this->current_func->llvmFunc, ".logicalAnd.rhs"
+										);
 
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 
 										this->builder->setInsertionPoint(logical_and_rhs);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
 										llvm::BasicBlock* block_after_rhs = this->builder->getInsertPoint();
-										llvm::BasicBlock* logical_and_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalAnd.end");
+										llvm::BasicBlock* logical_and_end = this->builder->createBasicBlock(
+											this->current_func->llvmFunc, ".logicalAnd.end"
+										);
 										this->builder->createBranch(logical_and_end);
 
 										this->builder->setInsertionPoint(starting_block);
@@ -976,19 +999,23 @@ namespace panther{
 										return this->builder->createPhi(llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool()), {
 											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(false)), starting_block),
 											llvmint::IRBuilder::PhiIncoming(rhs, block_after_rhs),
-										}, "logicalAnd");
+										}, ".logicalAnd");
 									} break;
 
 									case PIR::Intrinsic::Kind::logicalOr: {
 										llvm::BasicBlock* starting_block = this->builder->getInsertPoint();
-										llvm::BasicBlock* logical_or_rhs = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.rhs");
+										llvm::BasicBlock* logical_or_rhs = this->builder->createBasicBlock(
+											this->current_func->llvmFunc, ".logicalOr.rhs"
+										);
 
 										llvm::Value* lhs = this->get_value(func_call.args[0]);
 
 										this->builder->setInsertionPoint(logical_or_rhs);
 										llvm::Value* rhs = this->get_value(func_call.args[1]);
 										llvm::BasicBlock* block_after_rhs = this->builder->getInsertPoint();
-										llvm::BasicBlock* logical_or_end = this->builder->createBasicBlock(this->current_func->llvmFunc, "logicalOr.end");
+										llvm::BasicBlock* logical_or_end = this->builder->createBasicBlock(
+											this->current_func->llvmFunc, ".logicalOr.end"
+										);
 										this->builder->createBranch(logical_or_end);
 
 										this->builder->setInsertionPoint(starting_block);
@@ -999,12 +1026,12 @@ namespace panther{
 										return this->builder->createPhi(llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool()), {
 											llvmint::IRBuilder::PhiIncoming(llvmint::ptrcast<llvm::Value>(this->builder->valueBool(true)), starting_block),
 											llvmint::IRBuilder::PhiIncoming(rhs, block_after_rhs),
-										}, "logicalOr");
+										}, ".logicalOr");
 									} break;
 
 									case PIR::Intrinsic::Kind::logicalNot: {
 										llvm::Value* rhs = this->get_value(func_call.args[0]);
-										return this->builder->createNot(rhs, "logicalNot");
+										return this->builder->createNot(rhs, ".logicalNot");
 									} break;
 
 
@@ -1018,7 +1045,7 @@ namespace panther{
 									case PIR::Intrinsic::Kind::convIntToBool: {
 										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
 										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
-										return this->builder->createTrunc(conversion_value, type, "convIntToBool");
+										return this->builder->createTrunc(conversion_value, type, ".convIntToBool");
 									} break;
 
 									case PIR::Intrinsic::Kind::convUIntToInt: {
@@ -1028,19 +1055,19 @@ namespace panther{
 									case PIR::Intrinsic::Kind::convUIntToBool: {
 										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
 										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
-										return this->builder->createTrunc(conversion_value, type, "convUIntToBool");
+										return this->builder->createTrunc(conversion_value, type, ".convUIntToBool");
 									} break;
 
 									case PIR::Intrinsic::Kind::convBoolToInt: {
 										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
 										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
-										return this->builder->createZExt(conversion_value, type, "convBoolToInt");
+										return this->builder->createZExt(conversion_value, type, ".convBoolToInt");
 									} break;
 
 									case PIR::Intrinsic::Kind::convBoolToUInt: {
 										llvm::Value* conversion_value = this->get_value(func_call.args[0]);
 										llvm::Type* type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeI64());
-										return this->builder->createZExt(conversion_value, type, "convBoolToUInt");
+										return this->builder->createZExt(conversion_value, type, ".convBoolToUInt");
 									} break;
 								};
 
@@ -1049,6 +1076,31 @@ namespace panther{
 						};
 
 						evo::debugFatalBreak("Unkown func call kind");
+
+					} break;
+
+					case PIR::Expr::Kind::Initializer: {
+						const PIR::Initializer& initializer = this->source->getInitializer(value.initializer);
+						const PIR::Type& initializer_type = this->src_manager->getType(initializer.type);
+
+						llvm::Type* initializer_llvm_type = this->get_type(initializer_type);
+
+						llvm::AllocaInst* init_alloca = this->builder->createAlloca(initializer_llvm_type, ".alloca.initializer");
+						for(size_t i = 0; i < initializer.memberVals.size(); i+=1){
+							if(initializer.memberVals[i].kind == PIR::Expr::Kind::None){ continue; } // skip {none} values
+
+							const std::string gep_name = std::format(".alloca.initializer.{}.GEP", i);
+
+							llvm::Value* gep_value = this->builder->createGEP(init_alloca, {0, int32_t(i)}, gep_name);
+							llvm::Value* member_value = this->get_value(initializer.memberVals[i]);
+							this->builder->createStore(gep_value, member_value);
+						}
+
+						if(should_load){
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(init_alloca, ".alloca.initializer.load"));
+						}else{
+							return llvmint::ptrcast<llvm::Value>(init_alloca);
+						}
 
 					} break;
 
@@ -1228,7 +1280,6 @@ namespace panther{
 
 					case PIR::Expr::Kind::FuncCall: {
 						llvm::Value* temporary = this->get_value(arg);
-
 
 						const PIR::Type& param_type = this->src_manager->getType(param_type_id);
 						llvm::Type* arg_type = this->get_type(param_type);

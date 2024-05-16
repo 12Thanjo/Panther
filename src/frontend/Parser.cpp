@@ -233,7 +233,7 @@ namespace panther{
 	auto Parser::parse_template_pack() noexcept -> Result {
 		// |
 		if(this->get(this->peek()).kind != Token::get("|")){ return Result::WrongType; }
-		this->skip(1);
+		const Token::ID start_location = this->next();
 
 
 		auto templates = std::vector<AST::TemplatePack::Template>();
@@ -283,7 +283,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.template_packs, AST::Kind::TemplatePack,
-			std::move(templates)
+			start_location, std::move(templates)
 		);
 	};
 
@@ -292,7 +292,7 @@ namespace panther{
 	auto Parser::parse_func_params() noexcept -> Result {
 		// (
 		if(this->get(this->peek()).kind != Token::get("(")){ return Result::WrongType; }
-		this->skip(1);
+		const Token::ID start_location = this->next();
 
 
 		auto params = std::vector<AST::FuncParams::Param>();
@@ -363,7 +363,7 @@ namespace panther{
 
 		return this->create_node(
 			this->source.func_params, AST::Kind::FuncParams,
-			std::move(params)
+			start_location, std::move(params)
 		);
 	};
 
@@ -565,7 +565,7 @@ namespace panther{
 			if(is_builtin){
 				return evo::Result<AST::Type::Base>(AST::Type::Base(this->next()));
 			}else{
-				const Result accessor_expr = this->parse_accessor_expr();
+				const Result accessor_expr = this->parse_term(true);
 				if(accessor_expr.code() != Result::Success){ return evo::Result<AST::Type::Base>(evo::resultError); }
 				return evo::Result<AST::Type::Base>( AST::Type::Base{ .node = accessor_expr.value() } );
 			}
@@ -766,43 +766,18 @@ namespace panther{
 	// TODO: remove me?
 	auto Parser::parse_postfix_expr() noexcept -> Result {
 		// nothing at the moment
-		return this->parse_accessor_expr();
+		return this->parse_term();
 	};
 
 
 	// TODO: check for EOF
-	auto Parser::parse_accessor_expr() noexcept -> Result {
+	auto Parser::parse_term(bool is_type_term) noexcept -> Result {
 		Result output = this->parse_paren_expr();
 		if(output.code() == Result::WrongType || output.code() == Result::Error){ return output; }
 
 
 		while(true){
 			const Token::Kind peeked_kind = this->get(this->peek()).kind;
-
-			if(peeked_kind == Token::get(".")){
-				const Token::ID accessor_op_token = this->next();
-
-				const Result rhs_result = this->parse_ident();
-				if(this->check_result_fail(rhs_result, "identifier on right-hand side of accessor operator (\".\")")){ return Result::Error; }
-
-				output = this->create_node(this->source.infixes, AST::Kind::Infix,
-					output.value(), accessor_op_token, rhs_result.value()
-				);
-
-				continue;
-				
-			}else if(peeked_kind == Token::get(".&")){
-				const Token::ID op_token = this->next();
-
-				output = this->create_node(this->source.postfixes, AST::Kind::Postfix,
-					output.value(), op_token
-				);
-
-				continue;
-
-			}
-
-
 
 			auto parse_arguments = [&]() noexcept -> evo::Result<std::vector<AST::Node::ID>> {
 				this->skip(1);
@@ -838,7 +813,28 @@ namespace panther{
 			};
 
 
-			if(peeked_kind == Token::get("(")){
+			if(peeked_kind == Token::get(".")){
+				const Token::ID accessor_op_token = this->next();
+
+				const Result rhs_result = this->parse_ident();
+				if(this->check_result_fail(rhs_result, "identifier on right-hand side of accessor operator (\".\")")){ return Result::Error; }
+
+				output = this->create_node(this->source.infixes, AST::Kind::Infix,
+					output.value(), accessor_op_token, rhs_result.value()
+				);
+
+				continue;
+				
+			}else if(peeked_kind == Token::get(".&") && !is_type_term){
+				const Token::ID op_token = this->next();
+
+				output = this->create_node(this->source.postfixes, AST::Kind::Postfix,
+					output.value(), op_token
+				);
+
+				continue;
+
+			}else if(peeked_kind == Token::get("(") && !is_type_term){
 				const evo::Result<std::vector<AST::Node::ID>> arguments = parse_arguments();
 				if(arguments.isError()){ return Result::Error; }
 
@@ -905,6 +901,43 @@ namespace panther{
 
 				continue;
 
+			}else if(peeked_kind == Token::get("{") && !is_type_term){
+				this->skip(1);
+
+				auto members = std::vector<AST::Initializer::Member>();
+				while(true){
+					if(this->get(this->peek()).kind == Token::get("}")){
+						this->skip(1);
+						break;
+					}
+
+					const Result ident = this->parse_ident();
+					if(this->check_result_fail(ident, "identifier in member initializer")){ return Result::Error; }
+
+					// =
+					if(this->expect_token(Token::get("="), "in member initializer") == false){ return Result::Error; }
+
+					const Result expr = this->parse_expr();
+					if(this->check_result_fail(expr, "expression in member initializer")){ return Result::Error; }
+
+					members.emplace_back(ident.value(), expr.value());
+
+					const Token::ID after_param_peek_tok = this->next();
+					const Token& after_param_peek = this->get(after_param_peek_tok);
+					if(after_param_peek.kind != Token::get(",")){
+						if(after_param_peek.kind != Token::get("}")){
+							this->expected_but_got("\",\" at end of member initalizer or \"}\" at end of struct initializer", after_param_peek_tok);
+							return Result::Error;;
+						}
+
+						break;
+					}
+				};
+
+				output = this->create_node(this->source.initializers, AST::Kind::Initializer,
+					output.value(), std::move(members)
+				);
+
 			}else{
 				break;
 			}
@@ -917,7 +950,7 @@ namespace panther{
 	// TODO: add checking for EOF
 	auto Parser::parse_paren_expr() noexcept -> Result {
 		if(this->get(this->peek()).kind != Token::get("(")){
-			return this->parse_term();
+			return this->parse_atom();
 		}
 
 		const Token::ID open_location = this->next();
@@ -943,7 +976,7 @@ namespace panther{
 
 
 
-	auto Parser::parse_term() noexcept -> Result {
+	auto Parser::parse_atom() noexcept -> Result {
 		Result result = this->parse_literal();
 		if(result.code() == Result::Success || result.code() == Result::Error){ return result; }
 

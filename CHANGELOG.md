@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.29.0
+- Fixed getting members of values returned from functions
+- Fixed function call arguments not being printed correctly in the `PrintAST` output target
+- Fixed missing location lookup for message reporting
+- Added struct initializers
+- Added struct member default values
+
 ### v0.28.0
 - Added the following intrinsic functions:
 	- `@convIntToUInt(Int read) -> UInt`

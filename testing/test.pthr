@@ -1,12 +1,27 @@
-struct Struct = {
-	
+
+struct Vec2 = {
+	var x: Int = uninit;
+	var y: Int = 12;
 }
 
-func main = () #entry -> Int {
-	def bool: Bool = false;
+func get_vec2 = () -> Vec2 {
+	return Vec2{
+		x = uninit,
+		y = 2,
+	};
+}
 
-	// @__printBool(@castIntToBool(int));
-	@__printInt(true as Int);
+func entry = () #entry -> Int {
+	def vec2 = Vec2{
+		x = 9,
+		y = 1,
+	};
+
+	@__printInt(get_vec2().x); // UB
+	@__printInt(vec2.y); // 1
+	@__printInt(Vec2{ y = 4 }.x); // UB
+	@__printInt(Vec2{ x = 1 }.y); // 12
+	@__printInt(Vec2{ x = 1 }.x); // 1
 
 	return 0;
 }

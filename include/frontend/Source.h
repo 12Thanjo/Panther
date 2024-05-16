@@ -104,6 +104,9 @@ namespace panther{
 			EVO_NODISCARD auto getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall&;
 			EVO_NODISCARD auto getFuncCall(const AST::Node& node) const noexcept -> const AST::FuncCall&;
 
+			EVO_NODISCARD auto getInitializer(AST::Node::ID node_id) const noexcept -> const AST::Initializer&;
+			EVO_NODISCARD auto getInitializer(const AST::Node& node) const noexcept -> const AST::Initializer&;
+
 
 			EVO_NODISCARD auto getLiteral(AST::Node::ID node_id) const noexcept -> const Token&;
 			EVO_NODISCARD auto getLiteral(const AST::Node& node) const noexcept -> const Token&;
@@ -233,6 +236,18 @@ namespace panther{
 				return this->pir.func_calls[size_t(id.id)];
 			};
 
+			EVO_NODISCARD inline auto createInitializer(auto&&... args) noexcept -> PIR::Initializer::ID {
+				this->pir.initializers.emplace_back(std::forward<decltype(args)>(args)...);
+				return PIR::Initializer::ID( uint32_t(this->pir.initializers.size() - 1) );
+			};
+
+			EVO_NODISCARD inline auto getInitializer(PIR::Initializer::ID id) const noexcept -> const PIR::Initializer& {
+				return this->pir.initializers[size_t(id.id)];
+			};
+			EVO_NODISCARD inline auto getInitializer(PIR::Initializer::ID id) noexcept -> PIR::Initializer& {
+				return this->pir.initializers[size_t(id.id)];
+			};
+
 
 
 			EVO_NODISCARD inline auto createPrefix(auto&&... args) noexcept -> PIR::Prefix::ID {
@@ -352,6 +367,7 @@ namespace panther{
 			std::vector<AST::Infix> infixes{};
 			std::vector<AST::Postfix> postfixes{};
 			std::vector<AST::FuncCall> func_calls{};
+			std::vector<AST::Initializer> initializers{};
 			std::vector<AST::Type> types{};
 			std::vector<AST::Block> blocks{};
 
@@ -366,6 +382,7 @@ namespace panther{
 				std::vector<PIR::Return> returns{};
 				std::vector<PIR::Assignment> assignments{};
 				std::vector<PIR::FuncCall> func_calls{};
+				std::vector<PIR::Initializer> initializers{};
 				std::vector<PIR::Prefix> prefixes{};
 				std::vector<PIR::Deref> derefs{};
 				std::vector<PIR::Accessor> accessors{};
