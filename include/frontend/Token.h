@@ -46,6 +46,9 @@ namespace panther{
 			TypeUInt,
 			TypeString,
 
+			TypeISize,
+			TypeUSize,
+
 
 			///////////////////////////////////
 			// keywords
@@ -273,6 +276,9 @@ namespace panther{
 
 				break; case Kind::TypeBool:   return "Bool";
 				break; case Kind::TypeString: return "String";
+
+				break; case Kind::TypeISize: return "ISize";
+				break; case Kind::TypeUSize: return "USize";
 
 
 				///////////////////////////////////

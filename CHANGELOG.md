@@ -1,5 +1,52 @@
 # Changelog
 
+### v0.30.0
+- Added the following builtin types:
+	- `ISize`
+	- `USize`
+- Added the following intrinsic functions:
+	- `@addISize(ISize read, ISize read) -> ISize`
+	- `@addUSize(USize read, USize read) -> USize`
+	- `@addWrapISize(ISize read, ISize read) -> ISize`
+	- `@addUrapISUze(ISize read, USize read) -> USize`
+	- `@subISize(ISize read, ISize read) -> ISize`
+	- `@subUSize(USize read, USize read) -> USize`
+	- `@subWrapISize(ISize read, ISize read) -> ISize`
+	- `@subUrapISUze(ISize read, USize read) -> USize`
+	- `@mulISize(ISize read, ISize read) -> ISize`
+	- `@mulUSize(USize read, USize read) -> USize`
+	- `@mulWrapISize(ISize read, ISize read) -> ISize`
+	- `@mulUrapISUze(ISize read, USize read) -> USize`
+	- `@divISize(ISize read, ISize read) -> ISize`
+	- `@divUSize(USize read, USize read) -> USize`
+	- `@negateISize(ISize read, ISize read) -> ISize`
+	- `@equalISize(ISize read, ISize read) -> Bool`
+	- `@notEqualISize(ISize read, ISize read) -> Bool`
+	- `@lessThanISize(ISize read, ISize read) -> Bool`
+	- `@lessThanEqualISize(ISize read, ISize read) -> Bool`
+	- `@greaterThanISize(ISize read, ISize read) -> Bool`
+	- `@greaterThanEqualISize(ISize read, ISize read) -> Bool`
+	- `@equalUSize(USize read, USize read) -> Bool`
+	- `@notEqualUSize(USize read, USize read) -> Bool`
+	- `@lessThanUSize(USize read, USize read) -> Bool`
+	- `@lessThanEqualUSize(USize read, USize read) -> Bool`
+	- `@greaterThanUSize(USize read, USize read) -> Bool`
+	- `@greaterThanEqualUSize(USize read, USize read) -> Bool`
+	- `@convIntToISize(Int read) -> ISize`
+	- `@convIntToUSize(Int read) -> USize`
+	- `@convUIntToISize(UInt read) -> ISize`
+	- `@convUIntToUSize(UInt read) -> USize`
+	- `@convBoolToISize(Bool read) -> ISize`
+	- `@convBoolToUSize(Bool read) -> USize`
+	- `@convISizeToInt(ISize read) -> Int`
+	- `@convISizeToUInt(ISize read) -> UInt`
+	- `@convISizeToBool(ISize read) -> Bool`
+	- `@convISizeToUSize(ISize read) -> USize`
+	- `@convUSizeToInt(USize read) -> Int`
+	- `@convUSizeToUInt(USize read) -> UInt`
+	- `@convUSizeToBool(USize read) -> Bool`
+	- `@convUSizeToISize(USize read) -> ISize`
+
 ### v0.29.0
 - Fixed getting members of values returned from functions
 - Fixed function call arguments not being printed correctly in the `PrintAST` output target

@@ -550,6 +550,8 @@ namespace panther{
 			case Token::TypeUInt:
 			case Token::TypeBool:
 			case Token::TypeString:
+			case Token::TypeISize:
+			case Token::TypeUSize:
 				break;
 
 			case Token::Ident:

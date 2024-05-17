@@ -2198,11 +2198,15 @@ namespace panther{
 
 		const bool from_is_integral = 
 			from.baseType == this->src_manager.getBaseTypeID(Token::TypeInt) || 
-			from.baseType == this->src_manager.getBaseTypeID(Token::TypeUInt);
+			from.baseType == this->src_manager.getBaseTypeID(Token::TypeUInt) ||
+			from.baseType == this->src_manager.getBaseTypeID(Token::TypeISize) ||
+			from.baseType == this->src_manager.getBaseTypeID(Token::TypeUSize);
 
 		const bool to_is_integral = 
 			to.baseType == this->src_manager.getBaseTypeID(Token::TypeInt) || 
-			to.baseType == this->src_manager.getBaseTypeID(Token::TypeUInt);
+			to.baseType == this->src_manager.getBaseTypeID(Token::TypeUInt) ||
+			to.baseType == this->src_manager.getBaseTypeID(Token::TypeISize) ||
+			to.baseType == this->src_manager.getBaseTypeID(Token::TypeUSize);
 
 		if(from_is_integral && to_is_integral){ return true; }
 

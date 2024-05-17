@@ -1,7 +1,13 @@
 
+
+func get_num = (num1: ISize, num2: USize) -> ISize {
+	return num1 + num2 cast ISize;
+}
+
+
 struct Vec2 = {
-	var x: Int = uninit;
-	var y: Int = 12;
+	var x: ISize = uninit;
+	var y: ISize = get_num(4, 17);
 }
 
 func get_vec2 = () -> Vec2 {
@@ -17,11 +23,11 @@ func entry = () #entry -> Int {
 		y = 1,
 	};
 
-	@__printInt(get_vec2().x); // UB
-	@__printInt(vec2.y); // 1
-	@__printInt(Vec2{ y = 4 }.x); // UB
-	@__printInt(Vec2{ x = 1 }.y); // 12
-	@__printInt(Vec2{ x = 1 }.x); // 1
+	@__printInt(get_vec2().x cast Int); // UB
+	@__printInt(vec2.y cast Int); // 1
+	@__printInt(Vec2{ y = 4 }.x cast Int); // UB
+	@__printInt(Vec2{ x = 1 }.y cast Int); // 12
+	@__printInt(Vec2{ x = 3 }.x cast Int); // 3
 
 	return 0;
 }

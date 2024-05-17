@@ -160,6 +160,9 @@ namespace panther{
 			else if(ident_name == "Bool")   { this->create_token(Token::Kind::TypeBool); }
 			else if(ident_name == "String") { this->create_token(Token::Kind::TypeString); }
 
+			else if(ident_name == "ISize") { this->create_token(Token::Kind::TypeISize); }
+			else if(ident_name == "USize") { this->create_token(Token::Kind::TypeUSize); }
+
 
 			///////////////////////////////////
 			// keywords

@@ -580,39 +580,55 @@ namespace panther{
 				import,
 				breakpoint,
 
+
 				///////////////////////////////////
 				// arithmetic
 
 				// add
 				addInt,
 				addUInt,
+				addISize,
+				addUSize,
 
 				// add wrap
 				addWrapInt,
 				addWrapUInt,
+				addWrapISize,
+				addWrapUSize,
 
 				// sub
 				subInt,
 				subUInt,
+				subISize,
+				subUSize,
 
 				// sub wrap
 				subWrapInt,
 				subWrapUInt,
+				subWrapISize,
+				subWrapUSize,
 
 				// mul
 				mulInt,
 				mulUInt,
+				mulISize,
+				mulUSize,
 
 				// mul wrap
 				mulWrapInt,
 				mulWrapUInt,
+				mulWrapISize,
+				mulWrapUSize,
 
 				// div
 				divInt,
 				divUInt,
+				divISize,
+				divUSize,
 
 				// negate
 				negateInt,
+				negateISize,
 
 
 				///////////////////////////////////
@@ -641,6 +657,22 @@ namespace panther{
 				logicalOr,
 				logicalNot,
 
+				// logical ISize
+				equalISize,
+				notEqualISize,
+				lessThanISize,
+				lessThanEqualISize,
+				greaterThanISize,
+				greaterThanEqualISize,
+
+				// logical USize
+				equalUSize,
+				notEqualUSize,
+				lessThanUSize,
+				lessThanEqualUSize,
+				greaterThanUSize,
+				greaterThanEqualUSize,
+
 
 				///////////////////////////////////
 				// type conversion
@@ -648,14 +680,32 @@ namespace panther{
 				// Int
 				convIntToUInt,
 				convIntToBool,
+				convIntToISize,
+				convIntToUSize,
 
 				// UInt
 				convUIntToInt,
 				convUIntToBool,
+				convUIntToISize,
+				convUIntToUSize,
 
 				// Bool
 				convBoolToInt,
 				convBoolToUInt,
+				convBoolToISize,
+				convBoolToUSize,
+
+				// ISize
+				convISizeToInt,
+				convISizeToUInt,
+				convISizeToBool,
+				convISizeToUSize,
+
+				// USize
+				convUSizeToInt,
+				convUSizeToUInt,
+				convUSizeToBool,
+				convUSizeToISize,
 
 
 				///////////////////////////////////
