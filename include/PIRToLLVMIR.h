@@ -1410,8 +1410,12 @@ namespace panther{
 
 						llvm::Value* lhs_value = this->get_value(deref.ptr);
 
-						llvm::Type* deref_type = this->get_type(this->src_manager->getType(deref.type));
-						return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type, ".deref"));
+						if(should_load){
+							llvm::Type* deref_type = this->get_type(this->src_manager->getType(deref.type));
+							return llvmint::ptrcast<llvm::Value>(this->builder->createLoad(lhs_value, deref_type, ".deref"));
+						}else{
+							return lhs_value;
+						}
 					} break;
 
 

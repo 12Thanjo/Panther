@@ -10,6 +10,10 @@ struct Vec2 = {
 	var y: ISize = get_num(4, 17);
 }
 
+struct Struct = {
+	var x: Int;
+}
+
 func get_vec2 = () -> Vec2 {
 	return Vec2{
 		x = uninit,
@@ -23,11 +27,18 @@ func entry = () #entry -> Int {
 		y = 1,
 	};
 
+
+	def vec2_ptr: Vec2&| = addr vec2;
+
 	@__printInt(get_vec2().x cast Int); // UB
-	@__printInt(vec2.y cast Int); // 1
+	@__printInt(vec2_ptr.&.y cast Int); // 1
 	@__printInt(Vec2{ y = 4 }.x cast Int); // UB
 	@__printInt(Vec2{ x = 1 }.y cast Int); // 12
 	@__printInt(Vec2{ x = 3 }.x cast Int); // 3
+
+	if(false){
+		unreachable;
+	}
 
 	return 0;
 }

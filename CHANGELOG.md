@@ -1,7 +1,14 @@
 # Changelog
 
+### v0.30.1
+- Disallowed using expression operators as a statement (means that things like `1 + 2;` now emit an error)
+- Added more checking for improper use of `uninit`
+- Fixed improper error message for missing `;` at end of expression statement
+- Fixed fatal error when getting a member of a dereferenced value (`(a.&).b`)
+- Fixed imports of imports not always being handled properly in the semantic analysis
+
 ### v0.30.0
-- Added the following builtin types:
+- Added the following built-in types:
 	- `ISize`
 	- `USize`
 - Added the following intrinsic functions:
@@ -72,7 +79,7 @@
 - Changed operator `||` to `or`
 - Changed pointer (`^`) to `&`
 - Changed dereference (`.^`) to `.&`
-- Changed template packs from using `{`/`}` as delimiters to using `|` as the delmiter
+- Changed template packs from using `{`/`}` as delimiters to using `|` as the delimiter
 - Fixed logic with nested logical operators (for example: `true or (false and true)`)
 
 ### v0.27.0
@@ -192,7 +199,7 @@
 ### v0.21.4
 - Removed being able to set global variables to be value of another variable
 	- this is only temporary
-- Added order-independant declaration (in global scope)
+- Added order-independent declaration (in global scope)
 - Added variable type inference
 
 ### v0.21.3
@@ -202,7 +209,7 @@
 
 ### v0.21.2
 - Added the intrinsic function `@__printInt(Int read)`
-	- This existance of this is just temporary
+	- This existence of this is just temporary
 - Added warning if a `write`  parameter is known to never be written to
 
 ### v0.21.1
@@ -227,7 +234,7 @@
 
 ### v0.20.1
 - Fixed assert firing when using a function as a value
-- Fixed breakpoint firing when funciton marked with `#entry` does not return `Int`
+- Fixed breakpoint firing when function marked with `#entry` does not return `Int`
 
 ### v0.20.0
 - Added `def` variable declaration
@@ -243,7 +250,7 @@
 - Fixed `return` statements in conditionals causing LLVM to error
 - Changed `@__printHelloWorld` from using `printf` to using `puts`
 - Added `puts` to the list of functions that cannot be used as export names
-- CLI now only wait's for user input to exit when compiling with MSVC when not doing a ReleaseDist build
+- CLI now only waits for user input to exit when compiling with MSVC when not doing a ReleaseDist build
 
 ### v0.18.1
 - Added tokenizing of string and char literals
@@ -268,7 +275,7 @@
 
 ### v0.15.0
 - Added the intrinsic function `@__printHelloWorld()`
-	- This existance of this is just temporary
+	- This existence of this is just temporary
 
 ### v0.14.2
 - Fixed printing of AST for postfix operators

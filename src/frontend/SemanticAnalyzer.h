@@ -50,33 +50,54 @@ namespace panther{
 			EVO_NODISCARD auto check_func_call(const AST::FuncCall& func_call, PIR::Type::ID func_type_id) const noexcept -> bool;
 			EVO_NODISCARD auto get_func_call_args(const AST::FuncCall& func_call) const noexcept -> evo::Result<std::vector<PIR::Expr>>;
 
-			// note: func_call is only used when looking up a function overload
-			EVO_NODISCARD auto analyze_and_get_type_of_expr(const AST::Node& node, const AST::FuncCall* lookup_func_call = nullptr) const noexcept
-				-> evo::Result<PIR::Type::ID>;
+
+
+			
+			struct ExprInfo{
+				enum class ValueType{
+					ConcreteConst,
+					ConcreteMutable,
+					Ephemeral,
+					Import,
+				};
+
+				ValueType value_type;
+				std::optional<PIR::Type::ID> type_id; // nullopt == uninit
+				std::optional<PIR::Expr> expr; // nullopt if needs_expr_value == false
+			};
+
+
+			enum class ExprValueKind{
+				None,
+				ConstEval,
+				Runtime,
+			};
+
+
+			// note: lookup_func_call is only used when looking up a function overload
+			EVO_NODISCARD auto analyze_expr(
+				AST::Node::ID node_id, ExprValueKind value_kind = ExprValueKind::Runtime, const AST::FuncCall* lookup_func_call = nullptr
+			) const noexcept -> evo::Result<ExprInfo>;
+
+			EVO_NODISCARD auto analyze_prefix_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_infix_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_postfix_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_func_call_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_initializer_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_ident_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_literal_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_intrinsic_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_uninit_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+
+
+
 
 			EVO_NODISCARD auto get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID>;
 
 			EVO_NODISCARD auto is_implicitly_convertable_to(const PIR::Type& from, const PIR::Type& to, const AST::Node& from_expr) const noexcept -> bool;
 
-
-			// Not for use in global variables
-			EVO_NODISCARD auto get_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
-
-			EVO_NODISCARD auto get_const_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
-			EVO_NODISCARD auto get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr>;
-
 			EVO_NODISCARD auto get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID>;
 
-
-			enum class ExprValueType{
-				Concrete,
-				Ephemeral,
-				Import,
-			};
-			EVO_NODISCARD auto get_expr_value_type(AST::Node::ID node_id) const noexcept -> evo::Result<ExprValueType>;
-
-			// must be given a concrete value
-			EVO_NODISCARD auto is_expr_mutable(AST::Node::ID node_id) const noexcept -> bool;
 
 
 			EVO_NODISCARD auto is_valid_export_name(std::string_view name) const noexcept -> bool;

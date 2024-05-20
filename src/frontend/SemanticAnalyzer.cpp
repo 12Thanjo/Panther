@@ -184,11 +184,13 @@ namespace panther{
 		// type checking
 
 		auto var_type_id = std::optional<PIR::Type::ID>();
+		auto var_value = PIR::Expr();
 
 		if(var_decl.expr.has_value()){
-			const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(*var_decl.expr);
-			if(expr_value_type.isError()){ return false; }
-			if(expr_value_type.value() != ExprValueType::Ephemeral && expr_value_type.value() != ExprValueType::Import){
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+			if(expr_info.isError()){ return false; }
+
+			if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral && expr_info.value().value_type != ExprInfo::ValueType::Import){
 				// TODO: better messaging
 				this->source.error("Variables must be assigned with an ephemeral value", *var_decl.expr);
 				return false;
@@ -209,26 +211,20 @@ namespace panther{
 
 
 				if(expr_node.kind != AST::Kind::Uninit){
-					const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-					if(expr_type_id.isError()){ return false; }
+					const PIR::Type& var_type = this->src_manager.getType(*var_type_id);
+					const PIR::Type& expr_type = this->src_manager.getType(*expr_info.value().type_id);
 
-					if(*var_type_id != expr_type_id.value()){
-						const PIR::Type& var_type = this->src_manager.getType(*var_type_id);
-						const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
+					if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
+						this->source.error(
+							"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
+							expr_node,
 
-						if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
-							this->source.error(
-								"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
-								expr_node,
-
-								std::vector<Message::Info>{
-									{std::string("Variable is of type:   ") + this->src_manager.printType(*var_type_id)},
-									{std::string("Expression is of type: ") + this->src_manager.printType(expr_type_id.value())}
-								}
-							);
-							return false;
-						}
-
+							std::vector<Message::Info>{
+								{std::string("Variable is of type:   ") + this->src_manager.printType(*var_type_id)},
+								{std::string("Expression is of type: ") + this->src_manager.printType(*expr_info.value().type_id)}
+							}
+						);
+						return false;
 					}
 				}
 
@@ -240,17 +236,17 @@ namespace panther{
 					return false;
 				}
 
-				const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-				if(expr_type_id.isError()){ return false; }
 
-				if(expr_type_id.value() == SourceManager::getTypeString()){
+				if(*expr_info.value().type_id == SourceManager::getTypeString()){
 					this->source.error("String literal values (outside of calls to `@import()`) are not supported yet", expr_node);
 					return false;
 
 				}
 
-				var_type_id = expr_type_id.value();
+				var_type_id = *expr_info.value().type_id;
 			}
+
+			var_value = *expr_info.value().expr;
 
 
 		}else{
@@ -277,24 +273,10 @@ namespace panther{
 		///////////////////////////////////
 		// get / check value
 
-		const evo::Result<PIR::Expr> var_value = [&]() noexcept {
-			if(this->is_global_scope()){
-				return this->get_const_expr_value(*var_decl.expr);
-
-			}else if(var_decl.expr.has_value() == false){
-				return evo::Result<PIR::Expr>(PIR::Expr());
-
-			}else{
-				return this->get_expr_value(*var_decl.expr);
-			}
-		}();
-
-		if(var_value.isError()){ return false; }
-
 
 		// handle imports differently
 		if(var_type_id == SourceManager::getTypeImport()){
-			evo::debugAssert(var_value.value().kind == PIR::Expr::Kind::Import, "should be import");
+			evo::debugAssert(var_value.kind == PIR::Expr::Kind::Import, "should be import");
 
 			if(this->in_struct_scope()){
 				this->source.error("Struct members cannot be imports", var_decl.ident);
@@ -306,10 +288,10 @@ namespace panther{
 				return false;
 			}
 
-			this->add_import_to_scope(ident.value.string, Import(var_value.value().import, var_decl.ident));
+			this->add_import_to_scope(ident.value.string, Import(var_value.import, var_decl.ident));
 
 			if(is_pub){
-				this->source.addPublicImport(ident.value.string, var_value.value().import);
+				this->source.addPublicImport(ident.value.string, var_value.import);
 			}
 
 			return true;
@@ -318,8 +300,8 @@ namespace panther{
 
 
 		// check for uninit
-		if(var_value.value().kind == PIR::Expr::Kind::ASTNode){
-			const AST::Node& var_value_node = this->source.getNode(var_value.value().astNode);
+		if(var_value.kind == PIR::Expr::Kind::ASTNode){
+			const AST::Node& var_value_node = this->source.getNode(var_value.astNode);
 
 			if(var_value_node.kind == AST::Kind::Uninit){
 				if(this->is_global_scope()){
@@ -340,7 +322,7 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, *var_type_id, var_value.value(), var_decl.isDef, is_export);
+		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, *var_type_id, var_value, var_decl.isDef, is_export);
 
 		this->add_var_to_scope(ident.value.string, var_id);
 
@@ -387,7 +369,7 @@ namespace panther{
 			// if no circular members found, add the new member to the type
 			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
 			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
-			struct_data.memberVars.emplace_back(ident.value.string, var_decl.isDef, *var_type_id, var_value.value());
+			struct_data.memberVars.emplace_back(ident.value.string, var_decl.isDef, *var_type_id, var_value);
 
 		}else{
 			evo::debugFatalBreak("Unknown scope type");
@@ -749,16 +731,19 @@ namespace panther{
 		///////////////////////////////////
 		// condition
 
-		const AST::Node& cond_expr = this->source.getNode(sub_cond.ifExpr);
+		const evo::Result<ExprInfo> cond_info = this->analyze_expr(sub_cond.ifExpr);
+		if(cond_info.isError()){ return false; }
 
-		const evo::Result<PIR::Type::ID> cond_type_id = this->analyze_and_get_type_of_expr(cond_expr);
-		if(cond_type_id.isError()){ return false; }
+		if(cond_info.value().type_id.has_value() == false){
+			this->source.error("Conditional expression must be a boolean (cannot be [uninit])", sub_cond.ifExpr);
+			return false;
+		}
 
-		if(cond_type_id.value() != this->src_manager.getTypeBool()){
+		if(*cond_info.value().type_id != this->src_manager.getTypeBool()){
 			this->source.error(
-				"Conditional expression must be a boolean", cond_expr,
+				"Conditional expression must be a boolean", sub_cond.ifExpr,
 				std::vector<Message::Info>{
-					{std::string("Conditional expression is of type: ") + this->src_manager.printType(cond_type_id.value())}
+					{std::string("Conditional expression is of type: ") + this->src_manager.printType(*cond_info.value().type_id)}
 				}
 			);
 			return false;
@@ -812,10 +797,7 @@ namespace panther{
 		///////////////////////////////////
 		// create object
 
-		const evo::Result<PIR::Expr> if_expr_value = this->get_expr_value(sub_cond.ifExpr);
-		if(if_expr_value.isError()){ return false; }
-
-		const PIR::Conditional::ID cond_id = this->source.createConditional(if_expr_value.value(), std::move(then_stmts), std::move(else_stmts));
+		const PIR::Conditional::ID cond_id = this->source.createConditional(*cond_info.value().expr, std::move(then_stmts), std::move(else_stmts));
 		this->get_stmts_entry().emplace_back(cond_id);
 
 
@@ -840,7 +822,7 @@ namespace panther{
 
 		const PIR::Type::VoidableID func_return_type_id = this->get_current_func().returnType;
 
-		std::optional<PIR::Expr> return_value = std::nullopt;
+		auto return_value = PIR::Expr();
 
 		if(return_stmt.value.has_value()){
 			// "return expr;"
@@ -850,34 +832,35 @@ namespace panther{
 				return false;	
 			}
 
-			const AST::Node& expr_node = this->source.getNode(*return_stmt.value);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*return_stmt.value);
+			if(expr_info.isError()){ return false; }
 
-			const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(expr_node);
-			if(expr_type_id.isError()){ return false; }
-
-
-			if(expr_type_id.value() != func_return_type_id.typeID()){
-				const PIR::Type& func_return_type = this->src_manager.getType(func_return_type_id.typeID());
-				const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
-
-				if(this->is_implicitly_convertable_to(expr_type, func_return_type, expr_node) == false){
-					this->source.error(
-						"Return value type and function return type do not match", 
-						expr_node,
-
-						std::vector<Message::Info>{
-							{std::string("Function return is type: ") + this->src_manager.printType(func_return_type_id.typeID())},
-							{std::string("Return value is of type: ") + this->src_manager.printType(expr_type_id.value())}
-						}
-					);
-
-					return false;
-				}
+			if(expr_info.value().type_id.has_value() == false){
+				this->source.error("Cannot return [uninit]", *return_stmt.value);
+				return false;
 			}
 
-			const evo::Result<PIR::Expr> return_value_expr = this->get_expr_value(*return_stmt.value);
-			if(return_value_expr.isError()){ return false; }
-			return_value.emplace(return_value_expr.value());
+
+			const AST::Node& expr_node = this->source.getNode(*return_stmt.value);
+
+			const PIR::Type& func_return_type = this->src_manager.getType(func_return_type_id.typeID());
+			const PIR::Type& expr_type = this->src_manager.getType(*expr_info.value().type_id);
+
+			if(this->is_implicitly_convertable_to(expr_type, func_return_type, expr_node) == false){
+				this->source.error(
+					"Return value type and function return type do not match", 
+					expr_node,
+
+					std::vector<Message::Info>{
+						{std::string("Function return is type: ") + this->src_manager.printType(func_return_type_id.typeID())},
+						{std::string("Return value is of type: ") + this->src_manager.printType(*expr_info.value().type_id)}
+					}
+				);
+
+				return false;
+			}
+
+			return_value = *expr_info.value().expr;
 
 		}else{
 			// "return;"
@@ -888,6 +871,7 @@ namespace panther{
 			}
 		}
 
+		evo::debugAssert(return_value.kind != PIR::Expr::Kind::None, "cannot return PIR::Expr::Kind::None");
 
 
 		const PIR::Return::ID ret_id = this->source.createReturn(return_value);
@@ -908,8 +892,26 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_infix(const AST::Infix& infix) noexcept -> bool {
-		// for now since there are no other infix operations yet
-		return this->analyze_assignment(infix);
+		switch(this->source.getToken(infix.op).kind){
+			case Token::get("="): {	
+				return this->analyze_assignment(infix);
+			} break;
+
+			case Token::get("+"): case Token::get("+@"):
+			case Token::get("-"): case Token::get("-@"):
+			case Token::get("*"): case Token::get("*@"):
+			case Token::get("/"):
+			case Token::get("=="): case Token::get("!="):
+			case Token::get("<"):  case Token::get("<="):
+			case Token::get(">"):  case Token::get(">="):
+			case Token::KeywordAnd: case Token::KeywordOr: {
+				// TODO: better messaging
+				this->source.error("This operator can only be used in an expression, not a statement", infix.op);
+				return false;
+			} break;
+		};
+
+		evo::debugFatalBreak("Unknown or unsupported infix op: {}", int32_t(this->source.getToken(infix.op).kind));
 	};
 
 
@@ -925,30 +927,27 @@ namespace panther{
 		///////////////////////////////////
 		// checking of lhs
 
-		const evo::Result<ExprValueType> dst_value_type = this->get_expr_value_type(infix.lhs);
-		if(dst_value_type.isError()){ return false; }
-		if(dst_value_type.value() != ExprValueType::Concrete){
-			this->source.error("Only concrete values may be assigned to", infix.lhs);
+		const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+		if(lhs_info.isError()){ return false; }
+
+
+		if(lhs_info.value().value_type != ExprInfo::ValueType::ConcreteMutable){
+			if(lhs_info.value().value_type == ExprInfo::ValueType::ConcreteConst){
+				this->source.error("Only mutable values may be assigned to", infix.lhs);
+			}else{
+				this->source.error("Only concrete values may be assigned to", infix.lhs);
+			}
 			return false;
 		}
 
-		const evo::Result<PIR::Type::ID> dst_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-		if(dst_type_id.isError()){ return false; }
+		evo::debugAssert(lhs_info.value().type_id.has_value(), "cannot assign to [uninit]");
 
-		if(this->is_expr_mutable(infix.lhs) == false){
-			this->source.error("Only mutable values may be assigned to", infix.lhs);
-			return false;
-		}
-
-		const evo::Result<PIR::Expr> lhs_value = this->get_expr_value(infix.lhs);
-		if(lhs_value.isError()){ return false; }
-
-		if(lhs_value.value().kind == PIR::Expr::Kind::Param){
-			PIR::Param& param = this->source.getParam(lhs_value.value().param);
+		if(lhs_info.value().expr->kind == PIR::Expr::Kind::Param){
+			PIR::Param& param = this->source.getParam(lhs_info.value().expr->param);
 			param.mayHaveBeenEdited = true;
 
-		}else if(lhs_value.value().kind == PIR::Expr::Kind::Accessor){
-			PIR::Accessor& accessor = this->source.getAccessor(lhs_value.value().accessor);
+		}else if(lhs_info.value().expr->kind == PIR::Expr::Kind::Accessor){
+			PIR::Accessor& accessor = this->source.getAccessor(lhs_info.value().expr->accessor);
 			PIR::Expr* lhs = &accessor.lhs;
 
 			while(lhs->kind == PIR::Expr::Kind::Accessor){
@@ -966,47 +965,45 @@ namespace panther{
 		///////////////////////////////////
 		// checking of rhs
 
-		const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(infix.rhs);
-		if(expr_value_type.isError()){ return false; }
-		if(expr_value_type.value() != ExprValueType::Ephemeral){
+		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs);
+		if(rhs_info.isError()){ return false; }
+
+		if(rhs_info.value().value_type != ExprInfo::ValueType::Ephemeral){
 			this->source.error("Only ephemeral values may be assignment values", infix.rhs);
 			return false;
 		}
 
-		const AST::Node& rhs_node = this->source.getNode(infix.rhs);
-		const evo::Result<PIR::Type::ID> expr_type_id = this->analyze_and_get_type_of_expr(rhs_node);
-		if(expr_type_id.isError()){ return false; }
-
-		const evo::Result<PIR::Expr> rhs_value = this->get_expr_value(infix.rhs);
-		if(rhs_value.isError()){ return false; }
+		if(rhs_info.value().type_id.has_value() == false){
+			// TODO: better messaging
+			this->source.error("Cannot assign a value of [uninit]", infix.rhs);
+			return false;
+		}
 
 
 		///////////////////////////////////
 		// type checking
 
-		if(dst_type_id.value() != expr_type_id.value()){
-			const PIR::Type& dst_type = this->src_manager.getType(dst_type_id.value());
-			const PIR::Type& expr_type = this->src_manager.getType(expr_type_id.value());
+		const PIR::Type& dst_type = this->src_manager.getType(*lhs_info.value().type_id);
+		const PIR::Type& expr_type = this->src_manager.getType(*rhs_info.value().type_id);
 
-			if(this->is_implicitly_convertable_to(expr_type, dst_type, rhs_node) == false){
-				this->source.error(
-					"The types of the left-hand-side and right-hand-side of an assignment statement do not match, and cannot be implicitly converted",
-					infix.op,
+		if(this->is_implicitly_convertable_to(expr_type, dst_type, this->source.getNode(infix.rhs)) == false){
+			this->source.error(
+				"The types of the left-hand-side and right-hand-side of an assignment statement do not match, and cannot be implicitly converted",
+				infix.op,
 
-					std::vector<Message::Info>{
-						{std::string("left-hand-side is of type:  ") + this->src_manager.printType(dst_type_id.value())},
-						{std::string("right-hand-side is of type: ") + this->src_manager.printType(expr_type_id.value())}
-					}
-				);
-				return false;
-			}
+				std::vector<Message::Info>{
+					{std::string("left-hand-side is of type:  ") + this->src_manager.printType(*lhs_info.value().type_id)},
+					{std::string("right-hand-side is of type: ") + this->src_manager.printType(*rhs_info.value().type_id)}
+				}
+			);
+			return false;
 		}
 
 
 		///////////////////////////////////
 		// create object
 
-		const PIR::Assignment::ID assignment_id = this->source.createAssignment(lhs_value.value(), infix.op, rhs_value.value());
+		const PIR::Assignment::ID assignment_id = this->source.createAssignment(*lhs_info.value().expr, infix.op, *rhs_info.value().expr);
 		this->get_stmts_entry().emplace_back(assignment_id);
 
 
@@ -1018,21 +1015,20 @@ namespace panther{
 
 	auto SemanticAnalyzer::analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool {
 		// analyze and get type of ident
-		const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target), &func_call);
-		if(target_type_id.isError()){ return false; }
+		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, ExprValueKind::None, &func_call);
+		if(target_info.isError()){ return false; }
+
+		evo::debugAssert(target_info.value().type_id.has_value(), "type of function call target is [uninit]");
 
 		// check if discarding return value
-		const PIR::Type& target_type = this->src_manager.getType(target_type_id.value());
+		const PIR::Type& target_type = this->src_manager.getType(*target_info.value().type_id);
 		const PIR::BaseType& target_base_type = this->src_manager.getBaseType(target_type.baseType);
 
 		if(target_base_type.callOperator.has_value() == false){
 			this->source.error(
 				"cannot be called like a function", func_call.target,
 				std::vector<Message::Info>{
-					std::format(
-						"Type \"{}\" does not have a call operator",
-						this->src_manager.printType(target_type_id.value())
-					)
+					std::format("Type \"{}\" does not have a call operator", this->src_manager.printType(*target_info.value().type_id))
 				}
 			);
 			return false;
@@ -1043,7 +1039,7 @@ namespace panther{
 			return false;
 		}
 
-		if(this->check_func_call(func_call, target_type_id.value()) == false){ return false; }
+		if(this->check_func_call(func_call, *target_info.value().type_id) == false){ return false; }
 
 		const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
 		if(args.isError()){ return false; }
@@ -1090,11 +1086,11 @@ namespace panther{
 
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
-						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-						evo::debugAssert(value_of_lhs.isSuccess(), "uncaught error");
-						evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+						evo::debugAssert(lhs_info.isSuccess(), "uncaught error");
+						evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-						const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
+						const Source& import_source = this->src_manager.getSource(lhs_info.value().expr->import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 						const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(rhs_ident.value.string, import_source, func_call);
@@ -1262,31 +1258,32 @@ namespace panther{
 			const AST::Node& arg_node = this->source.getNode(arg_id);
 
 			// check types match
-			const evo::Result<PIR::Type::ID> arg_type_id = this->analyze_and_get_type_of_expr(arg_node);
-			if(arg_type_id.isError()){ return false; }
+			const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, ExprValueKind::None);
+			if(arg_info.isError()){ return false; }
 
-			if(param.type != arg_type_id.value()){
-				const PIR::Type& param_type = this->src_manager.getType(param.type);
-				const PIR::Type& arg_type = this->src_manager.getType(arg_type_id.value());
-
-				if(this->is_implicitly_convertable_to(arg_type, param_type, arg_node) == false){
-					// TODO: better messaging
-					this->source.error(
-						"Function call arguments do not match function", func_call.target,
-						std::vector<Message::Info>{
-							Message::Info(std::format("In argument: {}", i)),
-							Message::Info(std::format("Type of parameter: {}", this->src_manager.printType(param.type))),
-							Message::Info(std::format("Type of argument:  {}", this->src_manager.printType(arg_type_id.value()))),
-						}
-					);
-					return false;
-				}
+			if(arg_info.value().type_id.has_value() == false){
+				this->source.error("An function call argument cannot be [uninit]", arg_node);
+				return false;
 			}
 
-			// check param kind accepts arg value type
-			const evo::Result<ExprValueType> arg_value_type = this->get_expr_value_type(arg_id);
-			if(arg_value_type.isError()){ return false; }
+			const PIR::Type& param_type = this->src_manager.getType(param.type);
+			const PIR::Type& arg_type = this->src_manager.getType(*arg_info.value().type_id);
 
+			if(this->is_implicitly_convertable_to(arg_type, param_type, arg_node) == false){
+				// TODO: better messaging
+				this->source.error(
+					"Function call arguments do not match function", func_call.target,
+					std::vector<Message::Info>{
+						Message::Info(std::format("In argument: {}", i)),
+						Message::Info(std::format("Type of parameter: {}", this->src_manager.printType(param.type))),
+						Message::Info(std::format("Type of argument:  {}", this->src_manager.printType(*arg_info.value().type_id))),
+					}
+				);
+				return false;
+			}
+
+
+			// check param kind accepts arg value type
 			using ParamKind = AST::FuncParams::Param::Kind;
 			switch(param.kind){
 				case ParamKind::Read: {
@@ -1294,19 +1291,19 @@ namespace panther{
 				} break;
 
 				case ParamKind::Write: {
-					if(arg_value_type.value() != ExprValueType::Concrete){
-						this->source.error("write parameters require concrete expression values", arg_id);
+					if(arg_info.value().value_type != ExprInfo::ValueType::ConcreteMutable){
+						if(arg_info.value().value_type == ExprInfo::ValueType::ConcreteConst){
+							this->source.error("write parameters require mutable expression values", arg_id);
+						}else{
+							this->source.error("write parameters require concrete expression values", arg_id);
+						}
 						return false;
 					}
 
-					if(this->is_expr_mutable(arg_id) == false){
-						this->source.error("write parameters require mutable expression values", arg_id);
-						return false;
-					}
 				} break;
 
 				case ParamKind::In: {
-					if(arg_value_type.value() != ExprValueType::Ephemeral){
+					if(arg_info.value().value_type != ExprInfo::ValueType::Ephemeral){
 						this->source.error("write parameters require ephemeral expression values", arg_id);
 						return false;
 					}
@@ -1356,12 +1353,10 @@ namespace panther{
 		auto args = std::vector<PIR::Expr>();
 
 		for(AST::Node::ID arg_id : func_call.args){
-			if(this->analyze_and_get_type_of_expr(this->source.getNode(arg_id)).isError()){ return evo::resultError; }
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(arg_id);
+			if(expr_info.isError()){ return evo::resultError; }
 
-			const evo::Result<PIR::Expr> expr = this->is_global_scope() ? this->get_const_expr_value(arg_id) : this->get_expr_value(arg_id);
-			if(expr.isError()){ return evo::resultError; }
-
-			args.emplace_back(expr.value());
+			args.emplace_back(*expr_info.value().expr);
 		}
 
 		return args;
@@ -1369,648 +1364,1118 @@ namespace panther{
 
 
 
+	auto SemanticAnalyzer::analyze_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo> {
+		const AST::Node& node = this->source.getNode(node_id);
 
-
-
-	auto SemanticAnalyzer::analyze_and_get_type_of_expr(const AST::Node& node, const AST::FuncCall* lookup_func_call) const noexcept 
-	-> evo::Result<PIR::Type::ID> {
 		switch(node.kind){
-			case AST::Kind::Literal: {
-				const Token& literal_value = this->source.getLiteral(node);
+			case AST::Kind::Prefix:      return this->analyze_prefix_expr(node_id, value_kind);
+			case AST::Kind::Infix:       return this->analyze_infix_expr(node_id, value_kind, lookup_func_call);
+			case AST::Kind::Postfix:     return this->analyze_postfix_expr(node_id, value_kind);
+			case AST::Kind::FuncCall:    return this->analyze_func_call_expr(node_id, value_kind);
+			case AST::Kind::Initializer: return this->analyze_initializer_expr(node_id, value_kind);
+			case AST::Kind::Ident:       return this->analyze_ident_expr(node_id, value_kind, lookup_func_call);
+			case AST::Kind::Literal:     return this->analyze_literal_expr(node_id, value_kind);
+			case AST::Kind::Intrinsic:   return this->analyze_intrinsic_expr(node_id, value_kind);
+			case AST::Kind::Uninit:      return this->analyze_uninit_expr(node_id, value_kind);
+		};
 
-				if(literal_value.kind == Token::LiteralFloat){
-					this->source.error("Literal floats are not supported yet", node);
+
+		evo::debugFatalBreak("Unkown AST node kind");
+	};
+
+
+
+	auto SemanticAnalyzer::analyze_prefix_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		auto type_id = std::optional<PIR::Type::ID>();
+		auto expr = std::optional<PIR::Expr>();
+
+		const AST::Node& node = this->source.getNode(node_id);
+		const AST::Prefix& prefix = this->source.getPrefix(node);
+
+		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(prefix.rhs, value_kind);
+		if(rhs_info.isError()){ return evo::resultError; }
+
+
+		switch(this->source.getToken(prefix.op).kind){
+			case Token::KeywordCopy: {
+				if(rhs_info.value().value_type != ExprInfo::ValueType::ConcreteConst && rhs_info.value().value_type != ExprInfo::ValueType::ConcreteMutable){
+					this->source.error("Only concrete expressions can be copied", prefix.rhs);
 					return evo::resultError;
 				}
-				if(literal_value.kind == Token::LiteralChar){
-					this->source.error("Literal chars are not supported yet", node);
+
+				type_id = rhs_info.value().type_id;
+
+				if(value_kind != ExprValueKind::None){
+					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
+					expr = PIR::Expr(prefix_id);
+				}
+			} break;
+
+
+			case Token::KeywordAddr: {
+				// check value type
+				if(rhs_info.value().value_type != ExprInfo::ValueType::ConcreteConst && rhs_info.value().value_type != ExprInfo::ValueType::ConcreteMutable){
+					this->source.error("Can only take the address of a concrete expression", prefix.rhs);
 					return evo::resultError;
 				}
 
 
-				const Token::Kind base_type = [&]() noexcept {
-					switch(literal_value.kind){
-						break; case Token::LiteralInt: return Token::TypeInt;
-						break; case Token::LiteralBool: return Token::TypeBool;
-						break; case Token::LiteralString: return Token::TypeString;
+				// check that it's not an intrinsic
+				if(this->source.getNode(prefix.rhs).kind == AST::Kind::Intrinsic){
+					this->source.error("Cannot take the address of an intrinsic", prefix.rhs);
+					return evo::resultError;
+				}
+
+
+				// get type of rhs
+				if(rhs_info.value().type_id.has_value() == false){
+					this->source.error("Cannot take the address of the expression [uninit]", prefix.rhs);
+					return evo::resultError;
+				}
+
+				const PIR::Type& rhs_type = this->src_manager.getType(*rhs_info.value().type_id);
+				PIR::Type rhs_type_copy = rhs_type;
+
+
+				// make the type pointer of the type of rhs
+				const bool is_const = rhs_info.value().value_type == ExprInfo::ValueType::ConcreteConst;
+				rhs_type_copy.qualifiers.emplace_back(true, is_const);
+
+				type_id = this->src_manager.getOrCreateTypeID(rhs_type_copy);
+
+
+				// set that parameters may have been edited
+				if(rhs_info.value().expr->kind == PIR::Expr::Kind::Param){
+					PIR::Param& param = this->source.getParam(rhs_info.value().expr->param);
+					param.mayHaveBeenEdited = true;
+
+				}else if(rhs_info.value().expr->kind == PIR::Expr::Kind::Accessor){
+					PIR::Accessor& accessor = this->source.getAccessor(rhs_info.value().expr->accessor);
+					PIR::Expr* lhs = &accessor.lhs;
+
+					while(lhs->kind == PIR::Expr::Kind::Accessor){
+						PIR::Accessor& lhs_accessor = this->source.getAccessor(lhs->accessor);
+						lhs = &lhs_accessor.lhs;
 					};
 
-					evo::debugFatalBreak("Unkonwn literal type");
-				}();
-
-
-				return this->src_manager.getOrCreateTypeID(
-					PIR::Type( this->src_manager.getBaseTypeID(base_type) )
-				);
-			} break;
-
-
-			case AST::Kind::Ident: {
-				const Token& ident = this->source.getIdent(node);
-				std::string_view ident_str = ident.value.string;
-
-				for(const Scope& scope : this->scopes){
-					if(scope.vars.contains(ident_str)){
-						const PIR::Var& var = this->source.getVar(scope.vars.at(ident_str));
-						return var.type;
-
-					}else if(scope.funcs.contains(ident_str)){
-						if(lookup_func_call == nullptr){
-							this->source.error("Functions as values are not supported yet", node);
-							return evo::resultError;
-						}
-
-						const evo::Result<PIR::Func::ID> lookup_func_id = this->lookup_func_in_scope(ident_str, *lookup_func_call);
-						if(lookup_func_id.isError()){ return evo::resultError; }
-
-						const PIR::Func& lookup_func = this->source.getFunc(lookup_func_id.value());
-						return this->src_manager.getOrCreateTypeID(PIR::Type(lookup_func.baseType));
-
-					}else if(scope.structs.contains(ident_str)){
-						this->source.error("Types cannot be used as expressions", node);
-						return evo::resultError;
-
-					}else if(scope.params.contains(ident_str)){
-						const PIR::Param& param = this->source.getParam(scope.params.at(ident_str));
-						return param.type;
-
-					}else if(scope.imports.contains(ident_str)){
-						return this->src_manager.getTypeImport();
-
-					}else if(scope.aliases.contains(ident_str)){
-						this->source.error("Type aliases cannot be used as expressions", node);
-						return evo::resultError;
+					if(lhs->kind == PIR::Expr::Kind::Param){
+						PIR::Param& param = this->source.getParam(lhs->param);
+						param.mayHaveBeenEdited = true;
 					}
 				}
 
 
-				this->source.error(std::format("Identifier \"{}\" is undefined", ident_str), node);
-				return evo::resultError;
-			} break;
-
-
-			case AST::Kind::Intrinsic: {
-				const Token& intrinsic_tok = this->source.getIntrinsic(node);
-
-				for(const PIR::Intrinsic& intrinsic : this->src_manager.getIntrinsics()){
-					if(intrinsic.ident == intrinsic_tok.value.string){
-						return this->src_manager.getOrCreateTypeID(PIR::Type(intrinsic.baseType));
-					}
+				if(value_kind != ExprValueKind::None){
+					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
+					expr = PIR::Expr(prefix_id);
 				}
-
-
-				this->source.error(std::format("Intrinsic \"@{}\" does not exist", intrinsic_tok.value.string), intrinsic_tok);
-				return evo::resultError;
 			} break;
 
-
-			case AST::Kind::FuncCall: {
-				const AST::FuncCall& func_call = this->source.getFuncCall(node);
-
-				// get target type
-				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target), &func_call);
-				if(target_type_id.isError()){ return evo::resultError; }
-
-				// check function call / arguments
-				if(this->check_func_call(func_call, target_type_id.value()) == false){ return evo::resultError; }
-
-				// check it returns a value
-				const PIR::Type& type = this->src_manager.getType(target_type_id.value());
-				const PIR::BaseType& base_type = this->src_manager.getBaseType(type.baseType);
-				const PIR::Type::VoidableID return_type = base_type.callOperator->returnType;
-				if(return_type.isVoid()){
-					this->source.error("Function does not return a value", func_call.target);
+			case Token::get("-"): {
+				if(rhs_info.value().type_id.has_value() == false){
+					this->source.error("Cannot negate ([-]) the expression [uninit]", prefix.rhs);
 					return evo::resultError;
 				}
 
-				return return_type.typeID();
-			} break;
+				const PIR::Type& rhs_type = this->src_manager.getType(*rhs_info.value().type_id);
+				const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
 
-
-			case AST::Kind::Prefix: {
-				const AST::Prefix& prefix = this->source.getPrefix(node);
-
-				switch(this->source.getToken(prefix.op).kind){
-					case Token::KeywordCopy: {
-						const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(prefix.rhs);
-						if(expr_value_type.isError()){ return evo::resultError; }
-						if(expr_value_type.value() != ExprValueType::Concrete){
-							this->source.error("Only concrete expressions can be copied", prefix.rhs);
-							return evo::resultError;
+				if(rhs_base_type.ops.negate.empty()){
+					this->source.error(
+						"This type does not have a negate (-a) operator", prefix.rhs,
+						std::vector<Message::Info>{
+							Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(*rhs_info.value().type_id))),
 						}
-
-						return this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
-					} break;
-
-
-					case Token::KeywordAddr: {
-						// check value type
-						const evo::Result<ExprValueType> expr_value_type = this->get_expr_value_type(prefix.rhs);
-						if(expr_value_type.isError()){ return evo::resultError; }
-						if(expr_value_type.value() != ExprValueType::Concrete){
-							this->source.error("Can only take the address of a concrete expression", prefix.rhs);
-							return evo::resultError;
-						}
-
-
-						// check that it's not an intrinsic
-						if(this->source.getNode(prefix.rhs).kind == AST::Kind::Intrinsic){
-							this->source.error("Cannot take the address of an intrinsic", prefix.rhs);
-							return evo::resultError;
-						}
-
-
-						// get type of rhs
-						const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
-						if(type_of_rhs.isError()){ return evo::resultError; }
-
-						const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
-						PIR::Type rhs_type_copy = rhs_type;
-
-
-						// make the type pointer of the type of rhs
-						rhs_type_copy.qualifiers.emplace_back(true, !this->is_expr_mutable(prefix.rhs));
-
-						return this->src_manager.getOrCreateTypeID(rhs_type_copy);
-					} break;
-
-					case Token::get("-"): {
-						const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
-						if(type_of_rhs.isError()){ return evo::resultError; }
-
-						const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
-						const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
-
-						if(rhs_base_type.ops.negate.empty()){
-							this->source.error(
-								"This type does not have a negate (-a) operator", prefix.rhs,
-								std::vector<Message::Info>{
-									Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
-								}
-							);
-							return evo::resultError;
-						}
-
-						const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.negate[0].intrinsic;
-						const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
-						return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
-					} break;
-
-					case Token::get("!"): {
-						const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
-						if(type_of_rhs.isError()){ return evo::resultError; }
-
-						const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
-						const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
-
-						if(rhs_base_type.ops.logicalNot.empty()){
-							this->source.error(
-								"This type does not have a logical not (!a) operator", prefix.rhs,
-								std::vector<Message::Info>{
-									Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
-								}
-							);
-							return evo::resultError;
-						}
-
-						const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.logicalNot[0].intrinsic;
-						const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
-						return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
-					} break;
-
-					default: evo::debugFatalBreak("Unknown prefix operator");
-				};
-
-			} break;
-
-
-			case AST::Kind::Infix: {
-				const AST::Infix& infix = this->source.getInfix(node);
-				const Token::Kind infix_op_kind = this->source.getToken(infix.op).kind;
-
-				switch(infix_op_kind){
-					case Token::get("."): {
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-						if(lhs_type_id.isError()){ return evo::resultError; }
-
-						const Token& rhs_ident = this->source.getIdent(infix.rhs);
-
-						if(lhs_type_id.value() == SourceManager::getTypeImport()){
-							const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-							if(value_of_lhs.isError()){ return evo::resultError; }
-							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
-
-							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
-
-							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-								const std::vector<PIR::Func::ID>& imported_func_list = import_source.pir.pub_funcs.at(rhs_ident.value.string);
-
-								if(imported_func_list.size() == 1){
-									const PIR::Func& imported_func = Source::getFunc(imported_func_list[0]);
-
-									return this->src_manager.getOrCreateTypeID(
-										PIR::Type(imported_func.baseType)
-									);
-								}
-
-								if(lookup_func_call != nullptr){
-									const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
-										rhs_ident.value.string, import_source, *lookup_func_call
-									);
-									if(imported_func_id.isError()){ return evo::resultError; }
-
-									const PIR::Func& imported_func = Source::getFunc(imported_func_id.value());
-
-									return this->src_manager.getOrCreateTypeID(
-										PIR::Type(imported_func.baseType)
-									);
-								}
-
-								this->source.error("Cannot get overloaded function", infix.rhs);
-								return evo::resultError;
-
-							}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
-								const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
-								const PIR::Var& imported_var = Source::getVar(imported_var_id);
-
-								return imported_var.type;
-
-							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-								return this->src_manager.getTypeImport();
-							}
-
-							// TODO: better messaging
-							this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
-							return evo::resultError;
-						}
-
-
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-						if(lhs_type.qualifiers.empty() == false){
-							// TODO: better messaging
-							this->source.error("Type does not have a valid accessor operator", infix.lhs);
-							return evo::resultError;
-						}
-
-						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
-						for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
-							if(member.name == rhs_ident.value.string){
-								return member.type;
-							}
-						}
-
-
-						// TODO: better messaging
-						this->source.error(std::format("Type does not have memeber variable \"{}\"", rhs_ident.value.string), infix.rhs);
-						return evo::resultError;
-					} break;
-
-					case Token::get("+"): case Token::get("+@"):
-					case Token::get("-"): case Token::get("-@"):
-					case Token::get("*"): case Token::get("*@"):
-					case Token::get("/"):
-					case Token::get("=="): case Token::get("!="):
-					case Token::get("<"):  case Token::get("<="):
-					case Token::get(">"):  case Token::get(">="): 
-					case Token::KeywordAnd: case Token::KeywordOr: {
-
-						///////////////////////////////////
-						// lhs
-
-						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
-						if(lhs_type_id.isError()){ return evo::resultError; }
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-
-						if(lhs_type.qualifiers.empty() == false){
-							this->source.error(
-								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
-							);
-							return evo::resultError;
-						}
-
-						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-
-
-						const bool has_operator = [&]() noexcept {
-							switch(infix_op_kind){
-								case Token::get("+"):   return lhs_base_type.ops.add.empty() == false;
-								case Token::get("+@"):  return lhs_base_type.ops.addWrap.empty() == false;
-								case Token::get("-"):   return lhs_base_type.ops.sub.empty() == false;
-								case Token::get("-@"):  return lhs_base_type.ops.subWrap.empty() == false;
-								case Token::get("*"):   return lhs_base_type.ops.mul.empty() == false;
-								case Token::get("*@"):  return lhs_base_type.ops.mulWrap.empty() == false;
-								case Token::get("/"):   return lhs_base_type.ops.div.empty() == false;
-
-								case Token::get("=="):  return lhs_base_type.ops.logicalEqual.empty() == false;
-								case Token::get("!="):  return lhs_base_type.ops.notEqual.empty() == false;
-								case Token::get("<"):   return lhs_base_type.ops.lessThan.empty() == false;
-								case Token::get("<="):  return lhs_base_type.ops.lessThanEqual.empty() == false;
-								case Token::get(">"):   return lhs_base_type.ops.greaterThan.empty() == false;
-								case Token::get(">="):  return lhs_base_type.ops.greaterThanEqual.empty() == false;
-								case Token::KeywordAnd: return lhs_base_type.ops.logicalAnd.empty() == false;
-								case Token::KeywordOr:  return lhs_base_type.ops.logicalOr.empty() == false;
-							};
-
-							evo::debugFatalBreak("Unknown intrinsic kind");
-						}();
-
-						if(has_operator == false){
-							this->source.error(
-								std::format("This type does not have a [{}] operator", Token::printKind(infix_op_kind)), infix.lhs,
-								std::vector<Message::Info>{ 
-									Message::Info(std::format("Type of left-hand-side: {}", this->src_manager.printType(lhs_type_id.value()))),
-								}
-							);
-							return evo::resultError;
-						}
-
-
-						///////////////////////////////////
-						// rhs
-
-						const AST::Node& rhs_node = this->source.getNode(infix.rhs);
-						const evo::Result<PIR::Type::ID> type_id_of_rhs = this->analyze_and_get_type_of_expr(rhs_node);
-						if(type_id_of_rhs.isError()){ return evo::resultError; }
-
-						const PIR::Type& type_of_rhs = this->src_manager.getType(type_id_of_rhs.value());
-
-						if(type_of_rhs.qualifiers.empty() == false){
-							this->source.error(
-								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
-							);
-							return evo::resultError;
-						}
-
-						const PIR::BaseType& base_type_of_rhs = this->src_manager.getBaseType(type_of_rhs.baseType);
-
-
-
-						///////////////////////////////////
-						// op checking
-
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
-
-						if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
-							const PIR::BaseType* base_type_to_use = &lhs_base_type;
-
-							if(lhs_type_id.value() != type_id_of_rhs.value()){
-								if(this->is_implicitly_convertable_to(lhs_type, type_of_rhs, lhs_node)){
-									base_type_to_use = &base_type_of_rhs;
-									// do conversion (when needed/implemented)
-
-								}else if(this->is_implicitly_convertable_to(type_of_rhs, lhs_type, rhs_node)){
-									// do conversion (when needed/implemented)
-									
-								}else{
-									// TODO: better messaging
-									this->source.error(
-										std::format("No matching [{}] operator found", Token::printKind(infix_op_kind)), infix.lhs
-									);
-									return evo::resultError;
-								}
-							}
-
-
-							const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
-								switch(infix_op_kind){
-									case Token::get("+"):  return base_type_to_use->ops.add[0].intrinsic;
-									case Token::get("+@"): return base_type_to_use->ops.addWrap[0].intrinsic;
-									case Token::get("-"):  return base_type_to_use->ops.sub[0].intrinsic;
-									case Token::get("-@"): return base_type_to_use->ops.subWrap[0].intrinsic;
-									case Token::get("*"):  return base_type_to_use->ops.mul[0].intrinsic;
-									case Token::get("*@"): return base_type_to_use->ops.mulWrap[0].intrinsic;
-									case Token::get("/"):  return base_type_to_use->ops.div[0].intrinsic;
-
-									case Token::get("=="): return base_type_to_use->ops.logicalEqual[0].intrinsic;
-									case Token::get("!="): return base_type_to_use->ops.notEqual[0].intrinsic;
-									case Token::get("<"):  return base_type_to_use->ops.lessThan[0].intrinsic;
-									case Token::get("<="): return base_type_to_use->ops.lessThanEqual[0].intrinsic;
-									case Token::get(">"):  return base_type_to_use->ops.greaterThan[0].intrinsic;
-									case Token::get(">="): return base_type_to_use->ops.greaterThanEqual[0].intrinsic;
-									case Token::KeywordAnd: return base_type_to_use->ops.logicalAnd[0].intrinsic;
-									case Token::KeywordOr: return base_type_to_use->ops.logicalOr[0].intrinsic;
-								};
-
-								evo::debugFatalBreak("Unknown intrinsic kind");
-							}();
-
-							const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
-							return this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
-						}
-
-						evo::debugFatalBreak("Unknown base type kind");
-					} break;
-
-
-
-					case Token::KeywordAs: case Token::KeywordCast: {
-
-						///////////////////////////////////
-						// lhs
-
-						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
-						if(lhs_type_id.isError()){ return evo::resultError; }
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-
-						if(lhs_type.qualifiers.empty() == false){
-							this->source.error(
-								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
-							);
-							return evo::resultError;
-						}
-
-						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-
-
-						///////////////////////////////////
-						// rhs
-
-						const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs);
-						if(rhs_type_id.isError()){ return evo::resultError; }
-
-
-						///////////////////////////////////
-						// op checking
-
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
-
-
-						const std::vector<PIR::BaseType::OverloadedOperator>& op_list = [&]() noexcept {
-							switch(infix_op_kind){
-								case Token::KeywordAs:   return lhs_base_type.ops.as;
-								case Token::KeywordCast: return lhs_base_type.ops.cast;
-							};
-
-							evo::debugFatalBreak("invalid op for this infix case");
-						}();
-
-						for(const PIR::BaseType::OverloadedOperator& op : op_list){
-							if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
-								const PIR::Intrinsic& intrinsic = this->src_manager.getIntrinsic(op.intrinsic);
-								const PIR::BaseType& intrinsic_base_type = this->src_manager.getBaseType(intrinsic.baseType);
-
-								if(intrinsic_base_type.callOperator->returnType == rhs_type_id.value()){
-									return rhs_type_id.value().typeID();
-								}
-
-							}else{
-								evo::fatalBreak("Overloaded operators on user-defined types are not supported");
-							}
-						}
-						
-						// TODO: better messaging
-						this->source.error(
-							std::format("This type does not have a valid [{}] operator to that type", Token::printKind(infix_op_kind)), infix.rhs,
-							std::vector<Message::Info>{
-								Message::Info(std::format("From: {}", this->src_manager.printType(lhs_type_id.value()))),
-								Message::Info(std::format("To:   {}", this->src_manager.printType(rhs_type_id.value().typeID())))
-							}
-						);
-						return evo::resultError;
-					} break;
-				};
-
-				evo::debugFatalBreak("Unknown infix kind");
-			} break;
-
-
-			case AST::Kind::Initializer: {
-				const AST::Initializer& initializer = this->source.getInitializer(node);
-
-				const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type);
-				if(initializer_type_id.isError()){ return evo::resultError; }
-
-				if(initializer_type_id.value().isVoid()){
-					this->source.error("Struct initializer cannot be type Void", initializer.type);
+					);
 					return evo::resultError;
 				}
 
-				const PIR::Type& initializer_type = this->src_manager.getType(initializer_type_id.value().typeID());
-				evo::debugAssert(initializer_type.qualifiers.empty(), "Struct initializer should not have qualifiers");
+				const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.negate[0].intrinsic;
+				const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
+				type_id = this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
 
-				const PIR::BaseType& initializer_base_type = this->src_manager.getBaseType(initializer_type.baseType);
-				evo::debugAssert(initializer_base_type.kind == PIR::BaseType::Kind::Struct, "Expected struct type in initializer");
+				if(value_kind == ExprValueKind::Runtime){
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{*rhs_info.value().expr});
+					expr = PIR::Expr(func_call_id);
 
-				const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(initializer_base_type.data);
-
-				// check which members have values and type-check the members
-				auto members_with_value = std::vector<bool>(struct_data.memberVars.size(), false);
-				for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
-					if(struct_data.memberVars[i].defaultValue.kind != PIR::Expr::Kind::None){
-						members_with_value[i] = true;
-					}
+				}else if(value_kind == ExprValueKind::ConstEval){
+					this->source.error("At this time, constant-evaluated expressions cannot be negation ([-])", node);
+					return evo::resultError;
 				}
 
-				for(const AST::Initializer::Member& member_val : initializer.members){
-					const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
+			} break;
 
-					bool found_member = false;
-					for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+			case Token::get("!"): {
+				if(rhs_info.value().type_id.has_value() == false){
+					this->source.error("Cannot logical not ([!]) the expression [uninit]", prefix.rhs);
+					return evo::resultError;
+				}
 
-						if(struct_data.memberVars[i].name == member_ident){
-							members_with_value[i] = true;
-							found_member = true;
+				const PIR::Type& rhs_type = this->src_manager.getType(*rhs_info.value().type_id);
+				const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
 
-							const AST::Node& member_val_node = this->source.getNode(member_val.value);
+				if(rhs_base_type.ops.logicalNot.empty()){
+					this->source.error(
+						"This type does not have a logical not (!a) operator", prefix.rhs,
+						std::vector<Message::Info>{
+							Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(*rhs_info.value().type_id))),
+						}
+					);
+					return evo::resultError;
+				}
 
-							if(member_val_node.kind == AST::Kind::Uninit){ break; }
+				const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.logicalNot[0].intrinsic;
+				const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
+				type_id = this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
+
+				if(value_kind == ExprValueKind::Runtime){
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{*rhs_info.value().expr});
+					expr = PIR::Expr(func_call_id);
+				}else if(value_kind == ExprValueKind::ConstEval){
+					this->source.error("At this time, constant-evaluated expressions cannot be logical not ([!])", node);
+					return evo::resultError;
+				}
+			} break;
+		};
 
 
-							const evo::Result<PIR::Type::ID> member_val_type_id = this->analyze_and_get_type_of_expr(member_val_node);
-							if(member_val_type_id.isError()){ return evo::resultError; }
+		return ExprInfo{
+			.value_type = ExprInfo::ValueType::Ephemeral,
+			.type_id    = type_id,
+			.expr       = expr,
+		};
+	};
 
-							if(this->is_implicitly_convertable_to(
-								this->src_manager.getType(member_val_type_id.value()), 
-								this->src_manager.getType(struct_data.memberVars[i].type),
-								member_val_node
-							) == false){
-								this->source.error(
-									"Member cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
-									member_val_node,
-									std::vector<Message::Info>{
-										{std::string("Member is of type:     ") + this->src_manager.printType(struct_data.memberVars[i].type)},
-										{std::string("Expression is of type: ") + this->src_manager.printType(member_val_type_id.value())}
-									}
+
+
+
+	auto SemanticAnalyzer::analyze_infix_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo> {
+		auto output = ExprInfo{};
+
+		const AST::Node& node = this->source.getNode(node_id);
+		const AST::Infix& infix = this->source.getInfix(node);
+		const Token::Kind infix_op_kind = this->source.getToken(infix.op).kind;
+
+
+		switch(infix_op_kind){
+			case Token::get("."): {
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+				if(lhs_info.isError()){ return evo::resultError; }
+
+				if(lhs_info.value().type_id.has_value() == false){
+					this->source.error("The expression [uninit] has no members", infix.lhs);
+					return evo::resultError;
+				}
+
+				const Token& rhs_ident = this->source.getIdent(infix.rhs);
+
+				if(*lhs_info.value().type_id == SourceManager::getTypeImport()){
+					evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+
+					const Source& import_source = this->src_manager.getSource(lhs_info.value().expr->import);
+
+					if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
+						output.value_type = ExprInfo::ValueType::ConcreteConst;
+
+						const std::vector<PIR::Func::ID>& imported_func_list = import_source.pir.pub_funcs.at(rhs_ident.value.string);
+
+						if(imported_func_list.size() == 1){
+							const PIR::Func& imported_func = Source::getFunc(imported_func_list[0]);
+
+							output.type_id = this->src_manager.getOrCreateTypeID( PIR::Type(imported_func.baseType));
+
+						}else if(lookup_func_call != nullptr){
+							const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
+								rhs_ident.value.string, import_source, *lookup_func_call
+							);
+							if(imported_func_id.isError()){ return evo::resultError; }
+
+							const PIR::Func& imported_func = Source::getFunc(imported_func_id.value());
+
+							output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(imported_func.baseType));
+
+						}else{
+							this->source.error("Cannot get overloaded function", infix.rhs);
+							return evo::resultError;
+						}
+
+						if(value_kind == ExprValueKind::Runtime){
+							this->source.error("Functions as values is not supported yet", infix.lhs);
+							return evo::resultError;
+						}else if(value_kind == ExprValueKind::ConstEval){
+							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
+							return evo::resultError;
+						}
+
+					}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
+						const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
+						const PIR::Var& imported_var = Source::getVar(imported_var_id);
+
+						output.value_type = imported_var.isDef ? ExprInfo::ValueType::ConcreteConst : ExprInfo::ValueType::ConcreteMutable;
+						output.type_id = imported_var.type;
+
+						if(value_kind == ExprValueKind::Runtime){
+							output.expr = PIR::Expr(imported_var_id);
+						}else if(value_kind == ExprValueKind::ConstEval){
+							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
+							return evo::resultError;
+						}
+
+					}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
+						output.value_type = ExprInfo::ValueType::Import;
+
+						output.type_id = this->src_manager.getTypeImport();
+
+						if(value_kind == ExprValueKind::Runtime){
+							const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
+							output.expr = PIR::Expr(imported_source_id);
+						}else if(value_kind == ExprValueKind::ConstEval){
+							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
+							return evo::resultError;
+						}
+
+					}else{
+						this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
+						return evo::resultError;
+					}
+
+				}else{
+					output.value_type = lhs_info.value().value_type;
+
+					const PIR::Type& lhs_type = this->src_manager.getType(*lhs_info.value().type_id);
+					if(lhs_type.qualifiers.empty() == false){
+						// TODO: better messaging
+						this->source.error("Type does not have a valid accessor operator", infix.lhs);
+						return evo::resultError;
+					}
+
+					const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+					const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
+					for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
+						if(member.name == rhs_ident.value.string){
+							output.type_id = member.type;
+
+							if(value_kind == ExprValueKind::Runtime){
+								const PIR::Accessor::ID accessor_id = this->source.createAccessor(
+									*lhs_info.value().expr, *lhs_info.value().type_id, rhs_ident.value.string
 								);
-								return evo::resultError;	
+								output.expr = PIR::Expr(accessor_id);
+							}else if(value_kind == ExprValueKind::ConstEval){
+								this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
+								return evo::resultError;
 							}
 
 							break;
 						}
 					}
 
-					if(found_member == false){
+					if(output.type_id.has_value() == false){
 						// TODO: better messaging
-						this->source.error(std::format("Member \"{}\" does not exist", member_ident), member_val.ident);
+						this->source.error(std::format("Type does not have member variable \"{}\"", rhs_ident.value.string), infix.rhs);
+						return evo::resultError;
+					}
+				}
+			} break;
+
+			case Token::get("+"): case Token::get("+@"):
+			case Token::get("-"): case Token::get("-@"):
+			case Token::get("*"): case Token::get("*@"):
+			case Token::get("/"):
+			case Token::get("=="): case Token::get("!="):
+			case Token::get("<"):  case Token::get("<="):
+			case Token::get(">"):  case Token::get(">="): 
+			case Token::KeywordAnd: case Token::KeywordOr: {
+				output.value_type = ExprInfo::ValueType::Ephemeral;
+
+				///////////////////////////////////
+				// lhs
+
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, value_kind);
+				if(lhs_info.isError()){ return evo::resultError; }
+
+				if(lhs_info.value().type_id.has_value() == false){
+					this->source.error(
+						std::format("The [{}] operator does not support [uninit]", Token::printKind(infix_op_kind)),
+						infix.lhs
+					);
+					return evo::resultError;
+				}
+
+				const PIR::Type& lhs_type = this->src_manager.getType(*lhs_info.value().type_id);
+
+				if(lhs_type.qualifiers.empty() == false){
+					this->source.error(
+						std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)),
+						infix.lhs
+					);
+					return evo::resultError;
+				}
+
+				const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+
+
+				const bool has_operator = [&]() noexcept {
+					switch(infix_op_kind){
+						case Token::get("+"):   return lhs_base_type.ops.add.empty() == false;
+						case Token::get("+@"):  return lhs_base_type.ops.addWrap.empty() == false;
+						case Token::get("-"):   return lhs_base_type.ops.sub.empty() == false;
+						case Token::get("-@"):  return lhs_base_type.ops.subWrap.empty() == false;
+						case Token::get("*"):   return lhs_base_type.ops.mul.empty() == false;
+						case Token::get("*@"):  return lhs_base_type.ops.mulWrap.empty() == false;
+						case Token::get("/"):   return lhs_base_type.ops.div.empty() == false;
+
+						case Token::get("=="):  return lhs_base_type.ops.logicalEqual.empty() == false;
+						case Token::get("!="):  return lhs_base_type.ops.notEqual.empty() == false;
+						case Token::get("<"):   return lhs_base_type.ops.lessThan.empty() == false;
+						case Token::get("<="):  return lhs_base_type.ops.lessThanEqual.empty() == false;
+						case Token::get(">"):   return lhs_base_type.ops.greaterThan.empty() == false;
+						case Token::get(">="):  return lhs_base_type.ops.greaterThanEqual.empty() == false;
+						case Token::KeywordAnd: return lhs_base_type.ops.logicalAnd.empty() == false;
+						case Token::KeywordOr:  return lhs_base_type.ops.logicalOr.empty() == false;
+					};
+
+					evo::debugFatalBreak("Unknown intrinsic kind");
+				}();
+
+				if(has_operator == false){
+					this->source.error(
+						std::format("This type does not have a [{}] operator", Token::printKind(infix_op_kind)), infix.lhs,
+						std::vector<Message::Info>{ 
+							Message::Info(std::format("Type of left-hand-side: {}", this->src_manager.printType(*lhs_info.value().type_id))),
+						}
+					);
+					return evo::resultError;
+				}
+
+
+				///////////////////////////////////
+				// rhs
+
+				const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs, value_kind);
+				if(rhs_info.isError()){ return evo::resultError; }
+
+				if(rhs_info.value().type_id.has_value() == false){
+					this->source.error(
+						std::format("The [{}] operator does not support [uninit]", Token::printKind(infix_op_kind)),
+						infix.rhs
+					);
+					return evo::resultError;
+				}
+
+				const PIR::Type& rhs_type = this->src_manager.getType(*rhs_info.value().type_id);
+
+				if(rhs_type.qualifiers.empty() == false){
+					this->source.error(
+						std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.rhs
+					);
+					return evo::resultError;
+				}
+
+				const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
+
+
+				///////////////////////////////////
+				// op checking
+
+				evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
+				evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
+
+				const PIR::BaseType* base_type_to_use = &lhs_base_type;
+
+				if(*lhs_info.value().type_id != *rhs_info.value().type_id){
+					if(this->is_implicitly_convertable_to(lhs_type, rhs_type, this->source.getNode(infix.lhs))){
+						base_type_to_use = &rhs_base_type;
+						// do conversion (when needed/implemented)
+
+					}else if(this->is_implicitly_convertable_to(rhs_type, lhs_type, this->source.getNode(infix.rhs))){
+						// do conversion (when needed/implemented)
+						
+					}else{
+						// TODO: better messaging
+						this->source.error(
+							std::format("No matching [{}] operator found", Token::printKind(infix_op_kind)), infix.lhs
+						);
 						return evo::resultError;
 					}
 				}
 
-				// check that all members have values
-				for(size_t i = 0; i < members_with_value.size(); i+=1){
-					if(members_with_value[i] == false){
-						const std::string_view member_ident = struct_data.memberVars[i].name;
-						this->source.error(std::format("In struct initializer, member \"{}\" was not given a value", member_ident), node);
+
+				if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
+					const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
+						switch(infix_op_kind){
+							case Token::get("+"):  return base_type_to_use->ops.add[0].intrinsic;
+							case Token::get("+@"): return base_type_to_use->ops.addWrap[0].intrinsic;
+							case Token::get("-"):  return base_type_to_use->ops.sub[0].intrinsic;
+							case Token::get("-@"): return base_type_to_use->ops.subWrap[0].intrinsic;
+							case Token::get("*"):  return base_type_to_use->ops.mul[0].intrinsic;
+							case Token::get("*@"): return base_type_to_use->ops.mulWrap[0].intrinsic;
+							case Token::get("/"):  return base_type_to_use->ops.div[0].intrinsic;
+
+							case Token::get("=="): return base_type_to_use->ops.logicalEqual[0].intrinsic;
+							case Token::get("!="): return base_type_to_use->ops.notEqual[0].intrinsic;
+							case Token::get("<"):  return base_type_to_use->ops.lessThan[0].intrinsic;
+							case Token::get("<="): return base_type_to_use->ops.lessThanEqual[0].intrinsic;
+							case Token::get(">"):  return base_type_to_use->ops.greaterThan[0].intrinsic;
+							case Token::get(">="): return base_type_to_use->ops.greaterThanEqual[0].intrinsic;
+							case Token::KeywordAnd: return base_type_to_use->ops.logicalAnd[0].intrinsic;
+							case Token::KeywordOr: return base_type_to_use->ops.logicalOr[0].intrinsic;
+						};
+
+						evo::debugFatalBreak("Unknown intrinsic kind");
+					}();
+
+					const PIR::BaseType::ID intrinsic_base_type_id = this->src_manager.getIntrinsic(intrinsic_id).baseType;
+					output.type_id = this->src_manager.getBaseType(intrinsic_base_type_id).callOperator->returnType.typeID();
+
+					if(value_kind == ExprValueKind::Runtime){
+						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(
+							intrinsic_id, std::vector<PIR::Expr>{*lhs_info.value().expr, *rhs_info.value().expr}
+						);
+						output.expr = PIR::Expr(func_call_id);
+					}else if(value_kind == ExprValueKind::ConstEval){
+						this->source.error(std::format("At this time, constant-evaluated expressions cannot be [{}]", Token::printKind(infix_op_kind)), node);
 						return evo::resultError;
 					}
+
+				}else if(lhs_base_type.kind == PIR::BaseType::Kind::Struct){
+					evo::fatalBreak("Struct operators are not supported yet");
+
+				}else{
+					evo::debugFatalBreak("Unknown or unsupported base type kind");
 				}
 
-				return initializer_type_id.value().typeID();
 			} break;
 
 
-			case AST::Kind::Postfix: {
-				const AST::Postfix& postfix = this->source.getPostfix(node);
+			case Token::KeywordAs: case Token::KeywordCast: {
+				output.value_type = ExprInfo::ValueType::Ephemeral;
 
-				switch(this->source.getToken(postfix.op).kind){
-					case Token::get(".&"): {
-						// get type of lhs
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
-						if(lhs_type_id.isError()){ return evo::resultError; }
+				///////////////////////////////////
+				// lhs
 
-						// check that type of lhs is pointer
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-						if(lhs_type.qualifiers.empty() || lhs_type.qualifiers.back().isPtr == false){
-							this->source.error(
-								"left-hand-side of dereference expression must be of a pointer type", postfix.op,
-								std::vector<Message::Info>{
-									{std::string("expression is of type: ") + this->src_manager.printType(lhs_type_id.value())},
-								}
-							);
-							return evo::resultError;
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, value_kind);
+				if(lhs_info.isError()){ return evo::resultError; }
+
+				if(lhs_info.value().type_id.has_value() == false){
+					this->source.error("the expression [uninit] cannot be converted to another type", infix.lhs);
+					return evo::resultError;
+				}
+
+				const PIR::Type& lhs_type = this->src_manager.getType(*lhs_info.value().type_id);
+
+				if(lhs_type.qualifiers.empty() == false){
+					this->source.error(
+						std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
+					);
+					return evo::resultError;
+				}
+
+				const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
+
+
+				///////////////////////////////////
+				// rhs
+
+				const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs);
+				if(rhs_type_id.isError()){ return evo::resultError; }
+
+
+				///////////////////////////////////
+				// op checking
+
+				evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
+				evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
+
+
+				const std::vector<PIR::BaseType::OverloadedOperator>& op_list = [&]() noexcept {
+					switch(infix_op_kind){
+						case Token::KeywordAs:   return lhs_base_type.ops.as;
+						case Token::KeywordCast: return lhs_base_type.ops.cast;
+					};
+
+					evo::debugFatalBreak("invalid op for this infix case");
+				}();
+
+				for(const PIR::BaseType::OverloadedOperator& op : op_list){
+					if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
+						const PIR::Intrinsic& intrinsic = this->src_manager.getIntrinsic(op.intrinsic);
+						const PIR::BaseType& intrinsic_base_type = this->src_manager.getBaseType(intrinsic.baseType);
+
+						if(intrinsic_base_type.callOperator->returnType == rhs_type_id.value()){
+							output.type_id = rhs_type_id.value().typeID();
+
+							if(value_kind == ExprValueKind::Runtime){
+								const PIR::FuncCall::ID func_call_id = 
+									this->source.createFuncCall(op.intrinsic, std::vector<PIR::Expr>{*lhs_info.value().expr});
+								output.expr = PIR::Expr(func_call_id);
+							}
+
+							break;
 						}
 
-						// get dereferenced type
-						PIR::Type lhs_type_copy = lhs_type;
-						lhs_type_copy.qualifiers.pop_back();
+					}else{
+						evo::fatalBreak("Overloaded operators on user-defined types are not supported");
+					}
+				}
 
-						return this->src_manager.getOrCreateTypeID(lhs_type_copy);
-					} break;
 
-					default: evo::debugFatalBreak("Unknown postfix operator");
-				};
-
+				if(output.type_id.has_value() == false){
+					// TODO: better messaging
+					this->source.error(
+						std::format("This type does not have a valid [{}] operator to that type", Token::printKind(infix_op_kind)), infix.rhs,
+						std::vector<Message::Info>{
+							Message::Info(std::format("From: {}", this->src_manager.printType(*lhs_info.value().type_id))),
+							Message::Info(std::format("To:   {}", this->src_manager.printType(rhs_type_id.value().typeID())))
+						}
+					);
+					return evo::resultError;
+				}
 			} break;
 
+			default: evo::debugFatalBreak("Unknown infix kind");
+		};
+		
+
+
+		return output;
+	};
 
 
 
-			case AST::Kind::Uninit: {
-				this->source.error("[uninit] expressions are only allowed for assignment", node);
-				return evo::resultError;
+
+	auto SemanticAnalyzer::analyze_postfix_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		auto output = ExprInfo{};
+
+		const AST::Node& node = this->source.getNode(node_id);
+		const AST::Postfix& postfix = this->source.getPostfix(node);
+
+
+		switch(this->source.getToken(postfix.op).kind){
+			case Token::get(".&"): {
+				// get type of lhs
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(postfix.lhs, value_kind);
+				if(lhs_info.isError()){ return evo::resultError; }
+
+				if(lhs_info.value().type_id.has_value() == false){
+					this->source.error("Cannot dereference ([.&]) the expression [uninit]", postfix.lhs);
+					return evo::resultError;
+				}
+
+				// check that type of lhs is pointer
+				const PIR::Type& lhs_type = this->src_manager.getType(*lhs_info.value().type_id);
+				if(lhs_type.qualifiers.empty() || lhs_type.qualifiers.back().isPtr == false){
+					this->source.error(
+						"left-hand-side of dereference expression must be of a pointer type", postfix.op,
+						std::vector<Message::Info>{
+							{std::string("expression is of type: ") + this->src_manager.printType(*lhs_info.value().type_id)},
+						}
+					);
+					return evo::resultError;
+				}
+
+				// get expr value type
+				if(lhs_type.qualifiers.back().isConst){
+					output.value_type = ExprInfo::ValueType::ConcreteConst;
+				}else{
+					output.value_type = ExprInfo::ValueType::ConcreteMutable;
+				}
+
+
+				// get dereferenced type
+				PIR::Type lhs_type_copy = lhs_type;
+				lhs_type_copy.qualifiers.pop_back();
+
+				output.type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy);
+
+				if(value_kind == ExprValueKind::Runtime){
+					const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy);
+
+					const PIR::Deref::ID deref_id = this->source.createDeref(*lhs_info.value().expr, deref_type_id);
+					output.expr = PIR::Expr(deref_id);
+				}
 			} break;
+
+			default: evo::debugFatalBreak("Unknown postfix operator");
 		};
 
-		evo::debugFatalBreak("Unknown expr type");
+
+		return output;
 	};
+
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_func_call_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		const AST::Node& node = this->source.getNode(node_id);
+		const AST::FuncCall& func_call = this->source.getFuncCall(node);
+
+		// get target type
+		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, ExprValueKind::None, &func_call);
+		if(target_info.isError()){ return evo::resultError; }
+
+		// check function call / arguments
+		if(this->check_func_call(func_call, *target_info.value().type_id) == false){ return evo::resultError; }
+
+		// check it returns a value
+		const PIR::Type& type = this->src_manager.getType(*target_info.value().type_id);
+		const PIR::BaseType& base_type = this->src_manager.getBaseType(type.baseType);
+		const PIR::Type::VoidableID return_type = base_type.callOperator->returnType;
+		if(return_type.isVoid()){
+			// TODO: better messaging
+			this->source.error("Function does not return a value", func_call.target);
+			return evo::resultError;
+		}
+
+
+		auto expr = std::optional<PIR::Expr>();
+		if(value_kind == ExprValueKind::Runtime){
+			const AST::Node& target_node = this->source.getNode(func_call.target);
+
+			const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
+			if(args.isError()){ return evo::resultError; }
+
+			if(target_node.kind == AST::Kind::Ident){
+				const std::string_view ident = this->source.getIdent(func_call.target).value.string;
+
+				// get func
+				const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident, func_call);
+				if(func_id.isError()){ return evo::resultError; }
+
+
+				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
+				expr = PIR::Expr(func_call_id);
+
+			}else if(target_node.kind == AST::Kind::Intrinsic){
+				// get the intrinsic id
+				const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
+					const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
+					const evo::ArrayProxy<PIR::Intrinsic> intrinsics = this->src_manager.getIntrinsics();
+
+					for(size_t i = 0; i < intrinsics.size(); i+=1){
+						const PIR::Intrinsic& intrinsic = intrinsics[i];
+
+						if(intrinsic.ident == intrinsic_tok.value.string){
+							return PIR::Intrinsic::ID(uint32_t(i));
+						}
+					}
+
+					evo::debugFatalBreak("Unknown intrinsic");
+				}();
+
+
+				// imports
+				if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
+					const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
+					if(import_source_id.isError()){ return evo::resultError; }
+
+					expr = PIR::Expr(import_source_id.value());
+
+				}else{
+					// function calls normally
+					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
+					expr = PIR::Expr(func_call_id);
+				}
+
+
+			}else if(target_node.kind == AST::Kind::Infix){
+				const AST::Infix& infix = this->source.getInfix(func_call.target);
+
+				switch(this->source.getToken(infix.op).kind){
+					case Token::get("."): {
+						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+						if(lhs_info.isError()){ return evo::resultError; }
+						evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+
+						const Source& import_source = this->src_manager.getSource(lhs_info.value().expr->import);
+						const Token& rhs_ident = this->source.getIdent(infix.rhs);
+
+						// get func
+						const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
+							rhs_ident.value.string, import_source, func_call
+						);
+						if(imported_func_id.isError()){ return evo::resultError; }
+
+						
+						// create object
+						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
+						expr = PIR::Expr(func_call_id);
+					} break;
+
+				};
+
+				evo::debugFatalBreak("Unknown or unsupported infix type");
+
+			}else{
+				evo::debugFatalBreak("Unknown func target kind");
+			}
+		}
+
+
+
+		return ExprInfo{
+			.value_type = ExprInfo::ValueType::Ephemeral,
+			.type_id    = return_type.typeID(),
+			.expr       = expr,
+		};
+	};
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_initializer_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		const AST::Node& node = this->source.getNode(node_id);
+		const AST::Initializer& initializer = this->source.getInitializer(node);
+
+		const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type);
+		if(initializer_type_id.isError()){ return evo::resultError; }
+
+		if(initializer_type_id.value().isVoid()){
+			this->source.error("Struct initializer cannot be type Void", initializer.type);
+			return evo::resultError;
+		}
+
+		const PIR::Type& initializer_type = this->src_manager.getType(initializer_type_id.value().typeID());
+		evo::debugAssert(initializer_type.qualifiers.empty(), "Struct initializer should not have qualifiers");
+
+		const PIR::BaseType& initializer_base_type = this->src_manager.getBaseType(initializer_type.baseType);
+		evo::debugAssert(initializer_base_type.kind == PIR::BaseType::Kind::Struct, "Expected struct type in initializer");
+
+		const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(initializer_base_type.data);
+
+		// check which members have values and type-check the members
+		auto members_with_value = std::vector<bool>(struct_data.memberVars.size(), false);
+		for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+			if(struct_data.memberVars[i].defaultValue.kind != PIR::Expr::Kind::None){
+				members_with_value[i] = true;
+			}
+		}
+
+		for(const AST::Initializer::Member& member_val : initializer.members){
+			const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
+
+			bool found_member = false;
+			for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+
+				if(struct_data.memberVars[i].name == member_ident){
+					members_with_value[i] = true;
+					found_member = true;
+
+					const AST::Node& member_val_node = this->source.getNode(member_val.value);
+					if(member_val_node.kind == AST::Kind::Uninit){ break; }
+
+					const evo::Result<ExprInfo> member_val_info = this->analyze_expr(member_val.value, ExprValueKind::None);
+					if(member_val_info.isError()){ return evo::resultError; }
+
+
+					if(this->is_implicitly_convertable_to(
+						this->src_manager.getType(*member_val_info.value().type_id), 
+						this->src_manager.getType(struct_data.memberVars[i].type),
+						member_val_node
+					) == false){
+						this->source.error(
+							"Member cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
+							member_val_node,
+							std::vector<Message::Info>{
+								{std::string("Member is of type:     ") + this->src_manager.printType(struct_data.memberVars[i].type)},
+								{std::string("Expression is of type: ") + this->src_manager.printType(*member_val_info.value().type_id)}
+							}
+						);
+						return evo::resultError;	
+					}
+
+					break;
+				}
+			}
+
+			if(found_member == false){
+				// TODO: better messaging
+				this->source.error(std::format("Member \"{}\" does not exist", member_ident), member_val.ident);
+				return evo::resultError;
+			}
+		}
+
+		// check that all members have values
+		for(size_t i = 0; i < members_with_value.size(); i+=1){
+			if(members_with_value[i] == false){
+				const std::string_view member_ident = struct_data.memberVars[i].name;
+				this->source.error(std::format("In struct initializer, member \"{}\" was not given a value", member_ident), node);
+				return evo::resultError;
+			}
+		}
+
+		const PIR::Type::ID type_id = initializer_type_id.value().typeID();
+
+
+		auto expr = std::optional<PIR::Expr>();
+		if(value_kind == ExprValueKind::Runtime){
+			// get member values
+			auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr());
+			auto members_set = std::vector<bool>(struct_data.memberVars.size(), false);
+			for(const AST::Initializer::Member& member_val : initializer.members){
+				const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
+
+				for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
+					if(struct_data.memberVars[i].name == member_ident){
+						members_set[i] = true;
+
+						if(this->source.getNode(member_val.value).kind == AST::Kind::Uninit){ break; }
+
+						const evo::Result<ExprInfo> member_val_expr_info = this->analyze_expr(member_val.value);
+						if(member_val_expr_info.isError()){ return evo::resultError; }
+
+						member_values[i] = *member_val_expr_info.value().expr;
+
+						break;
+					}
+				}
+			}
+
+
+			// get defaults
+			for(size_t i = 0; i < member_values.size(); i+=1){
+				if(members_set[i]){ continue; }
+
+				const PIR::Expr& default_value = struct_data.memberVars[i].defaultValue;
+
+				if(default_value.kind != PIR::Expr::Kind::ASTNode){
+					member_values[i] = default_value;
+					continue;
+				}
+
+				const AST::Node& default_value_node = this->source.getNode(default_value.astNode);
+				if(default_value_node.kind != AST::Kind::Uninit){
+					member_values[i] = default_value;
+				}
+			}
+
+			expr = PIR::Expr(this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
+		}
+
+
+		return ExprInfo{
+			.value_type = ExprInfo::ValueType::Ephemeral,
+			.type_id    = type_id,
+			.expr       = expr,
+		};
+	};
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_ident_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo> {
+		auto output = ExprInfo{};
+
+
+		const AST::Node& node = this->source.getNode(node_id);
+		const Token& ident = this->source.getIdent(node);
+		std::string_view ident_str = ident.value.string;
+
+		for(const Scope& scope : this->scopes){
+			if(scope.vars.contains(ident_str)){
+				const PIR::Var::ID var_id = scope.vars.at(ident_str);
+				const PIR::Var& var = this->source.getVar(var_id);
+
+				// get value type
+				if(var.isDef){
+					output.value_type = ExprInfo::ValueType::ConcreteConst;
+				}else{
+					output.value_type = ExprInfo::ValueType::ConcreteMutable;
+				}
+
+				// get type
+				output.type_id = var.type;
+
+				// get expr
+				if(value_kind == ExprValueKind::Runtime){
+					output.expr = PIR::Expr(var_id);
+				}else if(value_kind == ExprValueKind::ConstEval){
+					this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
+					return evo::resultError;
+				}
+
+				break;
+
+			}else if(scope.funcs.contains(ident_str)){
+				if(value_kind != ExprValueKind::None || lookup_func_call == nullptr){
+					this->source.error("Functions as values are not supported yet", node);
+					return evo::resultError;
+				}
+
+				const evo::Result<PIR::Func::ID> lookup_func_id = this->lookup_func_in_scope(ident_str, *lookup_func_call);
+				if(lookup_func_id.isError()){ return evo::resultError; }
+
+				// get value type
+				output.value_type = ExprInfo::ValueType::ConcreteConst;
+
+				// get type
+				const PIR::Func& lookup_func = this->source.getFunc(lookup_func_id.value());
+				output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(lookup_func.baseType));
+
+				break;
+
+			}else if(scope.structs.contains(ident_str)){
+				this->source.error("Types cannot be used as expressions", node);
+				return evo::resultError;
+
+			}else if(scope.params.contains(ident_str)){
+				const PIR::Param::ID param_id = scope.params.at(ident_str);
+				const PIR::Param& param = this->source.getParam(param_id);
+
+				// get expr value type
+				using ParamKind = AST::FuncParams::Param::Kind;
+				switch(param.kind){
+					break; case ParamKind::Read:  output.value_type = ExprInfo::ValueType::ConcreteConst;
+					break; case ParamKind::Write: output.value_type = ExprInfo::ValueType::ConcreteMutable;
+					break; case ParamKind::In:    output.value_type = ExprInfo::ValueType::ConcreteMutable;
+				};
+
+				// get type
+				output.type_id = param.type;
+
+				// get expr
+				if(value_kind == ExprValueKind::Runtime){
+					output.expr = PIR::Expr(param_id);
+				}else if(value_kind == ExprValueKind::ConstEval){
+					this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
+					return evo::resultError;
+				}
+
+				break;
+
+			}else if(scope.imports.contains(ident_str)){
+				// get value type
+				output.value_type = ExprInfo::ValueType::Import;
+
+				// get type
+				output.type_id = this->src_manager.getTypeImport();
+
+				// get expr
+				if(value_kind == ExprValueKind::Runtime){
+					const Source::ID import_source_id = scope.imports.at(ident_str).source_id;
+					output.expr = PIR::Expr(import_source_id);
+				}else if(value_kind == ExprValueKind::ConstEval){
+					this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
+					return evo::resultError;
+				}
+
+				break;
+
+			}else if(scope.aliases.contains(ident_str)){
+				this->source.error("Type aliases cannot be used as expressions", node);
+				return evo::resultError;
+			}
+		}
+
+		if(output.type_id.has_value() == false){
+			this->source.error(std::format("Identifier \"{}\" does not exist", ident_str), ident);
+			return evo::resultError;
+		}
+
+		return output;
+	};
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_literal_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		const Token& literal_value = this->source.getLiteral(node_id);
+
+		if(literal_value.kind == Token::LiteralFloat){
+			this->source.error("Literal floats are not supported yet", node_id);
+			return evo::resultError;
+		}
+		if(literal_value.kind == Token::LiteralChar){
+			this->source.error("Literal chars are not supported yet", node_id);
+			return evo::resultError;
+		}
+
+		const Token::Kind base_type = [&]() noexcept {
+			switch(literal_value.kind){
+				break; case Token::LiteralInt: return Token::TypeInt;
+				break; case Token::LiteralBool: return Token::TypeBool;
+				break; case Token::LiteralString: return Token::TypeString;
+			};
+
+			evo::debugFatalBreak("Unkonwn literal type");
+		}();
+
+		const PIR::Type::ID type_id = this->src_manager.getOrCreateTypeID(
+			PIR::Type( this->src_manager.getBaseTypeID(base_type) )
+		);
+
+
+		auto expr = std::optional<PIR::Expr>();
+		if(value_kind != ExprValueKind::None){
+			expr = PIR::Expr(node_id);
+		}
+
+		return ExprInfo{
+			.value_type = ExprInfo::ValueType::Ephemeral,
+			.type_id    = type_id,
+			.expr       = expr,
+		};
+	};
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_intrinsic_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		evo::debugAssert(value_kind == ExprValueKind::None, "getting value of intrinsic is unsupported at the moment");
+
+		auto type_id = std::optional<PIR::Type::ID>();
+
+		const AST::Node& node = this->source.getNode(node_id);
+		const Token& intrinsic_tok = this->source.getIntrinsic(node);
+
+		for(const PIR::Intrinsic& intrinsic : this->src_manager.getIntrinsics()){
+			if(intrinsic.ident == intrinsic_tok.value.string){
+				return ExprInfo{
+					.value_type = ExprInfo::ValueType::ConcreteConst,
+					.type_id    = this->src_manager.getOrCreateTypeID(PIR::Type(intrinsic.baseType)),
+					.expr       = std::nullopt,
+				};
+			}
+		}
+
+		this->source.error(std::format("Intrinsic \"@{}\" does not exist", intrinsic_tok.value.string), intrinsic_tok);
+		return evo::resultError;
+	};
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_uninit_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		auto expr = std::optional<PIR::Expr>();
+		if(value_kind == ExprValueKind::Runtime){
+			expr = PIR::Expr(node_id);
+		}else if(value_kind == ExprValueKind::ConstEval){
+			this->source.error("Constant-evaluated expressions cannot be [uninit]", node_id);
+			return evo::resultError;
+		}
+
+		return ExprInfo{
+			.value_type = ExprInfo::ValueType::Ephemeral,
+			.type_id    = std::nullopt,
+			.expr       = expr,
+		};
+	};
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2103,12 +2568,12 @@ namespace panther{
 						return evo::resultError;
 					}
 
-					const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() 
-						? this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
-					if(value_of_lhs.isError()){ return evo::resultError; }
-					evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+					const ExprValueKind value_kind = this->is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
+					const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, value_kind); 
+					if(lhs_info.isError()){ return evo::resultError; }
+					evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
-					const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
+					const Source& import_source = this->src_manager.getSource(lhs_info.value().expr->import);
 					const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
 					if(import_source.pir.pub_aliases.contains(rhs_ident.value.string)){
@@ -2216,670 +2681,6 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::get_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr> {
-		evo::debugAssert(this->is_global_scope() == false, "SemanticAnalyzer::get_expr_value() is not for use in global variables");
-
-		const AST::Node& value_node = this->source.getNode(node_id);
-
-
-		switch(value_node.kind){
-			case AST::Kind::Ident: {
-				const Token& value_ident = this->source.getIdent(value_node);
-				std::string_view value_ident_str = value_ident.value.string;
-
-				// find the var
-				for(const Scope& scope : this->scopes){
-					if(scope.vars.contains(value_ident_str)){
-						return PIR::Expr(scope.vars.at(value_ident_str));
-					}
-
-					if(scope.params.contains(value_ident_str)){
-						return PIR::Expr(scope.params.at(value_ident_str));
-					}
-
-					if(scope.imports.contains(value_ident_str)){
-						const Source::ID import_source_id = scope.imports.at(value_ident_str).source_id;
-						return PIR::Expr(import_source_id);
-					}
-
-					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in expression");
-					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in expression");
-				}
-
-				this->source.error(std::format("Identifier \"{}\" does not exist", value_ident_str), value_ident);
-				return evo::resultError;
-			} break;
-
-
-			case AST::Kind::FuncCall: {
-				const AST::FuncCall& func_call = this->source.getFuncCall(value_node);
-				const AST::Node& target_node = this->source.getNode(func_call.target);
-
-				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
-				if(args.isError()){ return evo::resultError; }
-
-				if(target_node.kind == AST::Kind::Ident){
-					const std::string_view ident = this->source.getIdent(func_call.target).value.string;
-
-					// get func
-					const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident, func_call);
-					if(func_id.isError()){ return evo::resultError; }
-
-
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
-					return PIR::Expr(func_call_id);
-
-				}else if(target_node.kind == AST::Kind::Intrinsic){
-					// get the intrinsic id
-					const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
-						const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
-						const evo::ArrayProxy<PIR::Intrinsic> intrinsics = this->src_manager.getIntrinsics();
-
-						for(size_t i = 0; i < intrinsics.size(); i+=1){
-							const PIR::Intrinsic& intrinsic = intrinsics[i];
-
-							if(intrinsic.ident == intrinsic_tok.value.string){
-								return PIR::Intrinsic::ID(uint32_t(i));
-							}
-						}
-
-						evo::debugFatalBreak("Unknown intrinsic");
-					}();
-
-
-					// imports
-					if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
-						const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
-						if(import_source_id.isError()){ return evo::resultError; }
-
-						return PIR::Expr(import_source_id.value());
-					}
-
-					// function calls normally
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
-					return PIR::Expr(func_call_id);
-
-				}else if(target_node.kind == AST::Kind::Infix){
-					const AST::Infix& infix = this->source.getInfix(func_call.target);
-
-					switch(this->source.getToken(infix.op).kind){
-						case Token::get("."): {
-							const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-							if(value_of_lhs.isError()){ return evo::resultError; }
-							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
-
-							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
-							const Token& rhs_ident = this->source.getIdent(infix.rhs);
-
-							// get func
-							const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
-								rhs_ident.value.string, import_source, func_call
-							);
-							if(imported_func_id.isError()){ return evo::resultError; }
-
-							
-							// create object
-							const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
-							return PIR::Expr(func_call_id);
-						} break;
-
-					};
-
-					evo::debugFatalBreak("Unknown or unsupported infix type");
-				}
-
-				evo::debugFatalBreak("Unknown func target kind");
-
-			} break;
-
-			case AST::Kind::Initializer: {
-				const AST::Initializer& initializer = this->source.getInitializer(value_node);
-
-				const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type);
-				if(initializer_type_id.isError()){ return evo::resultError; }
-
-				if(initializer_type_id.value().isVoid()){
-					this->source.error("Struct initializer cannot be type Void", initializer.type);
-					return evo::resultError;
-				}
-
-				const PIR::Type& initializer_type = this->src_manager.getType(initializer_type_id.value().typeID());
-				evo::debugAssert(initializer_type.qualifiers.empty(), "Struct initializer should not have qualifiers");
-
-				const PIR::BaseType& initializer_base_type = this->src_manager.getBaseType(initializer_type.baseType);
-				evo::debugAssert(initializer_base_type.kind == PIR::BaseType::Kind::Struct, "Expected struct type in initializer");
-
-				const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(initializer_base_type.data);
-
-				// get member values
-				auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr());
-				auto members_set = std::vector<bool>(struct_data.memberVars.size(), false);
-				for(const AST::Initializer::Member& member_val : initializer.members){
-					const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
-
-					for(size_t i = 0; i < struct_data.memberVars.size(); i+=1){
-						if(struct_data.memberVars[i].name == member_ident){
-							members_set[i] = true;
-
-							if(this->source.getNode(member_val.value).kind == AST::Kind::Uninit){ break; }
-
-							const evo::Result<PIR::Expr> member_val_expr = this->get_expr_value(member_val.value);
-							if(member_val_expr.isError()){ return evo::resultError; }
-
-							member_values[i] = member_val_expr.value();
-
-							break;
-						}
-					}
-				}
-
-
-				// get defaults
-				for(size_t i = 0; i < member_values.size(); i+=1){
-					if(members_set[i]){ continue; }
-
-					const PIR::Expr& default_value = struct_data.memberVars[i].defaultValue;
-
-					if(default_value.kind != PIR::Expr::Kind::ASTNode){
-						member_values[i] = default_value;
-						continue;
-					}
-
-					const AST::Node& default_value_node = this->source.getNode(default_value.astNode);
-					if(default_value_node.kind != AST::Kind::Uninit){
-						member_values[i] = default_value;
-					}
-				}
-
-				return PIR::Expr(this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
-			} break;
-
-
-			case AST::Kind::Prefix: {
-				const AST::Prefix& prefix = this->source.getPrefix(value_node);
-
-				const evo::Result<PIR::Expr> rhs_value = this->get_expr_value(prefix.rhs);
-				if(rhs_value.isError()){ return evo::resultError; }
-
-				if(this->source.getToken(prefix.op).kind == Token::get("-")){
-					const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
-					if(type_of_rhs.isError()){ return evo::resultError; }
-
-					const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
-					const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
-
-					if(rhs_base_type.ops.negate.empty()){
-						this->source.error(
-							"This type does not have a negate (-a) operator", prefix.rhs,
-							std::vector<Message::Info>{
-								Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
-							}
-						);
-						return evo::resultError;
-					}
-
-					const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.negate[0].intrinsic;
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{rhs_value.value()});
-					return PIR::Expr(func_call_id);
-
-				}else if(this->source.getToken(prefix.op).kind == Token::get("!")){
-					const evo::Result<PIR::Type::ID> type_of_rhs = this->analyze_and_get_type_of_expr(this->source.getNode(prefix.rhs));
-					if(type_of_rhs.isError()){ return evo::resultError; }
-
-					const PIR::Type& rhs_type = this->src_manager.getType(type_of_rhs.value());
-					const PIR::BaseType& rhs_base_type = this->src_manager.getBaseType(rhs_type.baseType);
-
-					if(rhs_base_type.ops.logicalNot.empty()){
-						this->source.error(
-							"This type does not have a logical not (!a) operator", prefix.rhs,
-							std::vector<Message::Info>{
-								Message::Info(std::format("Type of right-hand-side: {}", this->src_manager.printType(type_of_rhs.value()))),
-							}
-						);
-						return evo::resultError;
-					}
-
-					const PIR::Intrinsic::ID intrinsic_id = rhs_base_type.ops.logicalNot[0].intrinsic;
-					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{rhs_value.value()});
-					return PIR::Expr(func_call_id);
-				}
-				
-
-				const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, rhs_value.value());
-
-
-
-				if(this->source.getToken(prefix.op).kind == Token::KeywordAddr){
-					if(rhs_value.value().kind == PIR::Expr::Kind::Param){
-						PIR::Param& param = this->source.getParam(rhs_value.value().param);
-						param.mayHaveBeenEdited = true;
-
-					}else if(rhs_value.value().kind == PIR::Expr::Kind::Accessor){
-						PIR::Accessor& accessor = this->source.getAccessor(rhs_value.value().accessor);
-						PIR::Expr* lhs = &accessor.lhs;
-
-						while(lhs->kind == PIR::Expr::Kind::Accessor){
-							PIR::Accessor& lhs_accessor = this->source.getAccessor(lhs->accessor);
-							lhs = &lhs_accessor.lhs;
-						};
-
-						if(lhs->kind == PIR::Expr::Kind::Param){
-							PIR::Param& param = this->source.getParam(lhs->param);
-							param.mayHaveBeenEdited = true;
-						}
-					}
-				}
-
-
-				return PIR::Expr(prefix_id);
-			} break;
-
-
-			case AST::Kind::Infix: {
-				const AST::Infix& infix = this->source.getInfix(value_node);
-				const Token::Kind infix_op_kind = this->source.getToken(infix.op).kind;
-
-				switch(infix_op_kind){
-					case Token::get("."): {
-						const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-						if(value_of_lhs.isError()){ return evo::resultError; }
-
-						const Token& rhs_ident = this->source.getIdent(infix.rhs);
-
-						if(value_of_lhs.value().kind == PIR::Expr::Kind::Import){
-							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
-
-							if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
-								const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
-								return PIR::Expr(imported_var_id);
-
-							}else if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-								this->source.error("Functions as values are not supported yet", infix.rhs);
-								return evo::resultError;
-								
-							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-								const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
-								return PIR::Expr(imported_source_id);
-							}
-
-							evo::debugFatalBreak("should have already caught that it's non-existant");
-						}else{
-							const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-							if(lhs_type_id.isError()){ return evo::resultError; }
-
-							const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-							evo::debugAssert(lhs_type.qualifiers.empty(), "uncaught invalid accessor operator");
-
-							const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-							const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
-							for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
-								if(member.name == rhs_ident.value.string){
-									const PIR::Accessor::ID accessor_id = this->source.createAccessor(
-										value_of_lhs.value(), lhs_type_id.value(), rhs_ident.value.string
-									);
-									return PIR::Expr(accessor_id);
-								}
-							}
-
-							evo::debugFatalBreak("uncaught non-existant ident");
-						}
-					} break;
-
-
-					case Token::get("+"): case Token::get("+@"):
-					case Token::get("-"): case Token::get("-@"):
-					case Token::get("*"): case Token::get("*@"):
-					case Token::get("/"): 
-					case Token::get("=="): case Token::get("!="):
-					case Token::get("<"):  case Token::get("<="):
-					case Token::get(">"):  case Token::get(">="): 
-					case Token::KeywordAnd: case Token::KeywordOr: {
-						///////////////////////////////////
-						// lhs
-
-						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
-						if(lhs_type_id.isError()){ return evo::resultError; }
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-						evo::debugAssert(lhs_type.qualifiers.empty(), "uncaught qualifiers");
-
-						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-
-
-						///////////////////////////////////
-						// rhs
-
-						const AST::Node& rhs_node = this->source.getNode(infix.rhs);
-						const evo::Result<PIR::Type::ID> type_id_of_rhs = this->analyze_and_get_type_of_expr(rhs_node);
-						if(type_id_of_rhs.isError()){ return evo::resultError; }
-
-						const PIR::Type& type_of_rhs = this->src_manager.getType(type_id_of_rhs.value());
-						evo::debugAssert(type_of_rhs.qualifiers.empty(), "uncaught qualifiers");
-
-						const PIR::BaseType& base_type_of_rhs = this->src_manager.getBaseType(type_of_rhs.baseType);
-
-
-						///////////////////////////////////
-						// create func call
-
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "uncaught import");
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "uncaught function");
-
-						if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
-							// evo::debugAssert(lhs_type_id.value() == type_id_of_rhs.value(), "uncaught type mismatch");
-
-							const PIR::BaseType& base_type_to_use = [&]() noexcept {
-								if(lhs_type_id.value() == type_id_of_rhs.value()){
-									return lhs_base_type;
-
-								}else if(this->is_implicitly_convertable_to(lhs_type, type_of_rhs, lhs_node)){
-									return base_type_of_rhs;
-
-								}else{
-									evo::debugAssert(this->is_implicitly_convertable_to(type_of_rhs, lhs_type, rhs_node), "uncaught invalid op");
-									return lhs_base_type;
-								}
-							}();
-
-							const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
-								switch(infix_op_kind){
-									case Token::get("+"):  return base_type_to_use.ops.add[0].intrinsic;
-									case Token::get("+@"): return base_type_to_use.ops.addWrap[0].intrinsic;
-									case Token::get("-"):  return base_type_to_use.ops.sub[0].intrinsic;
-									case Token::get("-@"): return base_type_to_use.ops.subWrap[0].intrinsic;
-									case Token::get("*"):  return base_type_to_use.ops.mul[0].intrinsic;
-									case Token::get("*@"): return base_type_to_use.ops.mulWrap[0].intrinsic;
-									case Token::get("/"):  return base_type_to_use.ops.div[0].intrinsic;
-
-									case Token::get("=="): return base_type_to_use.ops.logicalEqual[0].intrinsic;
-									case Token::get("!="): return base_type_to_use.ops.notEqual[0].intrinsic;
-									case Token::get("<"):  return base_type_to_use.ops.lessThan[0].intrinsic;
-									case Token::get("<="): return base_type_to_use.ops.lessThanEqual[0].intrinsic;
-									case Token::get(">"):  return base_type_to_use.ops.greaterThan[0].intrinsic;
-									case Token::get(">="): return base_type_to_use.ops.greaterThanEqual[0].intrinsic;
-									case Token::KeywordAnd: return base_type_to_use.ops.logicalAnd[0].intrinsic;
-									case Token::KeywordOr: return base_type_to_use.ops.logicalOr[0].intrinsic;
-								};
-
-								evo::debugFatalBreak("Unknown intrinsic kind");
-							}();
-
-							const evo::Result<PIR::Expr> lhs_expr = this->get_expr_value(infix.lhs);
-							if(lhs_expr.isError()){ return evo::resultError; }
-
-							const evo::Result<PIR::Expr> rhs_expr = this->get_expr_value(infix.rhs);
-							if(lhs_expr.isError()){ return evo::resultError; }
-
-							const PIR::FuncCall::ID func_call_id = 
-								this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{lhs_expr.value(), rhs_expr.value()});
-							return PIR::Expr(func_call_id);
-						}
-
-					} break;
-
-
-					case Token::KeywordAs: case Token::KeywordCast: {
-
-						///////////////////////////////////
-						// lhs
-
-						const AST::Node& lhs_node = this->source.getNode(infix.lhs);
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(lhs_node);
-						if(lhs_type_id.isError()){ return evo::resultError; }
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-
-						if(lhs_type.qualifiers.empty() == false){
-							this->source.error(
-								std::format("Types with qualifiers do not support the [{}] operator", Token::printKind(infix_op_kind)), infix.lhs
-							);
-							return evo::resultError;
-						}
-
-						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-
-
-						///////////////////////////////////
-						// rhs
-
-						const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs);
-						if(rhs_type_id.isError()){ return evo::resultError; }
-
-
-						///////////////////////////////////
-						// op checking
-
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Import, "should have been caught already");
-						evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
-
-
-						const std::vector<PIR::BaseType::OverloadedOperator>& op_list = [&]() noexcept {
-							switch(infix_op_kind){
-								case Token::KeywordAs:   return lhs_base_type.ops.as;
-								case Token::KeywordCast: return lhs_base_type.ops.cast;
-							};
-
-							evo::debugFatalBreak("invalid op for this infix case");
-						}();
-
-						for(const PIR::BaseType::OverloadedOperator& op : op_list){
-							if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
-								const PIR::Intrinsic& intrinsic = this->src_manager.getIntrinsic(op.intrinsic);
-								const PIR::BaseType& intrinsic_base_type = this->src_manager.getBaseType(intrinsic.baseType);
-
-								if(intrinsic_base_type.callOperator->returnType == rhs_type_id.value()){
-									const evo::Result<PIR::Expr> lhs_expr = this->get_expr_value(infix.lhs);
-									if(lhs_expr.isError()){ return evo::resultError; }
-
-									const PIR::FuncCall::ID func_call_id = 
-										this->source.createFuncCall(op.intrinsic, std::vector<PIR::Expr>{lhs_expr.value()});
-									return PIR::Expr(func_call_id);
-								}
-
-							}else{
-								evo::fatalBreak("Overloaded operators on user-defined types are not supported");
-							}
-						}
-						
-						// TODO: better messaging
-						this->source.error(
-							std::format("This type does not have a valid [{}] operator to that type", Token::printKind(infix_op_kind)),
-							infix.rhs
-						);
-						return evo::resultError;
-					} break;
-
-				};
-
-				evo::debugFatalBreak("Unknown or unsupported infix type");
-			} break;
-
-
-			case AST::Kind::Postfix: {
-				const AST::Postfix& postfix = this->source.getPostfix(value_node);
-
-				switch(this->source.getToken(postfix.op).kind){
-					case Token::get(".&"): {
-						// get deref type
-						const evo::Result<PIR::Type::ID> ptr_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
-						evo::debugAssert(ptr_type_id.isSuccess(), "Failed to get deref type - should have caught error earlier");
-
-						const PIR::Type& ptr_type = this->src_manager.getType(ptr_type_id.value());
-						PIR::Type ptr_type_copy = ptr_type;
-						ptr_type_copy.qualifiers.pop_back();
-						const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(ptr_type_copy);
-
-						const evo::Result<PIR::Expr> lhs_expr_value = this->get_expr_value(postfix.lhs);
-						if(lhs_expr_value.isError()){ return evo::resultError; }
-
-						const PIR::Deref::ID deref_id = this->source.createDeref(lhs_expr_value.value(), deref_type_id);
-						return PIR::Expr(deref_id);
-					} break;
-				};
-
-				evo::debugFatalBreak("Unknown or unsupported postfix type");
-			} break;
-
-
-
-			case AST::Kind::Literal: {
-				return PIR::Expr(node_id);
-			} break;
-
-			case AST::Kind::Uninit: {
-				return PIR::Expr(node_id);
-			} break;
-
-
-		};
-
-		evo::debugFatalBreak("Unknown node value kind");
-	};
-
-
-
-	auto SemanticAnalyzer::get_const_expr_value(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr> {
-		const evo::Result<PIR::Expr> recursive_value = this->get_const_expr_value_recursive(node_id);
-		if(recursive_value.isError()){ return evo::resultError; }
-
-		// if(recursive_value.value().kind == PIR::Expr::Kind::Var){
-		// 	const PIR::Var& value_var = this->source.getVar(recursive_value.value().var);
-		// 	return value_var.value;
-		// }
-
-		return recursive_value;
-	};
-
-
-
-	auto SemanticAnalyzer::get_const_expr_value_recursive(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Expr> {
-		const AST::Node& node = this->source.getNode(node_id);
-
-		switch(node.kind){
-			case AST::Kind::Ident: {
-				const Token& value_ident = this->source.getIdent(node);
-				std::string_view value_ident_str = value_ident.value.string;
-
-				// find the var
-				for(const Scope& scope : this->scopes){
-					if(scope.vars.contains(value_ident_str)){
-						// return PIR::Expr(scope.vars.at(value_ident_str));
-
-						this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
-						return evo::resultError;
-					}
-
-					if(scope.params.contains(value_ident_str)){
-						// return PIR::Expr(scope.params.at(value_ident_str));
-
-						this->source.error("At this time, constant-evaluated values cannot be the value of a parameter", node);
-						return evo::resultError;
-					}
-
-					if(scope.imports.contains(value_ident_str)){
-						// return PIR::Expr(scope.imports.at(value_ident_str).source_id);
-
-						this->source.error("At this time, constant-evaluated values cannot be the value of an import", node);
-						return evo::resultError;
-					}
-
-					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in const expr");
-					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in const expr");
-				}
-
-				evo::debugFatalBreak("Unknown ident: {}", value_ident_str);
-
-			} break;
-
-			case AST::Kind::FuncCall: {
-				const AST::FuncCall& func_call = this->source.getFuncCall(node);
-				const AST::Node& target_node = this->source.getNode(func_call.target);
-
-				if(target_node.kind != AST::Kind::Intrinsic){
-					this->source.error(
-						"At this time, constant-evaluated values cannot be function calls", node,
-						std::vector<Message::Info>{ Message::Info("calls to intrinsic functions are allowed") }
-					);
-					return evo::resultError;
-				}
-
-				const evo::Result<PIR::Type::ID> target_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(func_call.target));
-				if(target_type_id.isError()){ return evo::resultError; }
-
-
-				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
-				if(args.isError()){ return evo::resultError; }
-
-				// get the intrinsic id
-				const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
-					const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
-					const evo::ArrayProxy<PIR::Intrinsic> intrinsics = this->src_manager.getIntrinsics();
-
-					for(size_t i = 0; i < intrinsics.size(); i+=1){
-						const PIR::Intrinsic& intrinsic = intrinsics[i];
-
-						if(intrinsic.ident == intrinsic_tok.value.string){
-							return PIR::Intrinsic::ID(uint32_t(i));
-						}
-					}
-
-					evo::debugFatalBreak("Unknown intrinsic");
-				}();
-
-				// imports
-				if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
-					const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
-					if(import_source_id.isError()){ return evo::resultError; }
-
-					return PIR::Expr(import_source_id.value());
-				}
-
-				// function calls normally
-				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
-				return PIR::Expr(func_call_id);
-			} break;
-
-			case AST::Kind::Prefix: {
-				const AST::Prefix& prefix = this->source.getPrefix(node);
-
-				switch(this->source.getToken(prefix.op).kind){
-					case Token::KeywordCopy: {					
-						return this->get_const_expr_value_recursive(prefix.rhs);
-					} break;
-
-					case Token::KeywordAddr: {
-						const evo::Result<PIR::Expr> rhs_value = this->get_const_expr_value_recursive(prefix.rhs);
-						if(rhs_value.isError()){ return evo::resultError; }
-
-						const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, rhs_value.value());
-						return PIR::Expr(prefix_id);
-					} break;
-
-				};
-
-				evo::debugFatalBreak("Unknown prefix kind");
-			} break;
-
-			case AST::Kind::Postfix: {
-				this->source.error("At this time, constant values cannot be postfix operations", node);
-				return evo::resultError;
-			} break;
-
-			case AST::Kind::Literal: {
-				return PIR::Expr(node_id);
-			} break;
-
-			case AST::Kind::Uninit: {
-				this->source.error("Constant values cannot be \"uninit\"", node);
-				return evo::resultError;
-			} break;
-
-			default: evo::debugFatalBreak("Unknown node value kind");
-		};
-
-	};
-
 
 	auto SemanticAnalyzer::get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID> {
 		const std::string_view import_path_str = this->source.getLiteral(import_path.astNode).value.string;
@@ -2916,230 +2717,6 @@ namespace panther{
 
 		return imported_source_id_result.value();
 	};
-
-
-
-
-
-
-	auto SemanticAnalyzer::get_expr_value_type(AST::Node::ID node_id) const noexcept -> evo::Result<ExprValueType> {
-		const AST::Node& value_node = this->source.getNode(node_id);
-
-		switch(value_node.kind){
-			break; case AST::Kind::FuncCall: return ExprValueType::Ephemeral;
-
-			break; case AST::Kind::Prefix: return ExprValueType::Ephemeral;
-
-			break; case AST::Kind::Infix: {
-				const AST::Infix& infix = this->source.getInfix(value_node);
-
-				switch(this->source.getToken(infix.op).kind){
-					case Token::get("."): {
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-						if(lhs_type_id.isError()){ return evo::resultError; }
-
-						if(lhs_type_id.value() == SourceManager::getTypeImport()){
-							const evo::Result<PIR::Expr> value_of_lhs = this->is_global_scope() ? 
-								this->get_const_expr_value(infix.lhs) : this->get_expr_value(infix.lhs);
-							if(value_of_lhs.isError()){ return evo::resultError; } // TODO: make this a debug assert when globals can be variables
-
-							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
-
-							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
-							const Token& rhs_ident = this->source.getIdent(infix.rhs);
-
-							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-								return ExprValueType::Concrete;
-
-							}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
-								return ExprValueType::Concrete;
-
-							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-								return ExprValueType::Import;
-							}
-
-							this->source.error(std::format("import does not have public member \"{}\"", rhs_ident.value.string), infix.rhs);
-							return evo::resultError;
-
-						}else{
-							return this->get_expr_value_type(infix.lhs);
-						}
-					} break;
-
-					case Token::get("+"):  return ExprValueType::Ephemeral;
-					case Token::get("+@"): return ExprValueType::Ephemeral;
-					case Token::get("-"):  return ExprValueType::Ephemeral;
-					case Token::get("-@"): return ExprValueType::Ephemeral;
-					case Token::get("*"):  return ExprValueType::Ephemeral;
-					case Token::get("*@"): return ExprValueType::Ephemeral;
-					case Token::get("/"):  return ExprValueType::Ephemeral;
-
-					case Token::get("=="):  return ExprValueType::Ephemeral;
-					case Token::get("!="):  return ExprValueType::Ephemeral;
-					case Token::get("<"):   return ExprValueType::Ephemeral;
-					case Token::get("<="):  return ExprValueType::Ephemeral;
-					case Token::get(">"):   return ExprValueType::Ephemeral;
-					case Token::get(">="):  return ExprValueType::Ephemeral;
-					case Token::KeywordAnd: return ExprValueType::Ephemeral;
-					case Token::KeywordOr:  return ExprValueType::Ephemeral;
-
-					case Token::KeywordAs:   return ExprValueType::Ephemeral;
-					case Token::KeywordCast: return ExprValueType::Ephemeral;
-				};
-				evo::debugFatalBreak("Unknown infix kind");
-			}break;
-
-			break; case AST::Kind::Postfix: {
-				const AST::Postfix& postfix = this->source.getPostfix(value_node);
-
-				switch(this->source.getToken(postfix.op).kind){
-					break; case Token::get(".&"): return ExprValueType::Concrete;
-				};
-				evo::debugFatalBreak("Unknown postfix kind");
-			} break;
-
-			break; case AST::Kind::Initializer: return ExprValueType::Ephemeral;
-
-			break; case AST::Kind::Ident: return ExprValueType::Concrete;
-			break; case AST::Kind::Intrinsic: return ExprValueType::Concrete;
-			break; case AST::Kind::Literal: return ExprValueType::Ephemeral;
-			break; case AST::Kind::Uninit: return ExprValueType::Ephemeral;
-		};
-
-		evo::debugFatalBreak("Unknown AST node kind");
-	};
-
-
-	auto SemanticAnalyzer::is_expr_mutable(AST::Node::ID node_id) const noexcept -> bool {
-		const AST::Node& value_node = this->source.getNode(node_id);
-
-		switch(value_node.kind){
-			break; case AST::Kind::Prefix: evo::debugFatalBreak("Not concrete");
-			break; case AST::Kind::FuncCall: evo::debugFatalBreak("Not concrete");
-
-
-			break; case AST::Kind::Infix: {
-				const AST::Infix& infix = this->source.getInfix(value_node);
-
-				switch(this->source.getToken(infix.op).kind){
-					case Token::get("."): {
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(infix.lhs));
-						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
-
-						const Token& rhs_ident = this->source.getIdent(infix.rhs);
-
-						if(lhs_type_id.value() == SourceManager::getTypeImport()){
-							const evo::Result<PIR::Expr> value_of_lhs = this->get_expr_value(infix.lhs);
-							evo::debugAssert(value_of_lhs.isSuccess(), "Should have caught this error already");
-							evo::debugAssert(value_of_lhs.value().kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
-
-							const Source& import_source = this->src_manager.getSource(value_of_lhs.value().import);
-
-							if(import_source.pir.pub_funcs.contains(rhs_ident.value.string)){
-								return false;
-
-							}else if(import_source.pir.pub_vars.contains(rhs_ident.value.string)){
-								const PIR::Var::ID imported_var_id = import_source.pir.pub_vars.at(rhs_ident.value.string);
-								const PIR::Var& imported_var = Source::getVar(imported_var_id);
-
-								return !imported_var.isDef;
-
-							}else if(import_source.pir.pub_imports.contains(rhs_ident.value.string)){
-								return false;
-							}
-						}
-
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-						evo::debugAssert(lhs_type.qualifiers.empty(), "uncaught invalid accessor operator");
-
-						const PIR::BaseType& lhs_base_type = this->src_manager.getBaseType(lhs_type.baseType);
-						const PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(lhs_base_type.data);
-						for(const PIR::BaseType::StructData::MemberVar& member : struct_data.memberVars){
-							if(member.name == rhs_ident.value.string){
-								return !member.isDef;
-							}
-						}
-
-						evo::debugFatalBreak("uncaught unknown member");
-					} break;
-
-					default: evo::debugFatalBreak("Unknown infix kind");
-				};
-			} break;
-
-
-			break; case AST::Kind::Postfix: {
-				const AST::Postfix& postfix = this->source.getPostfix(value_node);
-
-				switch(this->source.getToken(postfix.op).kind){
-					case Token::get(".&"): {
-						const evo::Result<PIR::Type::ID> lhs_type_id = this->analyze_and_get_type_of_expr(this->source.getNode(postfix.lhs));
-						evo::debugAssert(lhs_type_id.isSuccess(), "Should have caught this error already");
-
-						const PIR::Type& lhs_type = this->src_manager.getType(lhs_type_id.value());
-						evo::debugAssert(lhs_type.qualifiers.back().isPtr, "Should have already been checked that this type is a pointer");
-
-						return !lhs_type.qualifiers.back().isConst;
-
-					} break;
-
-					default: evo::debugFatalBreak("Unknown postfix kind");
-				};
-			} break;
-
-			break; case AST::Kind::Ident: {
-				const Token& value_ident = this->source.getIdent(value_node);
-				std::string_view value_ident_str = value_ident.value.string;
-
-				// find the var
-				for(const Scope& scope : this->scopes){
-					if(scope.vars.contains(value_ident_str)){
-						const PIR::Var::ID var_id = scope.vars.at(value_ident_str);
-						const PIR::Var& var = this->source.getVar(var_id);
-						return !var.isDef;
-					}
-
-					if(scope.funcs.contains(value_ident_str)){
-						return false;
-					}
-
-					if(scope.params.contains(value_ident_str)){
-						const PIR::Param::ID param_id = scope.params.at(value_ident_str);
-						const PIR::Param& param = this->source.getParam(param_id);
-
-						using ParamKind = AST::FuncParams::Param::Kind;
-						switch(param.kind){
-							case ParamKind::Read: return false;
-							case ParamKind::Write: return true;
-							case ParamKind::In: return true;
-						};
-					}
-
-					if(scope.imports.contains(value_ident_str)){
-						return false;
-					}
-
-					evo::debugAssert(scope.aliases.contains(value_ident_str) == false, "uncaught type alias in expression");
-					evo::debugAssert(scope.structs.contains(value_ident_str) == false, "uncaught type in expression");
-				}
-
-				evo::debugFatalBreak("Didn't find value_ident");
-			} break;
-
-			break; case AST::Kind::Intrinsic: return false;
-
-			break; case AST::Kind::Literal: evo::debugFatalBreak("Not concrete");
-			break; case AST::Kind::Uninit: evo::debugFatalBreak("Not concrete");
-		};
-
-		evo::debugFatalBreak("Unknown AST node kind");
-	};
-
-
-
-
-
 
 
 	// TODO: check for exported functions in all files (through saving in SourceManager)
@@ -3389,16 +2966,13 @@ namespace panther{
 				const AST::Node& arg_node = this->source.getNode(arg_id);
 
 				// check types match
-				const evo::Result<PIR::Type::ID> arg_type_id = this->analyze_and_get_type_of_expr(arg_node);
-				if(arg_type_id.isError()){
-					func_is_candidate = false;
-					break;
-				}
+				const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, ExprValueKind::None);
+				if(arg_info.isError()){ return evo::resultError; }
 
 
-				if(param.type != arg_type_id.value()){
+				{
 					const PIR::Type& param_type = this->src_manager.getType(param.type);
-					const PIR::Type& arg_type = this->src_manager.getType(arg_type_id.value());
+					const PIR::Type& arg_type = this->src_manager.getType(*arg_info.value().type_id);
 
 					if(this->is_implicitly_convertable_to(arg_type, param_type, arg_node) == false){
 						func_is_candidate = false;
@@ -3409,12 +2983,6 @@ namespace panther{
 
 			
 				// check param kind accepts arg value type
-				const evo::Result<ExprValueType> arg_value_type = this->get_expr_value_type(arg_id);
-				if(arg_value_type.isError()){
-					func_is_candidate = false;
-					break;
-				}
-
 				using ParamKind = AST::FuncParams::Param::Kind;
 				switch(param.kind){
 					case ParamKind::Read: {
@@ -3422,19 +2990,14 @@ namespace panther{
 					} break;
 
 					case ParamKind::Write: {
-						if(arg_value_type.value() != ExprValueType::Concrete){
-							func_is_candidate = false;
-							break;
-						}
-
-						if(this->is_expr_mutable(arg_id) == false){
+						if(arg_info.value().value_type != ExprInfo::ValueType::ConcreteMutable){
 							func_is_candidate = false;
 							break;
 						}
 					} break;
 
 					case ParamKind::In: {
-						if(arg_value_type.value() != ExprValueType::Ephemeral){
+						if(arg_info.value().value_type != ExprInfo::ValueType::Ephemeral){
 							func_is_candidate = false;
 							break;
 						}

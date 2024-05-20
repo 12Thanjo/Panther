@@ -71,11 +71,11 @@ namespace panther{
 		auto Printer::print_message(const panther::Message& msg) const noexcept -> void {
 			switch(msg.type){
 				break; case panther::Message::Type::Fatal:
-					this->fatal( std::format("Fatal: {}\n", msg.message) );
+					this->fatal( std::format("<Fatal> {}\n", msg.message) );
 					this->fatal( std::format("\tThis is most likely a bug in the compiler\n", msg.message) );
 
-				break; case panther::Message::Type::Error:   this->error( std::format("Error: {}\n", msg.message) );
-				break; case panther::Message::Type::Warning: this->warning( std::format("Warning: {}\n", msg.message) );
+				break; case panther::Message::Type::Error:   this->error( std::format("<Error> {}\n", msg.message) );
+				break; case panther::Message::Type::Warning: this->warning( std::format("<Warning> {}\n", msg.message) );
 			};
 
 			if(msg.source != nullptr){

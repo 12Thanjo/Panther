@@ -59,7 +59,7 @@ namespace panther{
 		result = this->parse_expr();
 		if(result.code() == Result::Success){
 			// ;
-			if(this->expect_token(Token::get(";"), "at end of variable declaration") == false){ return Result::Error; }
+			if(this->expect_token(Token::get(";"), "at end of expression statement") == false){ return Result::Error; }
 			
 			return result;
 
