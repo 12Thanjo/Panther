@@ -29,7 +29,6 @@
 
 
 
-
 struct Config{
 	std::string name;
 	bool print_colors;
@@ -49,6 +48,9 @@ struct Config{
 
 	std::filesystem::path relative_directory{};
 	bool relative_directory_set = false;
+
+	// semantic analysis
+	bool allowStructMemberTypeInference = false;
 };
 
 
@@ -107,18 +109,16 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	if(config.output_path.empty()){
 		const char* file_ext = [&]() noexcept {
 			switch(config.target){
-				break; case Config::Target::LLVMIR: return "ll";
-				break; case Config::Target::Object: return "o";
+				case Config::Target::LLVMIR: return "ll";
+				case Config::Target::Object: return "o";
 
 				#if defined(EVO_PLATFORM_WINDOWS)
-					break; case Config::Target::Executable: return "exe";
+					case Config::Target::Executable: return "exe";
 				#elif defined(EVO_PLATFORM_LINUX)
-					break; case Config::Target::Executable: return "out";
+					case Config::Target::Executable: return "out";
 				#endif
 
-				// I'm not entirely sure why I need this static cast here, but MSVC complains
-				//  (I haven't bothered checking other compilers)
-				break; default: return static_cast<const char*>(nullptr);
+				default: return static_cast<const char*>(nullptr);
 			};
 		}();
 
@@ -153,9 +153,11 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 
 	auto source_manager = panther::SourceManager(
-		panther::SourceManager::Config(
-			config.relative_directory.string()
-		),
+		panther::SourceManager::Config{
+			.basePath = config.relative_directory.string(),
+
+			.allowStructMemberTypeInference = config.allowStructMemberTypeInference,
+		},
 		[&](const panther::Message& message){
 			printer.print_message(message);
 		}
@@ -169,7 +171,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	auto file_paths = std::vector<std::filesystem::path>{
 		(config.relative_directory / "test.pthr").make_preferred(),
-		// (config.relative_directory / "test2.pthr").make_preferred(),
+		(config.relative_directory / "test2.pthr").make_preferred(),
 		// (config.relative_directory / "test3.pthr").make_preferred(),
 	};
 

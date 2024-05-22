@@ -601,25 +601,45 @@ namespace panther{
 
 		evo::uint total_fails = 0;
 
+
 		for(Source& source : this->sources){
-			if(source.semantic_analysis_declarations() == false){
+			if(source.semantic_analysis_global_idents_and_imports() == false){
 				total_fails += 1;
 			}
 		}
 		if(total_fails != 0){ return total_fails; }
 
+
 		for(Source& source : this->sources){
-			if(source.semantic_analysis_structs() == false){
+			if(source.semantic_analysis_global_aliases() == false){
 				total_fails += 1;
 			}
 		}
 		if(total_fails != 0){ return total_fails; }
 
+
 		for(Source& source : this->sources){
-			if(source.semantic_analysis() == false){
+			if(source.semantic_analysis_global_types() == false){
 				total_fails += 1;
 			}
 		}
+		if(total_fails != 0){ return total_fails; }
+
+
+		for(Source& source : this->sources){
+			if(source.semantic_analysis_global_values() == false){
+				total_fails += 1;
+			}
+		}
+		if(total_fails != 0){ return total_fails; }
+
+
+		for(Source& source : this->sources){
+			if(source.semantic_analysis_runtime() == false){
+				total_fails += 1;
+			}
+		}
+
 
 		return total_fails;
 	};

@@ -19,14 +19,20 @@ namespace panther{
 			~SemanticAnalyzer() = default;
 
 
-			EVO_NODISCARD auto semantic_analysis_declarations() noexcept -> bool;
-			EVO_NODISCARD auto semantic_analysis_structs() noexcept -> bool;
-			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_idents_and_imports() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_aliases() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_types() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_values() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_runtime() noexcept -> bool;
+
 
 
 		private:
 			EVO_NODISCARD auto analyze_stmt(const AST::Node& node) noexcept -> bool;
+
 			EVO_NODISCARD auto analyze_var(const AST::VarDecl& var_decl) noexcept -> bool;
+			EVO_NODISCARD auto analyze_var_value(PIR::Var& var, const AST::VarDecl& var_decl) noexcept -> bool;
+			EVO_NODISCARD auto analyze_struct_member(const AST::VarDecl& var_decl) noexcept -> bool; // only be called from analyze_var()
 
 			EVO_NODISCARD auto analyze_func(const AST::Func& func) noexcept -> bool;
 			EVO_NODISCARD auto analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func) noexcept -> bool;
@@ -63,7 +69,7 @@ namespace panther{
 
 				ValueType value_type;
 				std::optional<PIR::Type::ID> type_id; // nullopt == uninit
-				std::optional<PIR::Expr> expr; // nullopt if needs_expr_value == false
+				std::optional<PIR::Expr> expr; // nullopt if `value_kind == ExprValueKind::None`
 			};
 
 
@@ -194,6 +200,8 @@ namespace panther{
 			Source& source;
 			SourceManager& src_manager;
 
+			bool is_analyzing_runtime = false;
+
 			struct Scope{
 				PIR::StmtBlock* stmts_entry;
 
@@ -209,6 +217,12 @@ namespace panther{
 				bool is_terminated = false;
 			};
 			std::vector<Scope> scopes{};
+
+			struct GlobalVar{
+				PIR::Var::ID pir_id;
+				const AST::VarDecl& ast;
+			};
+			std::vector<GlobalVar> global_vars{};
 
 			struct GlobalFunc{
 				PIR::Func::ID pir_id;

@@ -21,24 +21,35 @@ namespace panther{
 	};
 
 
-	auto Source::semantic_analysis_declarations() noexcept -> bool {
+	auto Source::semantic_analysis_global_idents_and_imports() noexcept -> bool {
 		this->semantic_analyzer = new SemanticAnalyzer(*this);
 		
-		return this->semantic_analyzer->semantic_analysis_declarations();
+		return this->semantic_analyzer->semantic_analysis_global_idents_and_imports();
 	};
 
-	auto Source::semantic_analysis_structs() noexcept -> bool {
-		return this->semantic_analyzer->semantic_analysis_structs();
+	
+	auto Source::semantic_analysis_global_aliases() noexcept -> bool {
+		return this->semantic_analyzer->semantic_analysis_global_aliases();
 	};
+	
 
-	auto Source::semantic_analysis() noexcept -> bool {
-		const bool result = this->semantic_analyzer->semantic_analysis();
+	auto Source::semantic_analysis_global_types() noexcept -> bool {
+		return this->semantic_analyzer->semantic_analysis_global_types();
+	};
+	
+	auto Source::semantic_analysis_global_values() noexcept -> bool {
+		return this->semantic_analyzer->semantic_analysis_global_values();
+	};
+	
+	auto Source::semantic_analysis_runtime() noexcept -> bool {
+		const bool result = this->semantic_analyzer->semantic_analysis_runtime();
 
 		delete this->semantic_analyzer;
-		this->semantic_analyzer = nullptr;
 
 		return result;
 	};
+
+
 
 
 

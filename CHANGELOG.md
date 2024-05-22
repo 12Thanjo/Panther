@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.30.2
+- Fixed fatal error when using imported types as the type of a function parameter
+- Fixed some incorrect error messages about constant-evaluated expressions
+- Allowed imported types to be used in `alias` expressions and as function return types
+- Added the config option `allowStructMemberTypeInference` (defaults to `false`)
+- Fixed struct member variables not allowed to have the same name as a global variable, function, etc.
+
 ### v0.30.1
 - Disallowed using expression operators as a statement (means that things like `1 + 2;` now emit an error)
 - Added more checking for improper use of `uninit`

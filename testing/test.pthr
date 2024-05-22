@@ -1,44 +1,16 @@
+def test2 = @import("test2.pthr");
 
-
-func get_num = (num1: ISize, num2: USize) -> ISize {
-	return num1 + num2 cast ISize;
-}
-
-
-struct Vec2 = {
-	var x: ISize = uninit;
-	var y: ISize = get_num(4, 17);
-}
-
-struct Struct = {
-	var x: Int;
-}
-
-func get_vec2 = () -> Vec2 {
-	return Vec2{
-		x = uninit,
-		y = 2,
-	};
-}
+alias Vec2 = test2.Vec2;
 
 func entry = () #entry -> Int {
-	def vec2 = Vec2{
-		x = 9,
-		y = 1,
-	};
+	var foo = create_vec2(12, 14);
 
-
-	def vec2_ptr: Vec2&| = addr vec2;
-
-	@__printInt(get_vec2().x cast Int); // UB
-	@__printInt(vec2_ptr.&.y cast Int); // 1
-	@__printInt(Vec2{ y = 4 }.x cast Int); // UB
-	@__printInt(Vec2{ x = 1 }.y cast Int); // 12
-	@__printInt(Vec2{ x = 3 }.x cast Int); // 3
-
-	if(false){
-		unreachable;
-	}
+	@__printInt(foo.x);
+	@__printInt(foo.y);
 
 	return 0;
+}
+
+func create_vec2 = (x: Int, y: Int) -> test2.Vec2 {
+	return Vec2{x = x, y = y};
 }

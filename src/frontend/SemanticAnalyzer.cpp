@@ -6,47 +6,62 @@
 #include <unordered_set>
 
 namespace panther{
-	
 
-	auto SemanticAnalyzer::semantic_analysis_declarations() noexcept -> bool {
+
+
+	//////////////////////////////////////////////////////////////////////
+	// semantic analysis passes
+
+	auto SemanticAnalyzer::semantic_analysis_global_idents_and_imports() noexcept -> bool {
 		this->enter_scope(nullptr);
 
-		// analyze global structs
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			if(node.kind == AST::Kind::Struct){
-				if(this->analyze_struct(this->source.getStruct(node)) == false){ return false; }
-			}
+			switch(node.kind){
+				case AST::Kind::VarDecl: {
+					if(this->analyze_var(this->source.getVarDecl(node)) == false){
+						return false;
+					}
+				} break;
+
+				case AST::Kind::Struct: {
+					if(this->analyze_struct(this->source.getStruct(node)) == false){
+						return false;
+					}
+				} break;
+			};
 		}
 
-		// analyze global aliases
+
+		return true;
+	};
+
+
+
+	auto SemanticAnalyzer::semantic_analysis_global_aliases() noexcept -> bool {
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			if(node.kind == AST::Kind::Alias){
-				if(this->analyze_alias(this->source.getAlias(node)) == false){ return false; }
-			}
+			switch(node.kind){
+				case AST::Kind::Alias: {
+					if(this->analyze_alias(this->source.getAlias(node)) == false){
+						return false;
+					}
+				} break;
+			};
 		}
 
+		return true;
+	};
 
-		// analyze global vars
+
+	auto SemanticAnalyzer::semantic_analysis_global_types() noexcept -> bool {
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
-			if(node.kind == AST::Kind::VarDecl){
-				if(this->analyze_var(this->source.getVarDecl(node)) == false){ return false; }
-			}
-		}
-
-		// everything else at global scope
-		for(AST::Node::ID global_stmt : this->source.global_stmts){
-			const AST::Node& node = this->source.getNode(global_stmt);
-
-			if(node.kind != AST::Kind::VarDecl && node.kind != AST::Kind::Alias && node.kind != AST::Kind::Struct){
-				if(this->analyze_stmt(node) == false){
-					return false;
-				}
+			if(node.kind == AST::Kind::Func){
+				if(this->analyze_func(this->source.getFunc(node)) == false){ return false; }
 			}
 		}
 
@@ -54,29 +69,35 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::semantic_analysis_structs() noexcept -> bool {
+	auto SemanticAnalyzer::semantic_analysis_global_values() noexcept -> bool {
+		for(const GlobalVar& global_var : this->global_vars){
+			if(this->analyze_var_value(this->source.getVar(global_var.pir_id), global_var.ast) == false){ return false; }
+		}
+
 		for(const GlobalStruct& global_struct : this->global_structs){
-			PIR::Struct& pir_struct = this->source.pir.structs[global_struct.pir_id.id];
-			if(this->analyze_struct_block(pir_struct, global_struct.ast) == false){
-				return false;
-			}
+			if(this->analyze_struct_block(this->source.getStruct(global_struct.pir_id), global_struct.ast) == false){ return false; }
 		}
+
 
 		return true;
 	};
 
-	auto SemanticAnalyzer::semantic_analysis() noexcept -> bool {
+
+	auto SemanticAnalyzer::semantic_analysis_runtime() noexcept -> bool {
+		this->is_analyzing_runtime = true;
+
 		for(const GlobalFunc& global_func : this->global_funcs){
-			PIR::Func& pir_func = this->source.pir.funcs[global_func.pir_id.id];
-			if(this->analyze_func_block(pir_func, global_func.ast) == false){
-				return false;
-			}
+			if(this->analyze_func_block(this->source.getFunc(global_func.pir_id), global_func.ast) == false){ return false; }
 		}
 
 		this->leave_scope();
 		return true;
 	};
 
+
+
+	//////////////////////////////////////////////////////////////////////
+	// semantic analysis
 
 
 	auto SemanticAnalyzer::analyze_stmt(const AST::Node& node) noexcept -> bool {
@@ -121,14 +142,35 @@ namespace panther{
 
 
 
+
+
+
+
+
+
+
 	auto SemanticAnalyzer::analyze_var(const AST::VarDecl& var_decl) noexcept -> bool {
 		// check ident is unused
 		const Token::ID ident_tok_id = this->source.getNode(var_decl.ident).token;
 		const Token& ident = this->source.getToken(ident_tok_id);
 
-		if(this->has_in_scope(ident.value.string)){
-			this->already_defined(ident);
-			return false;
+		if(this->in_struct_scope()){
+			PIR::Struct& current_struct = this->get_current_struct();
+			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
+			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
+
+			for(const PIR::BaseType::StructData::MemberVar& member_var : struct_data.memberVars){
+				if(member_var.name == ident.value.string){
+					this->source.error(std::format("This struct already has a member named \"{}\"", ident.value.string), ident);
+					return false;
+				}
+			}
+
+		}else{
+			if(this->has_in_scope(ident.value.string)){
+				this->already_defined(ident);
+				return false;
+			}
 		}
 
 
@@ -145,13 +187,13 @@ namespace panther{
 				if(this->is_global_scope()){
 					is_pub = true;
 				}else{
-					// TODO: maybe this should be an error instead?
-					this->source.warning("Only variables at global scope can be marked with the attribute #pub - ignoring", token);
+					this->source.error("Only variables at global scope can be marked with the attribute #pub", token);
+					return false;
 				}
 
 			}else if(token_str == "export"){
 				if(this->is_global_scope() == false){
-					this->source.error("Only variables at global scope can be marked with the attribute #export - ignoring", token);
+					this->source.error("Only variables at global scope can be marked with the attribute #export", token);
 					return false;
 				}
 
@@ -181,127 +223,168 @@ namespace panther{
 
 
 		///////////////////////////////////
-		// type checking
+		// check for import
 
-		auto var_type_id = std::optional<PIR::Type::ID>();
-		auto var_value = PIR::Expr();
+		const evo::Result<bool> is_import = [&]() noexcept {
+			if(var_decl.expr.has_value() == false){ return evo::Result<bool>(false); }
 
-		if(var_decl.expr.has_value()){
 			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
-			if(expr_info.isError()){ return false; }
+			if(expr_info.isError()){ return evo::Result<bool>(evo::resultError); }
 
-			if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral && expr_info.value().value_type != ExprInfo::ValueType::Import){
-				// TODO: better messaging
-				this->source.error("Variables must be assigned with an ephemeral value", *var_decl.expr);
-				return false;
+			if(expr_info.value().type_id.has_value() == false){ return evo::Result<bool>(false); }
+			if(*expr_info.value().type_id != SourceManager::getTypeImport()){ return evo::Result<bool>(false); }
+
+			if(this->in_struct_scope()){
+				this->source.error("Struct members cannot be imports", var_decl.ident);
+				return evo::Result<bool>(false);
 			}
 
+			if(var_decl.isDef == false){
+				this->source.error("Import variables must be marked [def] not [var]", var_decl.ident);
+				return evo::Result<bool>(false);
+			}
 
-			const AST::Node& expr_node = this->source.getNode(*var_decl.expr);
 			if(var_decl.type.has_value()){
-				const evo::Result<PIR::Type::VoidableID> var_type_id_result = this->get_type_id(*var_decl.type);
-				if(var_type_id_result.isError()){ return false; }
-
-				if(var_type_id_result.value().isVoid()){
-					this->source.error("Variable cannot be of type Void", *var_decl.type);
-					return false;
-				}
-
-				var_type_id = var_type_id_result.value().typeID();
-
-
-				if(expr_node.kind != AST::Kind::Uninit){
-					const PIR::Type& var_type = this->src_manager.getType(*var_type_id);
-					const PIR::Type& expr_type = this->src_manager.getType(*expr_info.value().type_id);
-
-					if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
-						this->source.error(
-							"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", 
-							expr_node,
-
-							std::vector<Message::Info>{
-								{std::string("Variable is of type:   ") + this->src_manager.printType(*var_type_id)},
-								{std::string("Expression is of type: ") + this->src_manager.printType(*expr_info.value().type_id)}
-							}
-						);
-						return false;
+				this->source.error(
+					"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted", var_decl.ident,
+					std::vector<Message::Info>{
+						Message::Info("Imports are typeless, so type inference should be used"),
 					}
-				}
-
-			}else{
-				// type inference
-
-				if(expr_node.kind == AST::Kind::Uninit){
-					this->source.error("The type of [uninit] cannot be inferenced", expr_node);
-					return false;
-				}
-
-
-				if(*expr_info.value().type_id == SourceManager::getTypeString()){
-					this->source.error("String literal values (outside of calls to `@import()`) are not supported yet", expr_node);
-					return false;
-
-				}
-
-				var_type_id = *expr_info.value().type_id;
+				);
+				return evo::Result<bool>(false);	
 			}
 
-			var_value = *expr_info.value().expr;
+			this->add_import_to_scope(ident.value.string, Import(expr_info.value().expr->import, var_decl.ident));
 
-
-		}else{
-			if(this->in_struct_scope() == false){
-				// TODO: better messaging
-				this->source.error("Variable must be given an initial value", ident);
-				return false;
+			if(is_pub){
+				this->source.addPublicImport(ident.value.string, expr_info.value().expr->import);
 			}
 
-			const evo::Result<PIR::Type::VoidableID> var_type_id_result = this->get_type_id(*var_decl.type);
-			if(var_type_id_result.isError()){ return false; }
+			return evo::Result<bool>(true);
+		}();
 
-			if(var_type_id_result.value().isVoid()){
-				this->source.error("Struct member cannot be of type Void", *var_decl.type);
-				return false;
-			}
-
-			var_type_id = var_type_id_result.value().typeID();
-		}
+		if(is_import.isError()){ return false; }
+		if(is_import.value()){ return true; }
 
 
 
 
 		///////////////////////////////////
-		// get / check value
+		// create object
 
 
-		// handle imports differently
-		if(var_type_id == SourceManager::getTypeImport()){
-			evo::debugAssert(var_value.kind == PIR::Expr::Kind::Import, "should be import");
 
-			if(this->in_struct_scope()){
-				this->source.error("Struct members cannot be imports", var_decl.ident);
-				return false;
-			}
+		if(this->is_global_scope()){
+			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(), var_decl.isDef, is_export);
+			this->add_var_to_scope(ident.value.string, var_id);
 
-			if(var_decl.isDef == false){
-				this->source.error("import variables must be marked [def] not [var]", var_decl.ident);
-				return false;
-			}
-
-			this->add_import_to_scope(ident.value.string, Import(var_value.import, var_decl.ident));
+			this->source.pir.global_vars.emplace_back(var_id);
+			this->global_vars.emplace_back(var_id, var_decl);
 
 			if(is_pub){
-				this->source.addPublicImport(ident.value.string, var_value.import);
+				this->source.addPublicVar(ident.value.string, var_id);
 			}
 
-			return true;
+		}else if(this->in_func_scope()){
+			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(), var_decl.isDef, is_export);
+			this->add_var_to_scope(ident.value.string, var_id);
+
+			this->get_stmts_entry().emplace_back(var_id);
+			if(this->analyze_var_value(this->source.getVar(var_id), var_decl) == false){ return false; }
+
+		}else if(this->in_struct_scope()){
+			if(this->analyze_struct_member(var_decl) == false){ return false; }
+
+		}else{
+			evo::debugFatalBreak("Unknown scope type");
+		}
+
+		///////////////////////////////////
+		// done
+
+		return true;
+	};
+
+
+
+
+
+
+
+	auto SemanticAnalyzer::analyze_var_value(PIR::Var& var, const AST::VarDecl& var_decl) noexcept -> bool {
+		if(var_decl.expr.has_value() == false){
+			this->source.error("Variables must be given an initial value", var_decl.ident);
+			return false;
+		}
+
+		const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+		if(expr_info.isError()){ return false; }
+
+		if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral && expr_info.value().value_type != ExprInfo::ValueType::Import){
+			// TODO: better messaging
+			this->source.error("Variables must be assigned with an ephemeral value", *var_decl.expr);
+			return false;
 		}
 
 
+		const AST::Node& expr_node = this->source.getNode(*var_decl.expr);
+		if(var_decl.type.has_value()){
+			const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(*var_decl.type);
+			if(var_type_id.isError()){ return false; }
+
+			if(var_type_id.value().isVoid()){
+				this->source.error("Variable cannot be of type Void", *var_decl.type);
+				return false;
+			}
+
+			var.type = var_type_id.value().typeID();
+
+
+			if(expr_node.kind != AST::Kind::Uninit){
+				const PIR::Type& var_type = this->src_manager.getType(var.type);
+				const PIR::Type& expr_type = this->src_manager.getType(*expr_info.value().type_id);
+
+				if(this->is_implicitly_convertable_to(expr_type, var_type, expr_node) == false){
+					this->source.error(
+						"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted",
+						expr_node,
+
+						std::vector<Message::Info>{
+							{std::string("Variable is of type:   ") + this->src_manager.printType(var.type)},
+							{std::string("Expression is of type: ") + this->src_manager.printType(*expr_info.value().type_id)}
+						}
+					);
+					return false;
+				}
+			}
+
+		}else{ // type inference
+			if(expr_node.kind == AST::Kind::Uninit){
+				this->source.error("The type of [uninit] cannot be inferenced", expr_node);
+				return false;
+			}
+
+			if(*expr_info.value().type_id == SourceManager::getTypeString()){
+				this->source.error("String literal values (outside of calls to `@import()`) are not supported yet", expr_node);
+				return false;
+
+			}
+
+			var.type = *expr_info.value().type_id;
+		}
+
+		var.value = *expr_info.value().expr;
+
+
+		///////////////////////////////////
+		// check value
+
+		evo::debugAssert(var.type != SourceManager::getTypeImport(), "Imports should already be handled in analyze_var()");
+
 
 		// check for uninit
-		if(var_value.kind == PIR::Expr::Kind::ASTNode){
-			const AST::Node& var_value_node = this->source.getNode(var_value.astNode);
+		if(var.value.kind == PIR::Expr::Kind::ASTNode){
+			const AST::Node& var_value_node = this->source.getNode(var.value.astNode);
 
 			if(var_value_node.kind == AST::Kind::Uninit){
 				if(this->is_global_scope()){
@@ -317,75 +400,139 @@ namespace panther{
 				}
 			}
 		}
+
 		
-
-		///////////////////////////////////
-		// create object
-
-		const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, *var_type_id, var_value, var_decl.isDef, is_export);
-
-		this->add_var_to_scope(ident.value.string, var_id);
-
-		if(this->is_global_scope()){
-			this->source.pir.global_vars.emplace_back(var_id);
-
-		}else if(this->in_func_scope()){
-			this->get_stmts_entry().emplace_back(var_id);
-
-		}else if(this->in_struct_scope()){
-			PIR::Struct& current_struct = this->get_current_struct();
-
-
-			// look for circular members in type of newly added member
-			auto types_seen = std::unordered_set<PIR::Type::ID>();
-			types_seen.emplace(this->src_manager.getOrCreateTypeID(PIR::Type(current_struct.baseType)));
-			auto types_queue = std::queue<PIR::Type::ID>();
-			types_queue.push(*var_type_id);
-
-			while(types_queue.empty() == false){
-				const PIR::Type::ID type_id_to_look_at = types_queue.front();
-				types_queue.pop();
-
-				const PIR::Type& type_to_look_at = this->src_manager.getType(type_id_to_look_at);
-				if(type_to_look_at.qualifiers.empty() == false){ continue; }
-
-				const PIR::BaseType& base_type_to_look_at = this->src_manager.getBaseType(type_to_look_at.baseType);
-				if(base_type_to_look_at.kind == PIR::BaseType::Kind::Builtin){ continue; }
-
-				if(types_seen.contains(type_id_to_look_at)){
-					// TODO: better messaging
-					this->source.error("Detected circular type dependancy", ident_tok_id);
-					return false;
-				}
-
-				for(const PIR::BaseType::StructData::MemberVar& member : std::get<PIR::BaseType::StructData>(base_type_to_look_at.data).memberVars){
-					types_queue.push(member.type);
-				}
-
-				types_seen.emplace(type_id_to_look_at);
-			};
-
-
-			// if no circular members found, add the new member to the type
-			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
-			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
-			struct_data.memberVars.emplace_back(ident.value.string, var_decl.isDef, *var_type_id, var_value);
-
-		}else{
-			evo::debugFatalBreak("Unknown scope type");
-		}
-
-
-		if(is_pub){
-			this->source.addPublicVar(ident.value.string, var_id);
-		}
-
 
 		///////////////////////////////////
 		// done
 
 		return true;
 	};
+
+
+
+
+	auto SemanticAnalyzer::analyze_struct_member(const AST::VarDecl& var_decl) noexcept -> bool {
+		if(this->src_manager.getConfig().allowStructMemberTypeInference == false && var_decl.type.has_value() == false){
+			this->source.error(
+				"Type inference of struct members is not allowed", var_decl.ident,
+				{ Message::Info("You can change this with the config option \"allowStructMemberTypeInference\"") }
+			);
+			return false;
+		}
+
+
+		auto type_id = std::optional<PIR::Type::ID>();
+		auto default_value = PIR::Expr();
+
+		if(var_decl.type.has_value()){
+			///////////////////////////////////
+			// type
+
+			const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(*var_decl.type);
+			if(var_type_id.isError()){ return false; }
+
+			if(var_type_id.value().isVoid()){
+				this->source.error("Variable cannot be of type Void", *var_decl.type);
+				return false;
+			}
+
+			type_id = var_type_id.value().typeID();
+
+
+			///////////////////////////////////
+			// expr
+
+			if(var_decl.expr.has_value()){
+				const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+				if(expr_info.isError()){ return false; }
+
+				if(expr_info.value().type_id.has_value() == false){
+					const PIR::Type& var_type = this->src_manager.getType(*type_id);
+					const PIR::Type& expr_type = this->src_manager.getType(*expr_info.value().type_id);
+
+					if(this->is_implicitly_convertable_to(expr_type, var_type, this->source.getNode(*var_decl.expr)) == false){
+						this->source.error(
+							"Variable cannot be assigned a value of a different type, and the value expression cannot be implicitly converted",
+							*var_decl.expr,
+
+							std::vector<Message::Info>{
+								{std::string("Variable is of type:   ") + this->src_manager.printType(*type_id)},
+								{std::string("Expression is of type: ") + this->src_manager.printType(*expr_info.value().type_id)}
+							}
+						);
+						return false;
+					}
+				}
+
+				default_value = *expr_info.value().expr;
+			}
+
+		}else{ // type inference
+			if(var_decl.expr.has_value() == false){
+				this->source.error("Cannot get type of struct member since there was neither a type nor a default value given", var_decl.ident);
+				return false;
+			}
+
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+			if(expr_info.isError()){ return false; }
+
+			if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral){
+				this->source.error("Default value of struct member must be ephemeral", var_decl.ident);
+				return false;
+			}
+
+			type_id = expr_info.value().type_id;
+			default_value = *expr_info.value().expr;
+		}
+
+
+
+
+		PIR::Struct& current_struct = this->get_current_struct();
+
+		// look for circular members in type of newly added member
+		auto types_seen = std::unordered_set<PIR::Type::ID>();
+		types_seen.emplace(this->src_manager.getOrCreateTypeID(PIR::Type(current_struct.baseType)));
+		auto types_queue = std::queue<PIR::Type::ID>();
+		types_queue.push(*type_id);
+
+		while(types_queue.empty() == false){
+			const PIR::Type::ID type_id_to_look_at = types_queue.front();
+			types_queue.pop();
+
+			const PIR::Type& type_to_look_at = this->src_manager.getType(type_id_to_look_at);
+			if(type_to_look_at.qualifiers.empty() == false){ continue; }
+
+			const PIR::BaseType& base_type_to_look_at = this->src_manager.getBaseType(type_to_look_at.baseType);
+			if(base_type_to_look_at.kind == PIR::BaseType::Kind::Builtin){ continue; }
+
+			if(types_seen.contains(type_id_to_look_at)){
+				// TODO: better messaging
+				this->source.error("Detected circular type dependancy", var_decl.ident);
+				return false;
+			}
+
+			for(const PIR::BaseType::StructData::MemberVar& member : std::get<PIR::BaseType::StructData>(base_type_to_look_at.data).memberVars){
+				types_queue.push(member.type);
+			}
+
+			types_seen.emplace(type_id_to_look_at);
+		};
+
+
+		// if no circular members found, add the new member to the type
+		PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
+		PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
+		struct_data.memberVars.emplace_back(this->source.getIdent(var_decl.ident).value.string, var_decl.isDef, *type_id, default_value);
+
+		return true;
+	};
+
+
+
+
+
 
 
 
@@ -2292,8 +2439,14 @@ namespace panther{
 				// get expr
 				if(value_kind == ExprValueKind::Runtime){
 					output.expr = PIR::Expr(var_id);
+
 				}else if(value_kind == ExprValueKind::ConstEval){
-					this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
+					if(this->is_global_scope() == false){
+						this->source.error("Constant-evaluated expressions cannot be the value of a local variable", node);
+						return evo::resultError;						
+					}
+
+					this->source.error("At this time, constant-evaluated expressions cannot be the value of a variable", node);
 					return evo::resultError;
 				}
 
@@ -2339,8 +2492,9 @@ namespace panther{
 				// get expr
 				if(value_kind == ExprValueKind::Runtime){
 					output.expr = PIR::Expr(param_id);
+
 				}else if(value_kind == ExprValueKind::ConstEval){
-					this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
+					this->source.error("Constant-evaluated expressions cannot be the value of a parameter", node);
 					return evo::resultError;
 				}
 
@@ -2354,13 +2508,8 @@ namespace panther{
 				output.type_id = this->src_manager.getTypeImport();
 
 				// get expr
-				if(value_kind == ExprValueKind::Runtime){
-					const Source::ID import_source_id = scope.imports.at(ident_str).source_id;
-					output.expr = PIR::Expr(import_source_id);
-				}else if(value_kind == ExprValueKind::ConstEval){
-					this->source.error("At this time, constant-evaluated values cannot be the value of a variable", node);
-					return evo::resultError;
-				}
+				const Source::ID import_source_id = scope.imports.at(ident_str).source_id;
+				output.expr = PIR::Expr(import_source_id);
 
 				break;
 

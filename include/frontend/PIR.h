@@ -65,7 +65,7 @@ namespace panther{
 
 		struct Expr{
 			enum class Kind{
-				None, // might not need this eventually
+				None,
 				Var,
 				Param,
 				ASTNode,

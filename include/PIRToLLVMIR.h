@@ -91,13 +91,15 @@ namespace panther{
 
 						this->lower_global_var(var);
 					}
+				}
 
+				for(Source& source_ref : sources){
+					this->source = &source_ref;
 
 					for(PIR::Func& func : source_ref.pir.funcs){
 						this->lower_func_declaration(func);
 					}
 				}
-
 
 				for(Source& source_ref : sources){
 					this->source = &source_ref;

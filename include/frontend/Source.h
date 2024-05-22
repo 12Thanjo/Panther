@@ -46,9 +46,11 @@ namespace panther{
 			EVO_NODISCARD auto parse() noexcept -> bool;
 
 			// returns true if successful (no errors)
-			EVO_NODISCARD auto semantic_analysis_declarations() noexcept -> bool;
-			EVO_NODISCARD auto semantic_analysis_structs() noexcept -> bool;
-			EVO_NODISCARD auto semantic_analysis() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_idents_and_imports() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_aliases() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_types() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_global_values() noexcept -> bool;
+			EVO_NODISCARD auto semantic_analysis_runtime() noexcept -> bool;
 
 
 			//////////////////////////////////////////////////////////////////////

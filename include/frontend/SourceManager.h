@@ -26,6 +26,9 @@ namespace panther{
 
 			struct Config{
 				std::string basePath;
+
+				// semantic analysis
+				bool allowStructMemberTypeInference = false;
 			};
 
 			enum class GetSourceIDError{
@@ -42,6 +45,7 @@ namespace panther{
 
 
 			EVO_NODISCARD inline auto numSources() const noexcept -> size_t { return this->sources.size(); };
+			EVO_NODISCARD inline auto getConfig() const noexcept -> const Config& { return this->config; };
 
 
 			// The purpose of locking is to make sure no sources are added after doing things like tokenizing
@@ -119,6 +123,8 @@ namespace panther{
 			// gets type with matching ID
 			// TODO: &&
 			EVO_NODISCARD auto getTypeID(const PIR::Type& type) const noexcept -> PIR::Type::ID;
+
+			EVO_NODISCARD static inline auto getDummyTypeID() noexcept -> PIR::Type::ID { return PIR::Type::ID(std::numeric_limits<uint32_t>::max()); };
 
 
 			EVO_NODISCARD inline auto getType(PIR::Type::ID id) const noexcept -> const PIR::Type& {
