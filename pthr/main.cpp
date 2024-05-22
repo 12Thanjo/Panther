@@ -48,9 +48,6 @@ struct Config{
 
 	std::filesystem::path relative_directory{};
 	bool relative_directory_set = false;
-
-	// semantic analysis
-	bool allowStructMemberTypeInference = false;
 };
 
 
@@ -155,8 +152,6 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 	auto source_manager = panther::SourceManager(
 		panther::SourceManager::Config{
 			.basePath = config.relative_directory.string(),
-
-			.allowStructMemberTypeInference = config.allowStructMemberTypeInference,
 		},
 		[&](const panther::Message& message){
 			printer.print_message(message);
@@ -175,6 +170,10 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 		// (config.relative_directory / "test3.pthr").make_preferred(),
 	};
 
+	const auto src_config = panther::Source::Config{
+		.allowStructMemberTypeInference = false,
+	};
+
 
 	auto file = evo::fs::File{};
 	auto source_ids = std::vector<panther::Source::ID>();
@@ -190,7 +189,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 		file.close();
 
-		source_ids.emplace_back(source_manager.addSource(std::move(file_path), std::move(file_data)));
+		source_ids.emplace_back(source_manager.addSource(std::move(file_path), std::move(file_data), src_config));
 	}
 
 

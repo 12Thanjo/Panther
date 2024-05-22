@@ -4,5 +4,5 @@ var x: Int = 12;
 
 struct Vec2 = #pub {
 	var x: Int;
-	var y = 0;
+	var y: Int;
 }

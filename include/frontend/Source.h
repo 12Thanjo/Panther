@@ -20,10 +20,14 @@ namespace panther{
 		public:
 			using ID = SourceID;
 
+			struct Config{
+				bool allowStructMemberTypeInference = false;
+			};
+
 		public:
 			// TODO: other permutations of refs
-			Source(std::filesystem::path&& src_path, std::string&& src_data, class SourceManager& src_manager, ID id) noexcept
-				: src_location(std::move(src_path)), data(std::move(src_data)), source_manager(src_manager), src_id(id) {};
+			Source(std::filesystem::path&& src_path, std::string&& src_data, const Config& _config, class SourceManager& src_manager, ID id) noexcept
+				: src_location(std::move(src_path)), data(std::move(src_data)), config(_config), source_manager(src_manager), src_id(id) {};
 
 			~Source() noexcept {
 				for(std::string* str_ptr : this->string_literal_values){
@@ -35,6 +39,7 @@ namespace panther{
 
 			EVO_NODISCARD inline auto getLocation() const noexcept -> const std::filesystem::path& { return this->src_location; };
 			EVO_NODISCARD inline auto getData() const noexcept -> const std::string& { return this->data; };
+			EVO_NODISCARD inline auto getConfig() const noexcept -> const Config& { return this->config; };
 			EVO_NODISCARD inline auto getSourceManager() noexcept -> SourceManager& { return this->source_manager; };
 			EVO_NODISCARD inline auto getSourceManager() const noexcept -> const SourceManager& { return this->source_manager; };
 			EVO_NODISCARD inline auto getID() const noexcept -> ID { return this->src_id; };
@@ -407,6 +412,7 @@ namespace panther{
 		private:
 			std::filesystem::path src_location;
 			std::string data;
+			const Config& config;
 			ID src_id;
 			class SourceManager& source_manager;
 

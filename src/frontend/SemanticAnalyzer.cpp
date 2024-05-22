@@ -228,7 +228,8 @@ namespace panther{
 		const evo::Result<bool> is_import = [&]() noexcept {
 			if(var_decl.expr.has_value() == false){ return evo::Result<bool>(false); }
 
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+			const ExprValueKind value_kind = this->is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, value_kind);
 			if(expr_info.isError()){ return evo::Result<bool>(evo::resultError); }
 
 			if(expr_info.value().type_id.has_value() == false){ return evo::Result<bool>(false); }
@@ -413,7 +414,7 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_struct_member(const AST::VarDecl& var_decl) noexcept -> bool {
-		if(this->src_manager.getConfig().allowStructMemberTypeInference == false && var_decl.type.has_value() == false){
+		if(this->source.getConfig().allowStructMemberTypeInference == false && var_decl.type.has_value() == false){
 			this->source.error(
 				"Type inference of struct members is not allowed", var_decl.ident,
 				{ Message::Info("You can change this with the config option \"allowStructMemberTypeInference\"") }
@@ -476,6 +477,11 @@ namespace panther{
 
 			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
 			if(expr_info.isError()){ return false; }
+
+			if(expr_info.value().type_id.has_value() == false){
+				this->source.error("The type of [uninit] cannot be inferenced", var_decl.ident);
+				return false;
+			}
 
 			if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral){
 				this->source.error("Default value of struct member must be ephemeral", var_decl.ident);

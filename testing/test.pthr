@@ -1,16 +1,12 @@
-def test2 = @import("test2.pthr");
 
-alias Vec2 = test2.Vec2;
+def foo: Int = 12;
+
+def bar: Int = copy foo;
+
+
+
 
 func entry = () #entry -> Int {
-	var foo = create_vec2(12, 14);
-
-	@__printInt(foo.x);
-	@__printInt(foo.y);
 
 	return 0;
-}
-
-func create_vec2 = (x: Int, y: Int) -> test2.Vec2 {
-	return Vec2{x = x, y = y};
 }

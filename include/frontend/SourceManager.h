@@ -26,9 +26,6 @@ namespace panther{
 
 			struct Config{
 				std::string basePath;
-
-				// semantic analysis
-				bool allowStructMemberTypeInference = false;
 			};
 
 			enum class GetSourceIDError{
@@ -64,7 +61,7 @@ namespace panther{
 			// funcs that require it is unlocked
 
 			// TODO: other permutations of refs
-			EVO_NODISCARD auto addSource(std::filesystem::path&& location, std::string&& data) noexcept -> Source::ID;
+			EVO_NODISCARD auto addSource(std::filesystem::path&& location, std::string&& data, const Source::Config& src_config) noexcept -> Source::ID;
 
 
 

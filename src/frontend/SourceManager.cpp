@@ -5,12 +5,12 @@
 namespace panther{
 
 
-	auto SourceManager::addSource(std::filesystem::path&& location, std::string&& data) noexcept -> Source::ID {
+	auto SourceManager::addSource(std::filesystem::path&& location, std::string&& data, const Source::Config& src_config) noexcept -> Source::ID {
 		evo::debugAssert(this->isLocked() == false, "Can only add sources to SourceManager when it is locked");
 
 		const auto src_id = Source::ID( uint32_t(this->sources.size()) );
 
-		this->sources.emplace_back(std::move(location), std::move(data), *this, src_id);
+		this->sources.emplace_back(std::move(location), std::move(data), src_config, *this, src_id);
 
 		return src_id;
 	};

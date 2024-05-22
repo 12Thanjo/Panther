@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.30.3
+- Fixed fatal error when a struct member with type inference has the default value of `uninit`
+- Changed the config option `allowStructMemberTypeInference` to be per file
+- Fixed fatal error when setting a global variable to the value of a `copy` expr
+
 ### v0.30.2
 - Fixed fatal error when using imported types as the type of a function parameter
 - Fixed some incorrect error messages about constant-evaluated expressions
