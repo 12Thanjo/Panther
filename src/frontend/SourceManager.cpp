@@ -190,7 +190,7 @@ namespace panther{
 				return_type
 			);
 
-			return this->createBaseType(std::move(base_type));
+			return this->getOrCreateBaseType(std::move(base_type)).id;
 		};
 
 
@@ -257,7 +257,7 @@ namespace panther{
 			auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 			base_type.callOperator = PIR::BaseType::Operator(std::vector<PIR::BaseType::Operator::Param>{}, PIR::Type::VoidableID::Void());
 
-			return this->createBaseType(std::move(base_type));
+			return this->getOrCreateBaseType(std::move(base_type)).id;
 		}();
 
 
@@ -269,7 +269,7 @@ namespace panther{
 				this->getTypeImport()
 			);
 
-			return this->createBaseType(std::move(base_type));
+			return this->getOrCreateBaseType(std::move(base_type)).id;
 		}();
 
 
@@ -419,7 +419,7 @@ namespace panther{
 				PIR::Type::VoidableID::Void()
 			);
 
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			const PIR::BaseType::ID base_type_id = this->getOrCreateBaseType(std::move(base_type)).id;
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printInt, "__printInt", base_type_id);
 		}
 
@@ -430,7 +430,7 @@ namespace panther{
 				PIR::Type::VoidableID::Void()
 			);
 
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			const PIR::BaseType::ID base_type_id = this->getOrCreateBaseType(std::move(base_type)).id;
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printUInt, "__printUInt", base_type_id);
 		}
 
@@ -442,7 +442,7 @@ namespace panther{
 				PIR::Type::VoidableID::Void()
 			);
 
-			const PIR::BaseType::ID base_type_id = this->createBaseType(std::move(base_type));
+			const PIR::BaseType::ID base_type_id = this->getOrCreateBaseType(std::move(base_type)).id;
 			this->intrinsics.emplace_back(PIR::Intrinsic::Kind::__printBool, "__printBool", base_type_id);
 		}
 
@@ -649,16 +649,16 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// objects
 
-	auto SourceManager::createBaseType(PIR::BaseType&& base_type) noexcept -> PIR::BaseType::ID {
+	auto SourceManager::getOrCreateBaseType(PIR::BaseType&& base_type) noexcept -> GottenBaseTypeID {
 		for(size_t i = 0; i < this->base_types.size(); i+=1){
 			if(base_type == this->base_types[i]){
-				return PIR::BaseType::ID( uint32_t(i) );
+				return GottenBaseTypeID(PIR::BaseType::ID(uint32_t(i)), false);
 			}
 		}
 
 
 		this->base_types.emplace_back(std::move(base_type));
-		return PIR::BaseType::ID( uint32_t(this->base_types.size() - 1) );
+		return GottenBaseTypeID(PIR::BaseType::ID(uint32_t(this->base_types.size() - 1)), true);
 	};
 
 
@@ -669,7 +669,7 @@ namespace panther{
 			}
 		}
 
-		EVO_FATAL_BREAK("Cannot get unknown builtin base type");
+		evo::debugFatalBreak("Cannot get unknown builtin base type");
 	};
 
 
@@ -682,25 +682,25 @@ namespace panther{
 			}
 		}
 
-		EVO_FATAL_BREAK("Cannot get unknown builtin base type");
+		evo::debugFatalBreak("Cannot get unknown builtin base type");
 	};
 
 
 
-	auto SourceManager::getOrCreateTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID {
+	auto SourceManager::getOrCreateTypeID(const PIR::Type& type) noexcept -> GottenTypeID {
 		// find existing type
 		for(size_t i = 0; i < this->types.size(); i+=1){
 			const PIR::Type& type_ref = this->types[i];
 
 			if(type_ref == type){
-				return PIR::Type::ID( uint32_t(i) );
+				return GottenTypeID(PIR::Type::ID(uint32_t(i)), false);
 			}
 		}
 
 
 		// create new type
 		this->types.emplace_back(type);
-		return PIR::Type::ID( uint32_t(this->types.size() - 1) );
+		return GottenTypeID(PIR::Type::ID(uint32_t(this->types.size() - 1)), true);
 	};
 
 	auto SourceManager::getTypeID(const PIR::Type& type) const noexcept -> PIR::Type::ID {
@@ -713,7 +713,7 @@ namespace panther{
 			}
 		}
 
-		EVO_FATAL_BREAK("Unknown type");
+		evo::debugFatalBreak("Unknown type");
 	};
 
 
@@ -739,11 +739,11 @@ namespace panther{
 				} break;
 
 				case PIR::BaseType::Kind::Struct: {
-					// TODO:
-					return std::string(std::get<PIR::BaseType::StructData>(base_type.data).name);
+					const PIR::BaseType::StructData struct_data = std::get<PIR::BaseType::StructData>(base_type.data);
+					return std::string(struct_data.name);
 				} break;
 
-				default: EVO_FATAL_BREAK("Unknown base-type kind");
+				default: evo::debugFatalBreak("Unknown base-type kind");
 			};
 		}();
 		

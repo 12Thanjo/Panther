@@ -22,6 +22,9 @@ namespace panther{
 
 			struct Config{
 				bool allowStructMemberTypeInference = false;
+
+				bool badPracticeDerefOfAddr = true;
+				bool badPracticeAddrOfDeref = true;
 			};
 
 		public:
@@ -107,6 +110,9 @@ namespace panther{
 
 			EVO_NODISCARD auto getPostfix(AST::Node::ID node_id) const noexcept -> const AST::Postfix&;
 			EVO_NODISCARD auto getPostfix(const AST::Node& node) const noexcept -> const AST::Postfix&;
+
+			EVO_NODISCARD auto getTemplatedExpr(AST::Node::ID node_id) const noexcept -> const AST::TemplatedExpr&;
+			EVO_NODISCARD auto getTemplatedExpr(const AST::Node& node) const noexcept -> const AST::TemplatedExpr&;
 
 			EVO_NODISCARD auto getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall&;
 			EVO_NODISCARD auto getFuncCall(const AST::Node& node) const noexcept -> const AST::FuncCall&;
@@ -373,6 +379,7 @@ namespace panther{
 			std::vector<AST::Prefix> prefixes{};
 			std::vector<AST::Infix> infixes{};
 			std::vector<AST::Postfix> postfixes{};
+			std::vector<AST::TemplatedExpr> templated_exprs{};
 			std::vector<AST::FuncCall> func_calls{};
 			std::vector<AST::Initializer> initializers{};
 			std::vector<AST::Type> types{};

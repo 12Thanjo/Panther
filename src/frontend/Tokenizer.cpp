@@ -274,6 +274,9 @@ namespace panther{
 		if(is_op("-@")){ set_op("-@"); return true; }
 		if(is_op("*@")){ set_op("*@"); return true; }
 
+		if(is_op("<{")){ set_op("<{"); return true; }
+		if(is_op("}>")){ set_op("}>"); return true; }
+
 
 		// length 1
 		if(is_op("=")){ set_op("="); return true; }
@@ -754,7 +757,7 @@ namespace panther{
 			case 13: return 'D';
 			case 14: return 'E';
 			case 15: return 'F';
-			default: EVO_FATAL_BREAK("Not valid num (must be 4 bits)");
+			default: evo::debugFatalBreak("Not valid num (must be 4 bits)");
 		};
 	};
 

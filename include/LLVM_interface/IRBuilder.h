@@ -141,6 +141,12 @@ namespace panther{
 
 				EVO_NODISCARD auto getTypeI_N(unsigned n) noexcept -> llvm::IntegerType*;
 
+				EVO_NODISCARD auto getTypeInt() noexcept -> llvm::IntegerType* { return this->getTypeI64(); };
+				EVO_NODISCARD auto getTypeUInt() noexcept -> llvm::IntegerType* { return this->getTypeI64(); };
+				EVO_NODISCARD auto getTypeISize() noexcept -> llvm::IntegerType* { return this->getTypeI64(); };
+				EVO_NODISCARD auto getTypeUSize() noexcept -> llvm::IntegerType* { return this->getTypeI64(); };
+
+
 				EVO_NODISCARD auto getTypeCInt() noexcept -> llvm::IntegerType*;
 
 

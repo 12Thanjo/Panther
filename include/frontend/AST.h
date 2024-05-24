@@ -21,6 +21,7 @@ namespace panther{
 			Prefix,
 			Infix,
 			Postfix,
+			TemplatedExpr,
 			FuncCall,
 			Initializer,
 
@@ -37,6 +38,10 @@ namespace panther{
 			struct ID{ // typesafe identifier
 				uint32_t id;
 				explicit ID(uint32_t _id) noexcept : id(_id) {};
+
+				EVO_NODISCARD auto operator==(const ID& rhs) const noexcept -> bool {
+					return this->id == rhs.id;
+				};
 			};
 
 			Kind kind;
@@ -66,18 +71,19 @@ namespace panther{
 			struct Template{
 				Node::ID ident;
 
-				bool is_type_keyword;
+				bool isTypeKeyword;
 				union{
-					Node::ID type_node;
+					Node::ID typeNode;
 					Token::ID keyword;
 				};
 
-				Template(Node::ID _ident, Node::ID node) noexcept : ident(_ident), is_type_keyword(false), type_node(node) {};
-				Template(Node::ID _ident, Token::ID _keyword) noexcept : ident(_ident), is_type_keyword(true),  keyword(_keyword) {};
+				Template(Node::ID _ident, Node::ID node) noexcept : ident(_ident), isTypeKeyword(false), typeNode(node) {};
+				Template(Node::ID _ident, Token::ID _keyword) noexcept : ident(_ident), isTypeKeyword(true),  keyword(_keyword) {};
 			};
 
 			std::vector<Template> templates;
 		};
+
 
 		struct FuncParams{
 			Token::ID startTok;
@@ -99,7 +105,7 @@ namespace panther{
 		struct Func{
 			Node::ID ident;
 
-			std::optional<Node::ID> template_pack;
+			std::optional<Node::ID> templatePack;
 			Node::ID params;
 			std::vector<Token::ID> attributes;
 			Node::ID returnType;
@@ -109,6 +115,7 @@ namespace panther{
 
 		struct Struct{
 			Node::ID ident;
+			std::optional<Node::ID> templatePack;
 			std::vector<Token::ID> attributes;
 			Node::ID block;
 		};
@@ -135,12 +142,11 @@ namespace panther{
 
 
 		struct Type{
+			bool isBuiltin;
 			union Base{
 				Token::ID token;
 				Node::ID node;
 			} base;
-
-			bool isBuiltin;
 
 			struct Qualifier{
 				bool isPtr;
@@ -174,10 +180,13 @@ namespace panther{
 			Token::ID op;
 		};
 
+		struct TemplatedExpr{
+			Node::ID expr;
+			std::vector<Node::ID> templateArgs;
+		};
 
 		struct FuncCall{
 			Node::ID target;
-			std::optional<std::vector<Node::ID>> template_args;
 			std::vector<Node::ID> args;
 		};
 
@@ -190,6 +199,7 @@ namespace panther{
 			};
 			std::vector<Member> members;
 		};
+
 
 
 	};

@@ -144,7 +144,7 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 			break; case Config::Target::Object:           printer.debug("Target: Object\n");
 			break; case Config::Target::Executable:       printer.debug("Target: Executable\n");
 			break; case Config::Target::Run:              printer.debug("Target: Run\n");
-			break; default: EVO_FATAL_BREAK("Unknown target");
+			break; default: evo::debugFatalBreak("Unknown target");
 		};
 	}
 
@@ -172,6 +172,9 @@ auto main([[maybe_unused]] int argc, [[maybe_unused]] const char* args[]) noexce
 
 	const auto src_config = panther::Source::Config{
 		.allowStructMemberTypeInference = false,
+
+		.badPracticeDerefOfAddr = true,
+		.badPracticeAddrOfDeref = true,
 	};
 
 

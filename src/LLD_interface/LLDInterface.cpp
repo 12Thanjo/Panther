@@ -81,22 +81,22 @@ namespace panther{
 
             case Linker::Gnu: {
                 // TODO: better messaging
-                EVO_FATAL_BREAK("Gnu Not supported");
+                evo::debugFatalBreak("Gnu Not supported");
             } break;
 
             case Linker::MinGW: {
                 // TODO: better messaging
-                EVO_FATAL_BREAK("MinGW Not supported");
+                evo::debugFatalBreak("MinGW Not supported");
             } break;
 
             case Linker::Darwin: {
                 // TODO: better messaging
-                EVO_FATAL_BREAK("Darwin Not supported");
+                evo::debugFatalBreak("Darwin Not supported");
             } break;
 
             case Linker::Wasm: {
                 // TODO: better messaging
-                EVO_FATAL_BREAK("Wasm Not supported");
+                evo::debugFatalBreak("Wasm Not supported");
             } break;
         };
 

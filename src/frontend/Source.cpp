@@ -157,6 +157,14 @@ namespace panther{
 		return this->postfixes[node.index];
 	};
 
+	auto Source::getTemplatedExpr(AST::Node::ID node_id) const noexcept -> const AST::TemplatedExpr& {
+		return this->getTemplatedExpr(this->getNode(node_id));
+	};
+	auto Source::getTemplatedExpr(const AST::Node& node) const noexcept -> const AST::TemplatedExpr& {
+		evo::debugAssert(node.kind == AST::Kind::TemplatedExpr, "Node is not a TemplatedExpr");
+		return this->templated_exprs[node.index];
+	};
+
 	auto Source::getFuncCall(AST::Node::ID node_id) const noexcept -> const AST::FuncCall& {
 		return this->getFuncCall(this->getNode(node_id));
 	};
@@ -380,6 +388,11 @@ namespace panther{
 				return this->getToken(template_pack.startTok).location;
 			} break;
 
+			case AST::Kind::TemplatedExpr: {
+				const AST::TemplatedExpr& templated_expr = this->getTemplatedExpr(node);
+				return this->get_node_location(templated_expr.expr);
+			} break;
+
 			case AST::Kind::FuncParams: {
 				const AST::FuncParams& func_params_block = this->getFuncParams(node);
 				return this->getToken(func_params_block.startTok).location;
@@ -491,7 +504,7 @@ namespace panther{
 
 		};
 
-		EVO_FATAL_BREAK("Unknown node type (cannot get node location)");
+		evo::debugFatalBreak("Unknown node type (cannot get node location)");
 	};
 
 

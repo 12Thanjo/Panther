@@ -1,12 +1,17 @@
 
-def foo: Int = 12;
 
-def bar: Int = copy foo;
-
+struct Test = <{T: Type, DEFAULT: T}> {
+	var foo: T = DEFAULT;
+}
 
 
 
 func entry = () #entry -> Int {
+	var test = Test<{USize, 12}>{};
 
+	@__printInt(test.foo cast Int);
+	// @__printUInt(test.size cast UInt);
+
+	
 	return 0;
 }

@@ -111,7 +111,7 @@ namespace panther{
 			const llvm::Intrinsic::ID intrinsic_id = [&]() noexcept {
 				switch(id){
 					case IntrinsicID::debugtrap: return llvm::Intrinsic::IndependentIntrinsics::debugtrap;
-					default: EVO_FATAL_BREAK("Unknown llvm intrinsic");
+					default: evo::debugFatalBreak("Unknown llvm intrinsic");
 				};
 			}();
 

@@ -51,7 +51,7 @@ namespace panther{
 				auto print_func(const AST::Node& node) noexcept -> void;
 				auto print_struct(const AST::Node& node) noexcept -> void;
 				auto print_template_pack(const std::optional<AST::Node::ID>& opt_node_id) noexcept -> void;
-				auto print_template_args(const std::optional<std::vector<AST::Node::ID>>& opt_args) noexcept -> void;
+				auto print_template_args(const std::vector<AST::Node::ID>& template_args) noexcept -> void;
 				auto print_func_params(const AST::Node& node) noexcept -> void;
 				auto print_conditional(const AST::Node& node) noexcept -> void;
 				auto print_return(const AST::Node& node) noexcept -> void;

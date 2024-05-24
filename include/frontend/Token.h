@@ -108,6 +108,9 @@ namespace panther{
 			Dereference, // .&
 			Accessor, // .
 
+			OpenArrowBrace, // <{
+			CloseArrowBrace, // }>
+
 
 			///////////////////////////////////
 			// punctuation
@@ -207,6 +210,9 @@ namespace panther{
 			if(is_token("-@")){ return Token::MinusWrap; }
 			if(is_token("*@")){ return Token::MultiplyWrap; }
 
+			if(is_token("<{")){ return Token::OpenArrowBrace; }
+			if(is_token("}>")){ return Token::CloseArrowBrace; }
+
 			// length 1
 			if(is_token("=")){ return Token::Equal; }
 
@@ -238,7 +244,7 @@ namespace panther{
 			if(is_token(":")){ return Token::Colon; }
 
 
-			EVO_FATAL_BREAK(std::format("Unknown token kind ({}) => {}", token_str, __FUNCTION__));
+			evo::debugFatalBreak(std::format("Unknown token kind ({}) => {}", token_str, __FUNCTION__));
 		};
 
 
@@ -315,30 +321,34 @@ namespace panther{
 				///////////////////////////////////
 				// operators
 				
-				break; case Kind::Equal:                 return "=";
+				break; case Kind::Equal:            return "=";
 
-				break; case Kind::LogicalEqual:          return "==";
-				break; case Kind::NotEqual:              return "!=";
-				break; case Kind::LessThan:              return "<";
-				break; case Kind::LessThanEqual:         return "<=";
-				break; case Kind::GreaterThan:           return ">";
-				break; case Kind::GreaterThanEqual:      return ">=";
-				break; case Kind::LogicalNot:            return "!";
+				break; case Kind::LogicalEqual:     return "==";
+				break; case Kind::NotEqual:         return "!=";
+				break; case Kind::LessThan:         return "<";
+				break; case Kind::LessThanEqual:    return "<=";
+				break; case Kind::GreaterThan:      return ">";
+				break; case Kind::GreaterThanEqual: return ">=";
+				break; case Kind::LogicalNot:       return "!";
 
-				break; case Kind::Plus:                  return "+";
-				break; case Kind::PlusWrap:              return "+@";
-				break; case Kind::Minus:                 return "-";
-				break; case Kind::MinusWrap:             return "-@";
-				break; case Kind::Multiply:              return "*";
-				break; case Kind::MultiplyWrap:          return "*@";
-				break; case Kind::Divide:                return "/";
+				break; case Kind::Plus:             return "+";
+				break; case Kind::PlusWrap:         return "+@";
+				break; case Kind::Minus:            return "-";
+				break; case Kind::MinusWrap:        return "-@";
+				break; case Kind::Multiply:         return "*";
+				break; case Kind::MultiplyWrap:     return "*@";
+				break; case Kind::Divide:           return "/";
 
-				break; case Kind::RightArrow:            return "->";
+				break; case Kind::RightArrow:       return "->";
 
-				break; case Kind::Pointer:               return "&";
-				break; case Kind::Dereference:           return ".&";
+				break; case Kind::Pointer:          return "&";
+				break; case Kind::Dereference:      return ".&";
 
-				break; case Kind::Accessor:              return ".";
+				break; case Kind::Accessor:         return ".";
+
+				break; case Kind::OpenArrowBrace:   return "<{";
+				break; case Kind::CloseArrowBrace:  return "}>";
+
 
 
 				///////////////////////////////////
@@ -347,11 +357,12 @@ namespace panther{
 				break; case Kind::OpenParen:    return "(";
 				break; case Kind::CloseParen:   return ")";
 				break; case Kind::OpenBracket:  return "[";
-				break; case Kind::Pipe:         return "|";
 
 				break; case Kind::CloseBracket: return "]";
 				break; case Kind::OpenBrace:    return "{";
 				break; case Kind::CloseBrace:   return "}";
+
+				break; case Kind::Pipe:         return "|";
 
 				break; case Kind::Comma:        return ",";
 				break; case Kind::SemiColon:    return ";";

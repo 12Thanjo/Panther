@@ -92,7 +92,7 @@ namespace panther{
 			// print infos
 
 			for(const Message::Info& info : msg.infos){
-				this->info( std::format("\tNote: {}\n", info.string) );
+				this->info( std::format("\t<Info> {}\n", info.string) );
 
 				if(msg.source != nullptr && info.location.has_value()){
 					this->print_location(*msg.source, *info.location, Message::Type::Info);
@@ -385,7 +385,7 @@ namespace panther{
 				this->print_ident(this->ast_source->getNode(func.ident));
 
 				this->indenter_set_arrow();
-				this->print_template_pack(func.template_pack);
+				this->print_template_pack(func.templatePack);
 
 				this->indenter_set_arrow();
 				this->print_func_params(this->ast_source->getNode(func.params));
@@ -438,6 +438,8 @@ namespace panther{
 				this->info("Ident: ");
 				this->print_ident(this->ast_source->getNode(struct_decl.ident));
 
+				this->indenter_set_arrow();
+				this->print_template_pack(struct_decl.templatePack);
 
 				this->indenter_print_arrow();
 				if(struct_decl.attributes.empty()){
@@ -511,10 +513,10 @@ namespace panther{
 
 						this->indenter_print_end();
 						this->info("Type:");
-						if(template_param.is_type_keyword){
+						if(template_param.isTypeKeyword){
 							this->debug(" Type\n");
 						}else{
-							this->print_type(this->ast_source->getNode(template_param.type_node));
+							this->print_type(this->ast_source->getNode(template_param.typeNode));
 						}
 
 					this->indenter_pop();
@@ -523,17 +525,11 @@ namespace panther{
 			this->indenter_pop();
 		};
 
-		auto Printer::print_template_args(const std::optional<std::vector<AST::Node::ID>>& opt_args) noexcept -> void {
+		auto Printer::print_template_args(const std::vector<AST::Node::ID>& template_args) noexcept -> void {
 			this->indenter_print();
 
-			if(opt_args.has_value() == false){
-				this->info("Template Pack: ");
-				this->debug("[NONE]\n");
-				return;
-			}
 
-
-			if(opt_args->empty()){
+			if(template_args.empty()){
 				this->info("Template Pack: ");
 				this->debug("[EMPTY]\n");
 				return;	
@@ -542,10 +538,10 @@ namespace panther{
 			this->info("Template Pack:\n");
 			this->indenter_push();
 
-				for(size_t i = 0; i < opt_args->size(); i+=1){
-					const AST::Node& arg_node = this->ast_source->getNode( (*opt_args)[i] );
+				for(size_t i = 0; i < template_args.size(); i+=1){
+					const AST::Node& arg_node = this->ast_source->getNode(template_args[i]);
 
-					if(i < opt_args->size() - 1){
+					if(i < template_args.size() - 1){
 						this->indenter_set_arrow();
 					}else{
 						this->indenter_set_end();
@@ -877,9 +873,6 @@ namespace panther{
 							this->print_expr(this->ast_source->getNode(func_call.target));
 						this->indenter_pop();
 
-						this->indenter_set_arrow();
-						this->print_template_args(func_call.template_args);
-
 
 						this->indenter_print_end();
 						if(func_call.args.empty()){
@@ -1029,7 +1022,29 @@ namespace panther{
 					this->indenter_pop();
 				} break;
 
-				break; default: evo::debugFatalBreak("Node is not an expr");
+
+				case AST::Kind::TemplatedExpr: {
+					const AST::TemplatedExpr& templated_expr = this->ast_source->getTemplatedExpr(node);
+
+					this->indenter_print();
+					this->info("TemplatedExpr:\n");
+
+					this->indenter_push();
+
+						// this->indenter_print();
+						this->print_template_args(templated_expr.templateArgs);
+
+						this->indenter_print_end();
+						this->info("Expr:\n");
+						this->indenter_push();
+							this->indenter_set_end();
+							this->print_expr(this->ast_source->getNode(templated_expr.expr));
+						this->indenter_pop();
+
+					this->indenter_pop();
+				} break;
+
+				break; default: evo::debugFatalBreak("AST::Node has an unknown or unsupported AST::Kind");
 			};
 		};
 

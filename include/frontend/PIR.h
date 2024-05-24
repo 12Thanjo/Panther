@@ -23,37 +23,65 @@ namespace panther{
 			Source& source;
 			uint32_t id;
 			explicit VarID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
+
+			EVO_NODISCARD inline auto operator==(const VarID& rhs) const noexcept -> bool {
+				return &this->source == &rhs.source && this->id == rhs.id;
+			};
 		};
 
 		struct ParamID{ // typesafe identifier
 			uint32_t id;
 			explicit ParamID(uint32_t _id) noexcept : id(_id) {};
+
+			EVO_NODISCARD inline auto operator==(const ParamID& rhs) const noexcept -> bool {
+				return this->id == rhs.id;
+			};
 		};
 
 
 		struct PrefixID{ // typesafe identifier
 			uint32_t id;
 			explicit PrefixID(uint32_t _id) noexcept : id(_id) {};
+
+			EVO_NODISCARD inline auto operator==(const PrefixID& rhs) const noexcept -> bool {
+				return this->id == rhs.id;
+			};
 		};
 
 		struct DerefID{ // typesafe identifier
 			uint32_t id;
 			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
+
+			EVO_NODISCARD inline auto operator==(const DerefID& rhs) const noexcept -> bool {
+				return this->id == rhs.id;
+			};
 		};
 
 		struct AccessorID{ // typesafe identifier
 			uint32_t id;
 			explicit AccessorID(uint32_t _id) noexcept : id(_id) {};
+
+			EVO_NODISCARD inline auto operator==(const AccessorID& rhs) const noexcept -> bool {
+				return this->id == rhs.id;
+			};
 		};
 
 		struct FuncCallID{
 			uint32_t id;
 			explicit FuncCallID(uint32_t _id) noexcept : id(_id){};
+
+			EVO_NODISCARD inline auto operator==(const FuncCallID& rhs) const noexcept -> bool {
+				return this->id == rhs.id;
+			};
 		};
 
 		struct InitializerID{ // typesafe identifier
 			uint32_t id;
 			explicit InitializerID(uint32_t _id) noexcept : id(_id) {};
+
+			EVO_NODISCARD inline auto operator==(const InitializerID& rhs) const noexcept -> bool {
+				return this->id == rhs.id;
+			};
 		};
 
 
@@ -106,6 +134,9 @@ namespace panther{
 
 				return *this;
 			};
+
+
+			EVO_NODISCARD auto operator==(const Expr& rhs) const noexcept -> bool;
 		};
 
 
@@ -162,6 +193,18 @@ namespace panther{
 		
 			private:
 				std::optional<TypeID> id;
+		};
+
+
+		struct TemplateArg{
+			bool isType;
+			TypeVoidableID typeID;
+			std::optional<Expr> expr;
+
+			TemplateArg(TypeVoidableID type_id)             noexcept : isType(true),  typeID(type_id), expr(std::nullopt) {};
+			TemplateArg(TypeVoidableID type_id, Expr _expr) noexcept : isType(false), typeID(type_id), expr(_expr)        {};
+
+			EVO_NODISCARD auto operator==(const TemplateArg& rhs) const noexcept -> bool;
 		};
 
 
@@ -222,6 +265,7 @@ namespace panther{
 				struct StructData{
 					std::string_view name;
 					const Source* source;
+					std::vector<TemplateArg> templateArgs;
 
 					struct MemberVar{
 						std::string_view name;
@@ -232,6 +276,8 @@ namespace panther{
 					std::vector<MemberVar> memberVars{};
 
 					llvm::StructType* llvm_type = nullptr;
+
+					EVO_NODISCARD inline auto isTemplate() const noexcept -> bool { return !this->templateArgs.empty(); };
 				};
 
 			public:
@@ -252,10 +298,13 @@ namespace panther{
 				}
 
 				// struct
-				BaseType(Kind _kind, std::string_view name, const Source* source) : kind(_kind){
+				BaseType(Kind _kind, std::string_view name, const Source* source, const std::vector<TemplateArg>& template_args) : kind(_kind){
 					evo::debugAssert(_kind == Kind::Struct, "This constructor must be only used for struct kind");
-
-					this->data.emplace<StructData>(name, source);
+					this->data.emplace<StructData>(name, source, template_args);
+				}
+				BaseType(Kind _kind, std::string_view name, const Source* source, std::vector<TemplateArg>&& template_args) : kind(_kind){
+					evo::debugAssert(_kind == Kind::Struct, "This constructor must be only used for struct kind");
+					this->data.emplace<StructData>(name, source, std::move(template_args));
 				}
 
 				~BaseType() = default;
@@ -555,6 +604,7 @@ namespace panther{
 
 
 			Token::ID ident;
+			std::optional<uint32_t> templateInstantiationIndex; 
 			
 			BaseType::ID baseType;
 			bool isPacked = false;

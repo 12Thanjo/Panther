@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.31.0
+- Changed template delimiters to `<{` and `}>`
+- Fixed fatal error when declaring imports at global scope
+- Fixed fatal error when using using a struct initializer as a function argument
+- Fixed fatal error when taking the address of a derefeference expression
+- Added config options `badPracticeDerefOfAddr` and `badPracticeAddrOfDeref`
+
 ### v0.30.3
 - Fixed fatal error when a struct member with type inference has the default value of `uninit`
 - Changed the config option `allowStructMemberTypeInference` to be per file

@@ -104,7 +104,11 @@ namespace panther{
 			// objects
 
 			// If an equivalent type already exists, return its ID instead
-			EVO_NODISCARD auto createBaseType(PIR::BaseType&& base_type) noexcept -> PIR::BaseType::ID;
+			struct GottenBaseTypeID{
+				PIR::BaseType::ID id;
+				bool created;
+			};
+			EVO_NODISCARD auto getOrCreateBaseType(PIR::BaseType&& base_type) noexcept -> GottenBaseTypeID;
 
 			EVO_NODISCARD inline auto getBaseType(PIR::BaseType::ID id) const noexcept -> const PIR::BaseType& { return this->base_types[id.id]; };
 			EVO_NODISCARD inline auto getBaseType(PIR::BaseType::ID id)       noexcept ->       PIR::BaseType& { return this->base_types[id.id]; };
@@ -114,8 +118,13 @@ namespace panther{
 
 			// gets type with matching ID
 			// if type doesn't already exist, create a new one
+			// The returned bool is if a new one is created
 			// TODO: &&
-			EVO_NODISCARD auto getOrCreateTypeID(const PIR::Type& type) noexcept -> PIR::Type::ID;
+			struct GottenTypeID{
+				PIR::Type::ID id;
+				bool created;
+			};
+			EVO_NODISCARD auto getOrCreateTypeID(const PIR::Type& type) noexcept -> GottenTypeID;
 
 			// gets type with matching ID
 			// TODO: &&

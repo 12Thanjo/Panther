@@ -5,6 +5,33 @@
 namespace panther{
 	namespace PIR{
 
+		auto Expr::operator==(const Expr& rhs) const noexcept -> bool {
+			if(this->kind != rhs.kind){ return false; }
+
+			switch(this->kind){
+				case Kind::None:        return true;
+				case Kind::Var:         return this->var == rhs.var;
+				case Kind::Param:       return this->param == rhs.param;
+				case Kind::ASTNode:     return this->astNode == rhs.astNode;
+				case Kind::FuncCall:    return this->funcCall == rhs.funcCall;
+				case Kind::Initializer: return this->initializer == rhs.initializer;
+				case Kind::Prefix:      return this->prefix == rhs.prefix;
+				case Kind::Deref:       return this->deref == rhs.deref;
+				case Kind::Accessor:    return this->accessor == rhs.accessor;
+				case Kind::Import:      return this->import == rhs.import;
+			};
+
+			evo::debugFatalBreak("Unknown expr kind in " __FUNCTION__);
+		};
+
+
+		auto TemplateArg::operator==(const TemplateArg& rhs) const noexcept -> bool {
+			if(this->isType != rhs.isType){ return false; }
+			if(this->typeID != rhs.typeID){ return false; }
+
+			return this->expr == rhs.expr;
+		};
+
 
 		auto BaseType::Operator::Param::operator==(const Operator::Param& rhs) const noexcept -> bool {
 			return this->type == rhs.type && this->kind == rhs.kind;
@@ -43,6 +70,7 @@ namespace panther{
 
 					if(this_data.name != rhs_data.name){ return false; }
 					if(this_data.source != rhs_data.source){ return false; }
+					if(this_data.templateArgs != rhs_data.templateArgs){ return false; }
 				} break;
 
 				default: {

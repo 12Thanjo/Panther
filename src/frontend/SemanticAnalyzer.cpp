@@ -13,20 +13,22 @@ namespace panther{
 	// semantic analysis passes
 
 	auto SemanticAnalyzer::semantic_analysis_global_idents_and_imports() noexcept -> bool {
-		this->enter_scope(nullptr);
+		this->scope_managers.emplace_back(std::make_unique<ScopeManager>(this->scope_alloc, this->type_scope_alloc, this->scope_levels_alloc));
+		this->scope_managers[0]->enter_scope(nullptr);
+
 
 		for(AST::Node::ID global_stmt : this->source.global_stmts){
 			const AST::Node& node = this->source.getNode(global_stmt);
 
 			switch(node.kind){
 				case AST::Kind::VarDecl: {
-					if(this->analyze_var(this->source.getVarDecl(node)) == false){
+					if(this->analyze_var(this->source.getVarDecl(node), *this->scope_managers[0]) == false){
 						return false;
 					}
 				} break;
 
 				case AST::Kind::Struct: {
-					if(this->analyze_struct(this->source.getStruct(node)) == false){
+					if(this->analyze_struct(this->source.getStruct(node), *this->scope_managers[0]) == false){
 						return false;
 					}
 				} break;
@@ -45,7 +47,7 @@ namespace panther{
 
 			switch(node.kind){
 				case AST::Kind::Alias: {
-					if(this->analyze_alias(this->source.getAlias(node)) == false){
+					if(this->analyze_alias(this->source.getAlias(node), *this->scope_managers[0]) == false){
 						return false;
 					}
 				} break;
@@ -61,7 +63,7 @@ namespace panther{
 			const AST::Node& node = this->source.getNode(global_stmt);
 
 			if(node.kind == AST::Kind::Func){
-				if(this->analyze_func(this->source.getFunc(node)) == false){ return false; }
+				if(this->analyze_func(this->source.getFunc(node), *this->scope_managers[0]) == false){ return false; }
 			}
 		}
 
@@ -71,11 +73,11 @@ namespace panther{
 
 	auto SemanticAnalyzer::semantic_analysis_global_values() noexcept -> bool {
 		for(const GlobalVar& global_var : this->global_vars){
-			if(this->analyze_var_value(this->source.getVar(global_var.pir_id), global_var.ast) == false){ return false; }
+			if(this->analyze_var_value(this->source.getVar(global_var.pir_id), global_var.ast, *this->scope_managers[0]) == false){ return false; }
 		}
 
 		for(const GlobalStruct& global_struct : this->global_structs){
-			if(this->analyze_struct_block(this->source.getStruct(global_struct.pir_id), global_struct.ast) == false){ return false; }
+			if(this->analyze_struct_block(this->source.getStruct(global_struct.pir_id), global_struct.ast, *this->scope_managers[0]) == false){ return false; }
 		}
 
 
@@ -87,10 +89,10 @@ namespace panther{
 		this->is_analyzing_runtime = true;
 
 		for(const GlobalFunc& global_func : this->global_funcs){
-			if(this->analyze_func_block(this->source.getFunc(global_func.pir_id), global_func.ast) == false){ return false; }
+			if(this->analyze_func_block(this->source.getFunc(global_func.pir_id), global_func.ast, *this->scope_managers[0]) == false){ return false; }
 		}
 
-		this->leave_scope();
+		this->scope_managers[0]->leave_scope();
 		return true;
 	};
 
@@ -100,23 +102,23 @@ namespace panther{
 	// semantic analysis
 
 
-	auto SemanticAnalyzer::analyze_stmt(const AST::Node& node) noexcept -> bool {
-		if(this->in_func_scope() && this->scope_is_terminated()){
+	auto SemanticAnalyzer::analyze_stmt(const AST::Node& node, ScopeManager& scope_manager) noexcept -> bool {
+		if(scope_manager.in_func_scope() && scope_manager.scope_is_terminated()){
 			// TODO: better messaging
 			this->source.error("Unreachable code", node);
 			return false;
 		}
 
 		switch(node.kind){
-			break; case AST::Kind::VarDecl: return this->analyze_var(this->source.getVarDecl(node));
-			break; case AST::Kind::Func: return this->analyze_func(this->source.getFunc(node));
-			break; case AST::Kind::Struct: return this->analyze_struct(this->source.getStruct(node));
-			break; case AST::Kind::Conditional: return this->analyze_conditional(this->source.getConditional(node));
-			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node));
-			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node));
-			break; case AST::Kind::FuncCall: return this->analyze_func_call(this->source.getFuncCall(node));
-			break; case AST::Kind::Unreachable: return this->analyze_unreachable(this->source.getUnreachable(node));
-			break; case AST::Kind::Alias: return this->analyze_alias(this->source.getAlias(node));
+			break; case AST::Kind::VarDecl: return this->analyze_var(this->source.getVarDecl(node), scope_manager);
+			break; case AST::Kind::Func: return this->analyze_func(this->source.getFunc(node), scope_manager);
+			break; case AST::Kind::Struct: return this->analyze_struct(this->source.getStruct(node), scope_manager);
+			break; case AST::Kind::Conditional: return this->analyze_conditional(this->source.getConditional(node), scope_manager);
+			break; case AST::Kind::Return: return this->analyze_return(this->source.getReturn(node), scope_manager);
+			break; case AST::Kind::Infix: return this->analyze_infix(this->source.getInfix(node), scope_manager);
+			break; case AST::Kind::FuncCall: return this->analyze_func_call(this->source.getFuncCall(node), scope_manager);
+			break; case AST::Kind::Unreachable: return this->analyze_unreachable(this->source.getUnreachable(node), scope_manager);
+			break; case AST::Kind::Alias: return this->analyze_alias(this->source.getAlias(node), scope_manager);
 			break;
 
 			case AST::Kind::Literal: {
@@ -149,13 +151,13 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_var(const AST::VarDecl& var_decl) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_var(const AST::VarDecl& var_decl, ScopeManager& scope_manager) noexcept -> bool {
 		// check ident is unused
 		const Token::ID ident_tok_id = this->source.getNode(var_decl.ident).token;
 		const Token& ident = this->source.getToken(ident_tok_id);
 
-		if(this->in_struct_scope()){
-			PIR::Struct& current_struct = this->get_current_struct();
+		if(scope_manager.in_struct_scope()){
+			PIR::Struct& current_struct = scope_manager.get_current_struct();
 			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
 			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
 
@@ -167,8 +169,8 @@ namespace panther{
 			}
 
 		}else{
-			if(this->has_in_scope(ident.value.string)){
-				this->already_defined(ident);
+			if(scope_manager.has_in_scope(ident.value.string)){
+				this->already_defined(ident, scope_manager);
 				return false;
 			}
 		}
@@ -184,7 +186,7 @@ namespace panther{
 			std::string_view token_str = token.value.string;
 
 			if(token_str == "pub"){
-				if(this->is_global_scope()){
+				if(scope_manager.is_global_scope()){
 					is_pub = true;
 				}else{
 					this->source.error("Only variables at global scope can be marked with the attribute #pub", token);
@@ -192,7 +194,7 @@ namespace panther{
 				}
 
 			}else if(token_str == "export"){
-				if(this->is_global_scope() == false){
+				if(scope_manager.is_global_scope() == false){
 					this->source.error("Only variables at global scope can be marked with the attribute #export", token);
 					return false;
 				}
@@ -228,14 +230,14 @@ namespace panther{
 		const evo::Result<bool> is_import = [&]() noexcept {
 			if(var_decl.expr.has_value() == false){ return evo::Result<bool>(false); }
 
-			const ExprValueKind value_kind = this->is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, value_kind);
+			const ExprValueKind value_kind = scope_manager.is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager, value_kind);
 			if(expr_info.isError()){ return evo::Result<bool>(evo::resultError); }
 
 			if(expr_info.value().type_id.has_value() == false){ return evo::Result<bool>(false); }
 			if(*expr_info.value().type_id != SourceManager::getTypeImport()){ return evo::Result<bool>(false); }
 
-			if(this->in_struct_scope()){
+			if(scope_manager.in_struct_scope()){
 				this->source.error("Struct members cannot be imports", var_decl.ident);
 				return evo::Result<bool>(false);
 			}
@@ -255,7 +257,7 @@ namespace panther{
 				return evo::Result<bool>(false);	
 			}
 
-			this->add_import_to_scope(ident.value.string, Import(expr_info.value().expr->import, var_decl.ident));
+			scope_manager.add_import_to_scope(ident.value.string, ScopeManager::Import(expr_info.value().expr->import, var_decl.ident));
 
 			if(is_pub){
 				this->source.addPublicImport(ident.value.string, expr_info.value().expr->import);
@@ -275,9 +277,9 @@ namespace panther{
 
 
 
-		if(this->is_global_scope()){
+		if(scope_manager.is_global_scope()){
 			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(), var_decl.isDef, is_export);
-			this->add_var_to_scope(ident.value.string, var_id);
+			scope_manager.add_var_to_scope(ident.value.string, var_id);
 
 			this->source.pir.global_vars.emplace_back(var_id);
 			this->global_vars.emplace_back(var_id, var_decl);
@@ -286,15 +288,15 @@ namespace panther{
 				this->source.addPublicVar(ident.value.string, var_id);
 			}
 
-		}else if(this->in_func_scope()){
+		}else if(scope_manager.in_func_scope()){
 			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(), var_decl.isDef, is_export);
-			this->add_var_to_scope(ident.value.string, var_id);
+			scope_manager.add_var_to_scope(ident.value.string, var_id);
 
-			this->get_stmts_entry().emplace_back(var_id);
-			if(this->analyze_var_value(this->source.getVar(var_id), var_decl) == false){ return false; }
+			scope_manager.get_stmts_entry().emplace_back(var_id);
+			if(this->analyze_var_value(this->source.getVar(var_id), var_decl, scope_manager) == false){ return false; }
 
-		}else if(this->in_struct_scope()){
-			if(this->analyze_struct_member(var_decl) == false){ return false; }
+		}else if(scope_manager.in_struct_scope()){
+			if(this->analyze_struct_member(var_decl, scope_manager) == false){ return false; }
 
 		}else{
 			evo::debugFatalBreak("Unknown scope type");
@@ -312,13 +314,13 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_var_value(PIR::Var& var, const AST::VarDecl& var_decl) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_var_value(PIR::Var& var, const AST::VarDecl& var_decl, ScopeManager& scope_manager) noexcept -> bool {
 		if(var_decl.expr.has_value() == false){
 			this->source.error("Variables must be given an initial value", var_decl.ident);
 			return false;
 		}
 
-		const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+		const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
 		if(expr_info.isError()){ return false; }
 
 		if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral && expr_info.value().value_type != ExprInfo::ValueType::Import){
@@ -330,7 +332,7 @@ namespace panther{
 
 		const AST::Node& expr_node = this->source.getNode(*var_decl.expr);
 		if(var_decl.type.has_value()){
-			const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(*var_decl.type);
+			const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(*var_decl.type, scope_manager);
 			if(var_type_id.isError()){ return false; }
 
 			if(var_type_id.value().isVoid()){
@@ -388,7 +390,7 @@ namespace panther{
 			const AST::Node& var_value_node = this->source.getNode(var.value.astNode);
 
 			if(var_value_node.kind == AST::Kind::Uninit){
-				if(this->is_global_scope()){
+				if(scope_manager.is_global_scope()){
 					this->source.error("Global variables cannot be initialized with the value \"uninit\"", *var_decl.expr);
 					return false;
 				}
@@ -413,7 +415,7 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_struct_member(const AST::VarDecl& var_decl) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_struct_member(const AST::VarDecl& var_decl, ScopeManager& scope_manager) noexcept -> bool {
 		if(this->source.getConfig().allowStructMemberTypeInference == false && var_decl.type.has_value() == false){
 			this->source.error(
 				"Type inference of struct members is not allowed", var_decl.ident,
@@ -430,7 +432,7 @@ namespace panther{
 			///////////////////////////////////
 			// type
 
-			const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(*var_decl.type);
+			const evo::Result<PIR::Type::VoidableID> var_type_id = this->get_type_id(*var_decl.type, scope_manager);
 			if(var_type_id.isError()){ return false; }
 
 			if(var_type_id.value().isVoid()){
@@ -445,7 +447,7 @@ namespace panther{
 			// expr
 
 			if(var_decl.expr.has_value()){
-				const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+				const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
 				if(expr_info.isError()){ return false; }
 
 				if(expr_info.value().type_id.has_value() == false){
@@ -475,7 +477,7 @@ namespace panther{
 				return false;
 			}
 
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
 			if(expr_info.isError()){ return false; }
 
 			if(expr_info.value().type_id.has_value() == false){
@@ -495,11 +497,11 @@ namespace panther{
 
 
 
-		PIR::Struct& current_struct = this->get_current_struct();
+		PIR::Struct& current_struct = scope_manager.get_current_struct();
 
 		// look for circular members in type of newly added member
 		auto types_seen = std::unordered_set<PIR::Type::ID>();
-		types_seen.emplace(this->src_manager.getOrCreateTypeID(PIR::Type(current_struct.baseType)));
+		types_seen.emplace(this->src_manager.getOrCreateTypeID(PIR::Type(current_struct.baseType)).id);
 		auto types_queue = std::queue<PIR::Type::ID>();
 		types_queue.push(*type_id);
 
@@ -544,12 +546,12 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_func(const AST::Func& func) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_func(const AST::Func& func, ScopeManager& scope_manager) noexcept -> bool {
 		const Token::ID ident_tok_id = this->source.getNode(func.ident).token;
 		const Token& ident = this->source.getToken(ident_tok_id);
 
 		// check function is in global scope
-		if(this->is_global_scope() == false){
+		if(scope_manager.is_global_scope() == false){
 			this->source.error("Functions can only be defined at global scope", ident);
 			return false;
 		}
@@ -558,7 +560,7 @@ namespace panther{
 		///////////////////////////////////
 		// template pack
 
-		if(func.template_pack.has_value()){
+		if(func.templatePack.has_value()){
 			this->source.error("Function declaration with a template pack is not supported yet", ident);
 			return false;
 		}
@@ -571,21 +573,21 @@ namespace panther{
 		auto param_type_ids = std::vector<PIR::BaseType::Operator::Param>();
 
 		// this is just for params
-		this->enter_scope(nullptr);
+		scope_manager.enter_scope(nullptr);
 
 		const AST::FuncParams& ast_func_params = this->source.getFuncParams(func.params);
 		for(const AST::FuncParams::Param& param : ast_func_params.params){
 			const Token::ID param_ident_tok_id = this->source.getNode(param.ident).token;
 			const Token& param_ident = this->source.getToken(param_ident_tok_id);
 
-			if(this->has_in_scope(param_ident.value.string)){
-				this->already_defined(param_ident);
+			if(scope_manager.has_in_scope(param_ident.value.string)){
+				this->already_defined(param_ident, scope_manager);
 				return false;
 			}
 
 
 			// get param type
-			const evo::Result<PIR::Type::VoidableID> param_type_id = this->get_type_id(param.type);
+			const evo::Result<PIR::Type::VoidableID> param_type_id = this->get_type_id(param.type, scope_manager);
 			if(param_type_id.isError()){ return false; }
 
 			if(param_type_id.value().isVoid()){
@@ -597,12 +599,12 @@ namespace panther{
 			param_type_ids.emplace_back(param_type_id.value().typeID(), param.kind);
 
 			const PIR::Param::ID param_id = this->source.createParam(param_ident_tok_id, param_type_id.value().typeID(), param.kind);
-			this->add_param_to_scope(param_ident.value.string, param_id);
+			scope_manager.add_param_to_scope(param_ident.value.string, param_id);
 			params.emplace_back(param_id);
 		}
 
 
-		this->leave_scope();
+		scope_manager.leave_scope();
 
 
 		///////////////////////////////////
@@ -642,7 +644,7 @@ namespace panther{
 				is_entry = true;
 
 			}else if(token_str == "pub"){
-				if(this->is_global_scope()){
+				if(scope_manager.is_global_scope()){
 					is_pub = true;
 				}else{
 					// TODO: maybe this should be an error instead?
@@ -660,7 +662,7 @@ namespace panther{
 		///////////////////////////////////
 		// return type
 
-		const evo::Result<PIR::Type::VoidableID> return_type_id = this->get_type_id(func.returnType);
+		const evo::Result<PIR::Type::VoidableID> return_type_id = this->get_type_id(func.returnType, scope_manager);
 		if(return_type_id.isError()){ return false; }
 
 
@@ -670,13 +672,15 @@ namespace panther{
 		auto base_type = PIR::BaseType(PIR::BaseType::Kind::Function);
 		base_type.callOperator = PIR::BaseType::Operator(std::move(param_type_ids), return_type_id.value());
 
-		const PIR::BaseType::ID base_type_id = this->src_manager.createBaseType(std::move(base_type));
+		const PIR::BaseType::ID base_type_id = this->src_manager.getOrCreateBaseType(std::move(base_type)).id;
 
 
 		///////////////////////////////////
 		// check for overload reuse
 
-		for(const Scope& scope : this->scopes){
+		for(size_t scope_index : scope_manager.get_scopes()){
+			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
 			ConstFuncScopeListIter func_scope_list_iter = scope.funcs.find(ident.value.string);
 			if(func_scope_list_iter == scope.funcs.end()){ continue; }
@@ -700,7 +704,7 @@ namespace panther{
 
 		const PIR::Func::ID func_id = this->source.createFunc(ident_tok_id, base_type_id, std::move(params), return_type_id.value(), is_export);
 
-		this->add_func_to_scope(ident.value.string, func_id);
+		scope_manager.add_func_to_scope(ident.value.string, func_id);
 
 
 
@@ -726,7 +730,7 @@ namespace panther{
 		///////////////////////////////////
 		// analyze block
 
-		if(this->is_global_scope()){
+		if(scope_manager.is_global_scope()){
 			this->global_funcs.emplace_back(func_id, func);
 
 			if(is_pub){
@@ -735,7 +739,7 @@ namespace panther{
 
 		}else{
 			PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
-			if(this->analyze_func_block(pir_func, func) == false){
+			if(this->analyze_func_block(pir_func, func, scope_manager) == false){
 				return false;
 			};
 		}
@@ -749,39 +753,39 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func) noexcept -> bool {
-		this->enter_type_scope(TypeScope::Kind::Func, pir_func);
+	auto SemanticAnalyzer::analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func, ScopeManager& scope_manager) noexcept -> bool {
+		scope_manager.enter_type_scope(ScopeManager::TypeScope::Kind::Func, pir_func);
 
-			this->enter_scope(&pir_func.stmts);
-				this->enter_scope_level();
-					this->add_scope_level_scope();
+			scope_manager.enter_scope(&pir_func.stmts);
+				scope_manager.enter_scope_level();
+					scope_manager.add_scope_level_scope();
 
 					// add the params into the scope
 					for(PIR::Param::ID param_id : pir_func.params){
 						const PIR::Param& param = this->source.getParam(param_id);
-						this->add_param_to_scope(this->source.getToken(param.ident).value.string, param_id);
+						scope_manager.add_param_to_scope(this->source.getToken(param.ident).value.string, param_id);
 					}
 
 					// analyze the statements in the block
 					const AST::Block& block = this->source.getBlock(ast_func.block);
-					if(this->analyze_block(block) == false){ return false; }
+					if(this->analyze_block(block, scope_manager) == false){ return false; }
 
-				this->leave_scope_level();
+				scope_manager.leave_scope_level();
 
 			// check if function is terminated
 			if(pir_func.returnType.isVoid()){
-				if(this->scope_is_terminated()){
+				if(scope_manager.scope_is_terminated()){
 					pir_func.stmts.setTerminated();
 				}
 			}else{
-				if(this->scope_is_terminated() == false){
+				if(scope_manager.scope_is_terminated() == false){
 					this->source.error("Function with return type does not return on all control paths", pir_func.ident);
 					return false;
 				}
 			}
 
-			this->leave_scope();
-		this->leave_type_scope();
+			scope_manager.leave_scope();
+		scope_manager.leave_type_scope();
 
 
 		for(PIR::Param::ID param_id : pir_func.params){
@@ -799,17 +803,17 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_struct(const AST::Struct& struct_decl) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_struct(const AST::Struct& struct_decl, ScopeManager& scope_manager) noexcept -> bool {
 		const Token::ID ident_tok_id = this->source.getNode(struct_decl.ident).token;
 		const Token& ident = this->source.getToken(ident_tok_id);
 
-		if(this->is_global_scope() == false){
+		if(scope_manager.is_global_scope() == false){
 			this->source.error("Structs can only be declared in global scope", ident);
 			return false;
 		}
 
-		if(this->has_in_scope(ident.value.string)){
-			this->already_defined(ident);
+		if(scope_manager.has_in_scope(ident.value.string)){
+			this->already_defined(ident, scope_manager);
 			return false;
 		}
 
@@ -827,14 +831,24 @@ namespace panther{
 
 
 		///////////////////////////////////
+		// template
+
+		if(struct_decl.templatePack.has_value()){
+			ScopeManager& new_scope_manager = *this->scope_managers.emplace_back(std::make_unique<ScopeManager>(scope_manager));
+			scope_manager.add_struct_to_scope(ident.value.string, ScopeManager::Scope::StructData(struct_decl, new_scope_manager));
+			return true;
+		}
+
+
+		///////////////////////////////////
 		// type
 
-		const PIR::BaseType::ID base_type_id = this->src_manager.createBaseType(
-			PIR::BaseType(PIR::BaseType::Kind::Struct, ident.value.string, &this->source)
-		);
-		const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, base_type_id);
+		const PIR::BaseType::ID base_type_id = this->src_manager.getOrCreateBaseType(
+			PIR::BaseType(PIR::BaseType::Kind::Struct, ident.value.string, &this->source, {})
+		).id;
+		const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, std::nullopt, base_type_id);
 
-		this->add_struct_to_scope(ident.value.string, struct_id);
+		scope_manager.add_struct_to_scope(ident.value.string, ScopeManager::Scope::StructData(struct_id));
 
 		this->global_structs.emplace_back(struct_id, struct_decl);
 
@@ -846,15 +860,15 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::analyze_struct_block(PIR::Struct& pir_struct, const AST::Struct& ast_struct) noexcept -> bool {
-		this->enter_type_scope(TypeScope::Kind::Struct, pir_struct);
-			this->enter_scope(nullptr);
+	auto SemanticAnalyzer::analyze_struct_block(PIR::Struct& pir_struct, const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept -> bool {
+		scope_manager.enter_type_scope(ScopeManager::TypeScope::Kind::Struct, pir_struct);
+			scope_manager.enter_scope(nullptr);
 
 				const AST::Block& block = this->source.getBlock(ast_struct.block);
-				if(this->analyze_block(block) == false){ return false; }
+				if(this->analyze_block(block, scope_manager) == false){ return false; }
 
-			this->leave_scope();
-		this->leave_type_scope();
+			scope_manager.leave_scope();
+		scope_manager.leave_type_scope();
 
 		return true;
 	};
@@ -863,19 +877,19 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_conditional(const AST::Conditional& cond) noexcept -> bool {
-		this->enter_scope_level();
+	auto SemanticAnalyzer::analyze_conditional(const AST::Conditional& cond, ScopeManager& scope_manager) noexcept -> bool {
+		scope_manager.enter_scope_level();
 
-		const bool analyze_conditional_result = analyze_conditional_recursive(cond);
+		const bool analyze_conditional_result = analyze_conditional_recursive(cond, scope_manager);
 
-		this->leave_scope_level();
+		scope_manager.leave_scope_level();
 
 		return analyze_conditional_result;
 	};
 
 
-	auto SemanticAnalyzer::analyze_conditional_recursive(const AST::Conditional& sub_cond) noexcept -> bool {
-		if(this->in_func_scope() == false){
+	auto SemanticAnalyzer::analyze_conditional_recursive(const AST::Conditional& sub_cond, ScopeManager& scope_manager) noexcept -> bool {
+		if(scope_manager.in_func_scope() == false){
 			this->source.error("Conditional statements can only be inside functions", sub_cond.ifTok);
 			return false;
 		}
@@ -884,7 +898,7 @@ namespace panther{
 		///////////////////////////////////
 		// condition
 
-		const evo::Result<ExprInfo> cond_info = this->analyze_expr(sub_cond.ifExpr);
+		const evo::Result<ExprInfo> cond_info = this->analyze_expr(sub_cond.ifExpr, scope_manager);
 		if(cond_info.isError()){ return false; }
 
 		if(cond_info.value().type_id.has_value() == false){
@@ -913,9 +927,9 @@ namespace panther{
 		///////////////////////////////////
 		// then block
 
-		this->add_scope_level_scope();
+		scope_manager.add_scope_level_scope();
 		const AST::Block& then_block = this->source.getBlock(sub_cond.thenBlock);
-		if(this->analyze_block(then_block, then_stmts) == false){ return false; }
+		if(this->analyze_block(then_block, then_stmts, scope_manager) == false){ return false; }
 
 
 		///////////////////////////////////
@@ -925,25 +939,25 @@ namespace panther{
 			const AST::Node& else_block_node = this->source.getNode(*sub_cond.elseBlock);
 
 			if(else_block_node.kind == AST::Kind::Block){
-				this->add_scope_level_scope();
+				scope_manager.add_scope_level_scope();
 
 				const AST::Block& else_block = this->source.getBlock(else_block_node);
-				if(this->analyze_block(else_block, else_stmts) == false){ return false; }
+				if(this->analyze_block(else_block, else_stmts, scope_manager) == false){ return false; }
 
 			}else if(else_block_node.kind == AST::Kind::Conditional){
-				this->enter_scope(&else_stmts);
+				scope_manager.enter_scope(&else_stmts);
 
 				const AST::Conditional& else_block = this->source.getConditional(else_block_node);
-				if(this->analyze_conditional_recursive(else_block) == false){ return false; }		
+				if(this->analyze_conditional_recursive(else_block, scope_manager) == false){ return false; }		
 
-				this->leave_scope();
+				scope_manager.leave_scope();
 
 			}else{
 				evo::debugFatalBreak("Unkonwn else block kind");
 			}
 
 		}else{
-			this->add_scope_level_scope();
+			scope_manager.add_scope_level_scope();
 		}
 
 
@@ -951,7 +965,7 @@ namespace panther{
 		// create object
 
 		const PIR::Conditional::ID cond_id = this->source.createConditional(*cond_info.value().expr, std::move(then_stmts), std::move(else_stmts));
-		this->get_stmts_entry().emplace_back(cond_id);
+		scope_manager.get_stmts_entry().emplace_back(cond_id);
 
 
 
@@ -967,25 +981,25 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_return(const AST::Return& return_stmt) noexcept -> bool {
-		if(this->in_func_scope() == false){
+	auto SemanticAnalyzer::analyze_return(const AST::Return& return_stmt, ScopeManager& scope_manager) noexcept -> bool {
+		if(scope_manager.in_func_scope() == false){
 			this->source.error("Return statements can only be inside functions", return_stmt.keyword);
 			return false;
 		}
 
-		const PIR::Type::VoidableID func_return_type_id = this->get_current_func().returnType;
+		const PIR::Type::VoidableID func_return_type_id = scope_manager.get_current_func().returnType;
 
 		auto return_value = PIR::Expr();
 
 		if(return_stmt.value.has_value()){
 			// "return expr;"
 
-			if(this->get_current_func().returnType.isVoid()){
+			if(scope_manager.get_current_func().returnType.isVoid()){
 				this->source.error("Return statement has value when function's return type is \"Void\"", return_stmt.keyword);
 				return false;	
 			}
 
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*return_stmt.value);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*return_stmt.value, scope_manager);
 			if(expr_info.isError()){ return false; }
 
 			if(expr_info.value().type_id.has_value() == false){
@@ -1028,14 +1042,14 @@ namespace panther{
 
 
 		const PIR::Return::ID ret_id = this->source.createReturn(return_value);
-		this->get_stmts_entry().emplace_back(ret_id);
-		this->get_stmts_entry().setTerminated();
-		if(this->is_in_func_base_scope()){
-			this->get_current_func().terminatesInBaseScope = true;
+		scope_manager.get_stmts_entry().emplace_back(ret_id);
+		scope_manager.get_stmts_entry().setTerminated();
+		if(scope_manager.is_in_func_base_scope()){
+			scope_manager.get_current_func().terminatesInBaseScope = true;
 		}
 
-		this->set_scope_terminated();
-		this->add_scope_level_terminated();
+		scope_manager.set_scope_terminated();
+		scope_manager.add_scope_level_terminated();
 
 
 		return true;
@@ -1044,10 +1058,10 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_infix(const AST::Infix& infix) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_infix(const AST::Infix& infix, ScopeManager& scope_manager) noexcept -> bool {
 		switch(this->source.getToken(infix.op).kind){
 			case Token::get("="): {	
-				return this->analyze_assignment(infix);
+				return this->analyze_assignment(infix, scope_manager);
 			} break;
 
 			case Token::get("+"): case Token::get("+@"):
@@ -1069,9 +1083,9 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_assignment(const AST::Infix& infix) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_assignment(const AST::Infix& infix, ScopeManager& scope_manager) noexcept -> bool {
 		// check if at global scope
-		if(this->is_global_scope()){
+		if(scope_manager.is_global_scope()){
 			this->source.error("Assignment statements are not allowed at global scope", infix.op);
 			return false;
 		}
@@ -1080,7 +1094,7 @@ namespace panther{
 		///////////////////////////////////
 		// checking of lhs
 
-		const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+		const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
 		if(lhs_info.isError()){ return false; }
 
 
@@ -1118,7 +1132,7 @@ namespace panther{
 		///////////////////////////////////
 		// checking of rhs
 
-		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs);
+		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs, scope_manager);
 		if(rhs_info.isError()){ return false; }
 
 		if(rhs_info.value().value_type != ExprInfo::ValueType::Ephemeral){
@@ -1157,7 +1171,7 @@ namespace panther{
 		// create object
 
 		const PIR::Assignment::ID assignment_id = this->source.createAssignment(*lhs_info.value().expr, infix.op, *rhs_info.value().expr);
-		this->get_stmts_entry().emplace_back(assignment_id);
+		scope_manager.get_stmts_entry().emplace_back(assignment_id);
 
 
 		return true;
@@ -1166,9 +1180,9 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_func_call(const AST::FuncCall& func_call) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_func_call(const AST::FuncCall& func_call, ScopeManager& scope_manager) noexcept -> bool {
 		// analyze and get type of ident
-		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, ExprValueKind::None, &func_call);
+		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, scope_manager, ExprValueKind::None, &func_call);
 		if(target_info.isError()){ return false; }
 
 		evo::debugAssert(target_info.value().type_id.has_value(), "type of function call target is [uninit]");
@@ -1192,9 +1206,9 @@ namespace panther{
 			return false;
 		}
 
-		if(this->check_func_call(func_call, *target_info.value().type_id) == false){ return false; }
+		if(this->check_func_call(func_call, *target_info.value().type_id, scope_manager) == false){ return false; }
 
-		const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
+		const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call, scope_manager);
 		if(args.isError()){ return false; }
 
 		switch(this->source.getNode(func_call.target).kind){
@@ -1202,13 +1216,13 @@ namespace panther{
 				const Token& ident_tok = this->source.getIdent(func_call.target);
 
 				// get func
-				const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident_tok.value.string, func_call);
+				const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident_tok.value.string, func_call, scope_manager);
 				if(func_id.isError()){ return false; }
 
 
 				// create object
 				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
-				this->get_stmts_entry().emplace_back(func_call_id);
+				scope_manager.get_stmts_entry().emplace_back(func_call_id);
 
 				return true;
 			} break;
@@ -1223,7 +1237,7 @@ namespace panther{
 					if(intrinsic.ident == intrinsic_tok.value.string){
 						// create object
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(PIR::Intrinsic::ID(uint32_t(i)), std::move(args.value()));
-						this->get_stmts_entry().emplace_back(func_call_id);
+						scope_manager.get_stmts_entry().emplace_back(func_call_id);
 						
 						return true;
 					}
@@ -1239,19 +1253,19 @@ namespace panther{
 
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
-						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
 						evo::debugAssert(lhs_info.isSuccess(), "uncaught error");
 						evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
 						const Source& import_source = this->src_manager.getSource(lhs_info.value().expr->import);
 						const Token& rhs_ident = this->source.getIdent(infix.rhs);
 
-						const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(rhs_ident.value.string, import_source, func_call);
+						const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(rhs_ident.value.string, import_source, func_call, scope_manager);
 						if(imported_func_id.isError()){ return false; }
 						
 						// create object
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
-						this->get_stmts_entry().emplace_back(func_call_id);
+						scope_manager.get_stmts_entry().emplace_back(func_call_id);
 
 						return true;
 					} break;
@@ -1266,20 +1280,20 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_unreachable(const Token& unreachable) noexcept -> bool {
-		if(this->in_func_scope() == false){
+	auto SemanticAnalyzer::analyze_unreachable(const Token& unreachable, ScopeManager& scope_manager) noexcept -> bool {
+		if(scope_manager.in_func_scope() == false){
 			// TODO: different / better messaging? Should check if in global scope instead?
 			this->source.error("\"unreachable\" statements are not outside of a function", unreachable);
 			return false;
 		}
 
-		this->add_scope_level_terminated();
-		this->set_scope_terminated();
+		scope_manager.add_scope_level_terminated();
+		scope_manager.set_scope_terminated();
 
-		this->get_stmts_entry().emplace_back(PIR::Stmt::getUnreachable());
-		this->get_stmts_entry().setTerminated();
-		if(this->is_in_func_base_scope()){
-			this->get_current_func().terminatesInBaseScope = true;
+		scope_manager.get_stmts_entry().emplace_back(PIR::Stmt::getUnreachable());
+		scope_manager.get_stmts_entry().setTerminated();
+		if(scope_manager.is_in_func_base_scope()){
+			scope_manager.get_current_func().terminatesInBaseScope = true;
 		}
 
 		return true;
@@ -1287,14 +1301,14 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_alias(const AST::Alias& alias) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_alias(const AST::Alias& alias, ScopeManager& scope_manager) noexcept -> bool {
 		///////////////////////////////////
 		// ident
 
 		const Token& ident_tok = this->source.getIdent(alias.ident);
 		const std::string_view ident_str = ident_tok.value.string;
-		if(this->has_in_scope(ident_str)){
-			this->already_defined(ident_tok);
+		if(scope_manager.has_in_scope(ident_str)){
+			this->already_defined(ident_tok, scope_manager);
 			return false;
 		}
 
@@ -1322,14 +1336,14 @@ namespace panther{
 		///////////////////////////////////
 		// type
 
-		const evo::Result<PIR::Type::VoidableID> type = this->get_type_id(alias.type);
+		const evo::Result<PIR::Type::VoidableID> type = this->get_type_id(alias.type, scope_manager);
 		if(type.isError()){ return false; }
 
 
 		///////////////////////////////////
 		// create
 
-		this->add_alias_to_scope(ident_str, Alias(type.value(), alias.ident));
+		scope_manager.add_alias_to_scope(ident_str, ScopeManager::Alias(type.value(), alias.ident));
 
 		if(is_pub){
 			this->source.pir.pub_aliases.emplace(ident_str, type.value());
@@ -1344,20 +1358,20 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry) noexcept -> bool {
-		this->enter_scope(&stmts_entry);
+	auto SemanticAnalyzer::analyze_block(const AST::Block& block, PIR::StmtBlock& stmts_entry, ScopeManager& scope_manager) noexcept -> bool {
+		scope_manager.enter_scope(&stmts_entry);
 
-		if(this->analyze_block(block) == false){ return false; }
+		if(this->analyze_block(block, scope_manager) == false){ return false; }
 
-		this->leave_scope();
+		scope_manager.leave_scope();
 
 		return true;
 	};
 
 
-	auto SemanticAnalyzer::analyze_block(const AST::Block& block) noexcept -> bool {
+	auto SemanticAnalyzer::analyze_block(const AST::Block& block, ScopeManager& scope_manager) noexcept -> bool {
 		for(AST::Node::ID node_id : block.nodes){
-			if(this->analyze_stmt(this->source.getNode(node_id)) == false){
+			if(this->analyze_stmt(this->source.getNode(node_id), scope_manager) == false){
 				return false;
 			}
 		}
@@ -1370,7 +1384,7 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::check_func_call(const AST::FuncCall& func_call, PIR::Type::ID func_type_id) const noexcept -> bool {
+	auto SemanticAnalyzer::check_func_call(const AST::FuncCall& func_call, PIR::Type::ID func_type_id, ScopeManager& scope_manager) noexcept -> bool {
 		const PIR::Type& type = this->src_manager.getType(func_type_id);
 
 		if(type.qualifiers.empty() == false){
@@ -1392,12 +1406,6 @@ namespace panther{
 		}
 
 
-		if(func_call.template_args.has_value()){
-			this->source.error("Template arguments are not supported yet", func_call.target);
-			return false;
-		}
-
-
 		if(base_type.callOperator->params.size() != func_call.args.size()){
 			// TODO: better messaging
 			this->source.error("Function call number of arguments do not match function", func_call.target);
@@ -1411,7 +1419,7 @@ namespace panther{
 			const AST::Node& arg_node = this->source.getNode(arg_id);
 
 			// check types match
-			const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, ExprValueKind::None);
+			const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, scope_manager, ExprValueKind::None);
 			if(arg_info.isError()){ return false; }
 
 			if(arg_info.value().type_id.has_value() == false){
@@ -1469,7 +1477,9 @@ namespace panther{
 				if(arg_node.kind == AST::Kind::Ident){
 					std::string_view param_ident_str = this->source.getIdent(arg_node).value.string;
 
-					for(const Scope& scope : this->scopes){
+					for(size_t scope_index : scope_manager.get_scopes()){
+						const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 	 					if(scope.params.contains(param_ident_str)){
 							PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
 							pir_param.mayHaveBeenEdited = true;
@@ -1487,7 +1497,9 @@ namespace panther{
 
 						std::string_view param_ident_str = this->source.getIdent(*lhs_node).value.string;
 
-						for(const Scope& scope : this->scopes){
+						for(size_t scope_index : scope_manager.get_scopes()){
+							const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 		 					if(scope.params.contains(param_ident_str)){
 								PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
 								pir_param.mayHaveBeenEdited = true;
@@ -1502,11 +1514,11 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::get_func_call_args(const AST::FuncCall& func_call) const noexcept -> evo::Result<std::vector<PIR::Expr>> {
+	auto SemanticAnalyzer::get_func_call_args(const AST::FuncCall& func_call, ScopeManager& scope_manager) noexcept -> evo::Result<std::vector<PIR::Expr>> {
 		auto args = std::vector<PIR::Expr>();
 
 		for(AST::Node::ID arg_id : func_call.args){
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(arg_id);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(arg_id, scope_manager);
 			if(expr_info.isError()){ return evo::resultError; }
 
 			args.emplace_back(*expr_info.value().expr);
@@ -1517,16 +1529,17 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) noexcept 
+	-> evo::Result<ExprInfo> {
 		const AST::Node& node = this->source.getNode(node_id);
 
 		switch(node.kind){
-			case AST::Kind::Prefix:      return this->analyze_prefix_expr(node_id, value_kind);
-			case AST::Kind::Infix:       return this->analyze_infix_expr(node_id, value_kind, lookup_func_call);
-			case AST::Kind::Postfix:     return this->analyze_postfix_expr(node_id, value_kind);
-			case AST::Kind::FuncCall:    return this->analyze_func_call_expr(node_id, value_kind);
-			case AST::Kind::Initializer: return this->analyze_initializer_expr(node_id, value_kind);
-			case AST::Kind::Ident:       return this->analyze_ident_expr(node_id, value_kind, lookup_func_call);
+			case AST::Kind::Prefix:      return this->analyze_prefix_expr(node_id, scope_manager, value_kind);
+			case AST::Kind::Infix:       return this->analyze_infix_expr(node_id, scope_manager, value_kind, lookup_func_call);
+			case AST::Kind::Postfix:     return this->analyze_postfix_expr(node_id, scope_manager, value_kind);
+			case AST::Kind::FuncCall:    return this->analyze_func_call_expr(node_id, scope_manager, value_kind);
+			case AST::Kind::Initializer: return this->analyze_initializer_expr(node_id, scope_manager, value_kind);
+			case AST::Kind::Ident:       return this->analyze_ident_expr(node_id, scope_manager, value_kind, lookup_func_call);
 			case AST::Kind::Literal:     return this->analyze_literal_expr(node_id, value_kind);
 			case AST::Kind::Intrinsic:   return this->analyze_intrinsic_expr(node_id, value_kind);
 			case AST::Kind::Uninit:      return this->analyze_uninit_expr(node_id, value_kind);
@@ -1538,14 +1551,14 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_prefix_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_prefix_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		auto type_id = std::optional<PIR::Type::ID>();
 		auto expr = std::optional<PIR::Expr>();
 
 		const AST::Node& node = this->source.getNode(node_id);
 		const AST::Prefix& prefix = this->source.getPrefix(node);
 
-		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(prefix.rhs, value_kind);
+		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(prefix.rhs, scope_manager, value_kind);
 		if(rhs_info.isError()){ return evo::resultError; }
 
 
@@ -1573,16 +1586,36 @@ namespace panther{
 				}
 
 
+				const AST::Node& rhs_node = this->source.getNode(prefix.rhs);
+
 				// check that it's not an intrinsic
-				if(this->source.getNode(prefix.rhs).kind == AST::Kind::Intrinsic){
+				if(rhs_node.kind == AST::Kind::Intrinsic){
 					this->source.error("Cannot take the address of an intrinsic", prefix.rhs);
 					return evo::resultError;
 				}
 
 
+
+				// check that it's not taking the address of a dereference
+				if(this->source.getConfig().badPracticeAddrOfDeref && rhs_node.kind == AST::Kind::Postfix){
+					const AST::Postfix& rhs_postfix = this->source.getPostfix(rhs_node);
+					if(this->source.getToken(rhs_postfix.op).kind == Token::get(".&")){
+						this->source.error(
+							"[Bad Practice] Should not take the address of ([.&]) a dereference ([.&]) expression", rhs_node,
+							{ 
+								Message::Info("Remove both the [addr] and the [.&] as it will give you the same value"),
+								Message::Info("Note: (addr x.&) == x"),
+								Message::Info("You can change this with the config option \"badPracticeAddrOfDeref\""),
+							}
+						);
+						return evo::resultError;
+					}
+				}
+
+
 				// get type of rhs
 				if(rhs_info.value().type_id.has_value() == false){
-					this->source.error("Cannot take the address of the expression [uninit]", prefix.rhs);
+					this->source.error("Cannot take the address of the expression [uninit]", rhs_node);
 					return evo::resultError;
 				}
 
@@ -1594,31 +1627,31 @@ namespace panther{
 				const bool is_const = rhs_info.value().value_type == ExprInfo::ValueType::ConcreteConst;
 				rhs_type_copy.qualifiers.emplace_back(true, is_const);
 
-				type_id = this->src_manager.getOrCreateTypeID(rhs_type_copy);
+				type_id = this->src_manager.getOrCreateTypeID(rhs_type_copy).id;
 
-
-				// set that parameters may have been edited
-				if(rhs_info.value().expr->kind == PIR::Expr::Kind::Param){
-					PIR::Param& param = this->source.getParam(rhs_info.value().expr->param);
-					param.mayHaveBeenEdited = true;
-
-				}else if(rhs_info.value().expr->kind == PIR::Expr::Kind::Accessor){
-					PIR::Accessor& accessor = this->source.getAccessor(rhs_info.value().expr->accessor);
-					PIR::Expr* lhs = &accessor.lhs;
-
-					while(lhs->kind == PIR::Expr::Kind::Accessor){
-						PIR::Accessor& lhs_accessor = this->source.getAccessor(lhs->accessor);
-						lhs = &lhs_accessor.lhs;
-					};
-
-					if(lhs->kind == PIR::Expr::Kind::Param){
-						PIR::Param& param = this->source.getParam(lhs->param);
-						param.mayHaveBeenEdited = true;
-					}
-				}
 
 
 				if(value_kind != ExprValueKind::None){
+					// set that parameters may have been edited
+					if(rhs_info.value().expr->kind == PIR::Expr::Kind::Param){
+						PIR::Param& param = this->source.getParam(rhs_info.value().expr->param);
+						param.mayHaveBeenEdited = true;
+
+					}else if(rhs_info.value().expr->kind == PIR::Expr::Kind::Accessor){
+						PIR::Accessor& accessor = this->source.getAccessor(rhs_info.value().expr->accessor);
+						PIR::Expr* lhs = &accessor.lhs;
+
+						while(lhs->kind == PIR::Expr::Kind::Accessor){
+							PIR::Accessor& lhs_accessor = this->source.getAccessor(lhs->accessor);
+							lhs = &lhs_accessor.lhs;
+						};
+
+						if(lhs->kind == PIR::Expr::Kind::Param){
+							PIR::Param& param = this->source.getParam(lhs->param);
+							param.mayHaveBeenEdited = true;
+						}
+					}
+
 					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
 					expr = PIR::Expr(prefix_id);
 				}
@@ -1702,7 +1735,9 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_infix_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_infix_expr(
+		AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
+	) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
 
 		const AST::Node& node = this->source.getNode(node_id);
@@ -1712,7 +1747,7 @@ namespace panther{
 
 		switch(infix_op_kind){
 			case Token::get("."): {
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -1735,17 +1770,17 @@ namespace panther{
 						if(imported_func_list.size() == 1){
 							const PIR::Func& imported_func = Source::getFunc(imported_func_list[0]);
 
-							output.type_id = this->src_manager.getOrCreateTypeID( PIR::Type(imported_func.baseType));
+							output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(imported_func.baseType)).id;
 
 						}else if(lookup_func_call != nullptr){
 							const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
-								rhs_ident.value.string, import_source, *lookup_func_call
+								rhs_ident.value.string, import_source, *lookup_func_call, scope_manager
 							);
 							if(imported_func_id.isError()){ return evo::resultError; }
 
 							const PIR::Func& imported_func = Source::getFunc(imported_func_id.value());
 
-							output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(imported_func.baseType));
+							output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(imported_func.baseType)).id;
 
 						}else{
 							this->source.error("Cannot get overloaded function", infix.rhs);
@@ -1843,7 +1878,7 @@ namespace panther{
 				///////////////////////////////////
 				// lhs
 
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, value_kind);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager, value_kind);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -1904,7 +1939,7 @@ namespace panther{
 				///////////////////////////////////
 				// rhs
 
-				const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs, value_kind);
+				const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs, scope_manager, value_kind);
 				if(rhs_info.isError()){ return evo::resultError; }
 
 				if(rhs_info.value().type_id.has_value() == false){
@@ -2006,7 +2041,7 @@ namespace panther{
 				///////////////////////////////////
 				// lhs
 
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, value_kind);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager, value_kind);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -2029,7 +2064,7 @@ namespace panther{
 				///////////////////////////////////
 				// rhs
 
-				const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs);
+				const evo::Result<PIR::Type::VoidableID> rhs_type_id = this->get_type_id(infix.rhs, scope_manager);
 				if(rhs_type_id.isError()){ return evo::resultError; }
 
 
@@ -2096,7 +2131,7 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_postfix_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_postfix_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
 
 		const AST::Node& node = this->source.getNode(node_id);
@@ -2105,8 +2140,26 @@ namespace panther{
 
 		switch(this->source.getToken(postfix.op).kind){
 			case Token::get(".&"): {
+
+				// check that it's not taking the address of a dereference
+				if(this->source.getConfig().badPracticeDerefOfAddr && this->source.getNode(postfix.lhs).kind == AST::Kind::Prefix){
+					const AST::Prefix& rhs_prefix = this->source.getPrefix(postfix.lhs);
+					if(this->source.getToken(rhs_prefix.op).kind == Token::KeywordAddr){
+						this->source.error(
+							"[Bad Practice] Should not dereference ([.&]) an address of ([addr]) expression", postfix.lhs,
+							{ 
+								Message::Info("Remove both the [addr] and the [.&] as it will give you the same value"),
+								Message::Info("Note: (addr x).& == x"),
+								Message::Info("You can change this with the config option \"badPracticeDerefOfAddr\""),
+							}
+						);
+						return evo::resultError;
+					}
+				}
+
+
 				// get type of lhs
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(postfix.lhs, value_kind);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(postfix.lhs, scope_manager, value_kind);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -2138,10 +2191,10 @@ namespace panther{
 				PIR::Type lhs_type_copy = lhs_type;
 				lhs_type_copy.qualifiers.pop_back();
 
-				output.type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy);
+				output.type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy).id;
 
 				if(value_kind == ExprValueKind::Runtime){
-					const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy);
+					const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy).id;
 
 					const PIR::Deref::ID deref_id = this->source.createDeref(*lhs_info.value().expr, deref_type_id);
 					output.expr = PIR::Expr(deref_id);
@@ -2160,16 +2213,16 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_func_call_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_func_call_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		const AST::Node& node = this->source.getNode(node_id);
 		const AST::FuncCall& func_call = this->source.getFuncCall(node);
 
 		// get target type
-		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, ExprValueKind::None, &func_call);
+		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, scope_manager, ExprValueKind::None, &func_call);
 		if(target_info.isError()){ return evo::resultError; }
 
 		// check function call / arguments
-		if(this->check_func_call(func_call, *target_info.value().type_id) == false){ return evo::resultError; }
+		if(this->check_func_call(func_call, *target_info.value().type_id, scope_manager) == false){ return evo::resultError; }
 
 		// check it returns a value
 		const PIR::Type& type = this->src_manager.getType(*target_info.value().type_id);
@@ -2183,61 +2236,75 @@ namespace panther{
 
 
 		auto expr = std::optional<PIR::Expr>();
-		if(value_kind == ExprValueKind::Runtime){
-			const AST::Node& target_node = this->source.getNode(func_call.target);
+		const AST::Node& target_node = this->source.getNode(func_call.target);
 
-			const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call);
-			if(args.isError()){ return evo::resultError; }
 
-			if(target_node.kind == AST::Kind::Ident){
+		if(target_node.kind == AST::Kind::Ident){
+			if(value_kind == ExprValueKind::Runtime){
+				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call, scope_manager);
+				if(args.isError()){ return evo::resultError; }
+
 				const std::string_view ident = this->source.getIdent(func_call.target).value.string;
 
 				// get func
-				const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident, func_call);
+				const evo::Result<PIR::Func::ID> func_id = this->lookup_func_in_scope(ident, func_call, scope_manager);
 				if(func_id.isError()){ return evo::resultError; }
 
 
 				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
 				expr = PIR::Expr(func_call_id);
+			}
 
-			}else if(target_node.kind == AST::Kind::Intrinsic){
-				// get the intrinsic id
-				const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
-					const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
-					const evo::ArrayProxy<PIR::Intrinsic> intrinsics = this->src_manager.getIntrinsics();
+		}else if(target_node.kind == AST::Kind::Intrinsic){
+			// get the intrinsic id
+			const PIR::Intrinsic::ID intrinsic_id = [&]() noexcept {
+				const Token& intrinsic_tok = this->source.getIntrinsic(func_call.target);
+				const evo::ArrayProxy<PIR::Intrinsic> intrinsics = this->src_manager.getIntrinsics();
 
-					for(size_t i = 0; i < intrinsics.size(); i+=1){
-						const PIR::Intrinsic& intrinsic = intrinsics[i];
+				for(size_t i = 0; i < intrinsics.size(); i+=1){
+					const PIR::Intrinsic& intrinsic = intrinsics[i];
 
-						if(intrinsic.ident == intrinsic_tok.value.string){
-							return PIR::Intrinsic::ID(uint32_t(i));
-						}
+					if(intrinsic.ident == intrinsic_tok.value.string){
+						return PIR::Intrinsic::ID(uint32_t(i));
 					}
+				}
 
-					evo::debugFatalBreak("Unknown intrinsic");
-				}();
+				evo::debugFatalBreak("Unknown intrinsic");
+			}();
 
 
-				// imports
-				if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
-					const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
-					if(import_source_id.isError()){ return evo::resultError; }
+			// imports
+			if(intrinsic_id == SourceManager::getIntrinsicID(PIR::Intrinsic::Kind::import)){
+				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call, scope_manager);
+				if(args.isError()){ return evo::resultError; }
 
-					expr = PIR::Expr(import_source_id.value());
+				const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
+				if(import_source_id.isError()){ return evo::resultError; }
 
-				}else{
+				expr = PIR::Expr(import_source_id.value());
+
+			}else{
+				if(value_kind == ExprValueKind::Runtime){
+					const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call, scope_manager);
+					if(args.isError()){ return evo::resultError; }
+
 					// function calls normally
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
 					expr = PIR::Expr(func_call_id);
 				}
+			}
 
 
-			}else if(target_node.kind == AST::Kind::Infix){
+		}else if(target_node.kind == AST::Kind::Infix){
+			if(value_kind == ExprValueKind::Runtime){
+				const evo::Result<std::vector<PIR::Expr>> args = this->get_func_call_args(func_call, scope_manager);
+				if(args.isError()){ return evo::resultError; }
+
 				const AST::Infix& infix = this->source.getInfix(func_call.target);
 
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
-						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs);
+						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
 						if(lhs_info.isError()){ return evo::resultError; }
 						evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
@@ -2246,7 +2313,7 @@ namespace panther{
 
 						// get func
 						const evo::Result<PIR::Func::ID> imported_func_id = this->lookup_func_in_import(
-							rhs_ident.value.string, import_source, func_call
+							rhs_ident.value.string, import_source, func_call, scope_manager
 						);
 						if(imported_func_id.isError()){ return evo::resultError; }
 
@@ -2259,12 +2326,11 @@ namespace panther{
 				};
 
 				evo::debugFatalBreak("Unknown or unsupported infix type");
-
-			}else{
-				evo::debugFatalBreak("Unknown func target kind");
 			}
-		}
 
+		}else{
+			evo::debugFatalBreak("Unknown func target kind");
+		}
 
 
 		return ExprInfo{
@@ -2278,11 +2344,11 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_initializer_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_initializer_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		const AST::Node& node = this->source.getNode(node_id);
 		const AST::Initializer& initializer = this->source.getInitializer(node);
 
-		const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type);
+		const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type, scope_manager);
 		if(initializer_type_id.isError()){ return evo::resultError; }
 
 		if(initializer_type_id.value().isVoid()){
@@ -2319,7 +2385,7 @@ namespace panther{
 					const AST::Node& member_val_node = this->source.getNode(member_val.value);
 					if(member_val_node.kind == AST::Kind::Uninit){ break; }
 
-					const evo::Result<ExprInfo> member_val_info = this->analyze_expr(member_val.value, ExprValueKind::None);
+					const evo::Result<ExprInfo> member_val_info = this->analyze_expr(member_val.value, scope_manager, ExprValueKind::None);
 					if(member_val_info.isError()){ return evo::resultError; }
 
 
@@ -2376,7 +2442,7 @@ namespace panther{
 
 						if(this->source.getNode(member_val.value).kind == AST::Kind::Uninit){ break; }
 
-						const evo::Result<ExprInfo> member_val_expr_info = this->analyze_expr(member_val.value);
+						const evo::Result<ExprInfo> member_val_expr_info = this->analyze_expr(member_val.value, scope_manager);
 						if(member_val_expr_info.isError()){ return evo::resultError; }
 
 						member_values[i] = *member_val_expr_info.value().expr;
@@ -2419,7 +2485,9 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_ident_expr(AST::Node::ID node_id, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_ident_expr(
+		AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
+	) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
 
 
@@ -2427,7 +2495,9 @@ namespace panther{
 		const Token& ident = this->source.getIdent(node);
 		std::string_view ident_str = ident.value.string;
 
-		for(const Scope& scope : this->scopes){
+		for(size_t scope_index : scope_manager.get_scopes()){
+			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 			if(scope.vars.contains(ident_str)){
 				const PIR::Var::ID var_id = scope.vars.at(ident_str);
 				const PIR::Var& var = this->source.getVar(var_id);
@@ -2447,7 +2517,7 @@ namespace panther{
 					output.expr = PIR::Expr(var_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
-					if(this->is_global_scope() == false){
+					if(scope_manager.is_global_scope() == false){
 						this->source.error("Constant-evaluated expressions cannot be the value of a local variable", node);
 						return evo::resultError;						
 					}
@@ -2464,7 +2534,7 @@ namespace panther{
 					return evo::resultError;
 				}
 
-				const evo::Result<PIR::Func::ID> lookup_func_id = this->lookup_func_in_scope(ident_str, *lookup_func_call);
+				const evo::Result<PIR::Func::ID> lookup_func_id = this->lookup_func_in_scope(ident_str, *lookup_func_call, scope_manager);
 				if(lookup_func_id.isError()){ return evo::resultError; }
 
 				// get value type
@@ -2472,7 +2542,7 @@ namespace panther{
 
 				// get type
 				const PIR::Func& lookup_func = this->source.getFunc(lookup_func_id.value());
-				output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(lookup_func.baseType));
+				output.type_id = this->src_manager.getOrCreateTypeID(PIR::Type(lookup_func.baseType)).id;
 
 				break;
 
@@ -2522,6 +2592,18 @@ namespace panther{
 			}else if(scope.aliases.contains(ident_str)){
 				this->source.error("Type aliases cannot be used as expressions", node);
 				return evo::resultError;
+
+			}else if(scope.template_args.contains(ident_str)){
+				const PIR::TemplateArg& template_arg = scope.template_args.at(ident_str);
+
+				if(template_arg.isType){
+					this->source.error("Type template args cannot be used as expressions", node);
+					return evo::resultError;
+				}
+
+				output.type_id = template_arg.typeID.typeID();
+				output.expr = *template_arg.expr;
+				break;
 			}
 		}
 
@@ -2561,7 +2643,7 @@ namespace panther{
 
 		const PIR::Type::ID type_id = this->src_manager.getOrCreateTypeID(
 			PIR::Type( this->src_manager.getBaseTypeID(base_type) )
-		);
+		).id;
 
 
 		auto expr = std::optional<PIR::Expr>();
@@ -2592,7 +2674,7 @@ namespace panther{
 			if(intrinsic.ident == intrinsic_tok.value.string){
 				return ExprInfo{
 					.value_type = ExprInfo::ValueType::ConcreteConst,
-					.type_id    = this->src_manager.getOrCreateTypeID(PIR::Type(intrinsic.baseType)),
+					.type_id    = this->src_manager.getOrCreateTypeID(PIR::Type(intrinsic.baseType)).id,
 					.expr       = std::nullopt,
 				};
 			}
@@ -2634,15 +2716,16 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::get_type_id(AST::Node::ID node_id) const noexcept -> evo::Result<PIR::Type::VoidableID> {
+	auto SemanticAnalyzer::get_type_id(AST::Node::ID node_id, ScopeManager& scope_manager) noexcept -> evo::Result<PIR::Type::VoidableID> {
 		const AST::Node& node = this->source.getNode(node_id);
 
 		const AST::Type type = [&]() noexcept {
 			if(node.kind == AST::Kind::Type){
 				return this->source.getType(node);
 
-			}else if(node.kind == AST::Kind::Ident || node.kind == AST::Kind::Infix){
-				return AST::Type(AST::Type::Base{ .node = node_id }, false, {});
+			}else if(node.kind == AST::Kind::Ident || node.kind == AST::Kind::Infix || node.kind == AST::Kind::TemplatedExpr){
+				return AST::Type(false, AST::Type::Base{ .node = node_id }, {});
+
 			}else{
 				evo::debugFatalBreak("Unknown node kind");
 			}
@@ -2684,9 +2767,11 @@ namespace panther{
 					const Token& ident_tok = this->source.getIdent(base_type_node);
 					const std::string_view ident = ident_tok.value.string;
 
-					for(const Scope& scope : this->scopes){
+					for(size_t scope_index : scope_manager.get_scopes()){
+						const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 						if(scope.aliases.contains(ident)){
-							const Alias& alias = scope.aliases.at(ident);
+							const ScopeManager::Alias& alias = scope.aliases.at(ident);
 
 							if(type.qualifiers.empty() == false && alias.type_id.isVoid()){
 								this->source.error("Void type cannot have qualifiers", node); 
@@ -2703,12 +2788,41 @@ namespace panther{
 							}
 
 						}else if(scope.structs.contains(ident)){
-							const PIR::Struct::ID struct_id = scope.structs.at(ident);
-							const PIR::Struct& struct_info = this->source.getStruct(struct_id);
+							const ScopeManager::Scope::StructData& struct_data = scope.structs.at(ident);
 
-							base_type_id = struct_info.baseType;
+							if(struct_data.is_template){
+								// TODO: better messaging
+								this->source.error("No template pack given for a templated type", node);
+								return evo::resultError;
+							}
+
+							const PIR::Struct& pir_struct = this->source.getStruct(struct_data.struct_id);
+
+							base_type_id = pir_struct.baseType;
 							type_qualifiers = type.qualifiers;
 
+						}else if(scope.template_args.contains(ident)){
+							const PIR::TemplateArg& template_arg = scope.template_args.at(ident);
+
+							if(template_arg.isType == false){
+								// TODO: better messaging
+								this->source.error("Template arg used is not a type", node);
+								return evo::resultError;
+							}
+
+							if(type.qualifiers.empty() == false && template_arg.typeID.isVoid()){
+								this->source.error("Void type cannot have qualifiers", node); 
+								return evo::resultError;
+							}
+
+							const PIR::Type& template_arg_type = this->src_manager.getType(template_arg.typeID.typeID());
+
+							base_type_id = template_arg_type.baseType;
+							type_qualifiers = template_arg_type.qualifiers;
+
+							for(const AST::Type::Qualifier& qualifier : type.qualifiers){
+								type_qualifiers.push_back(qualifier);
+							}
 						}
 					}
 				} break;
@@ -2723,8 +2837,8 @@ namespace panther{
 						return evo::resultError;
 					}
 
-					const ExprValueKind value_kind = this->is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
-					const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, value_kind); 
+					const ExprValueKind value_kind = scope_manager.is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
+					const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager, value_kind); 
 					if(lhs_info.isError()){ return evo::resultError; }
 					evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
@@ -2760,6 +2874,155 @@ namespace panther{
 				} break;
 
 
+				case AST::Kind::TemplatedExpr: {
+					const AST::TemplatedExpr& templated_expr = this->source.getTemplatedExpr(base_type_node);
+					const AST::Node& template_base_node = this->source.getNode(templated_expr.expr);
+
+					if(template_base_node.kind == AST::Kind::Infix){
+						this->source.error("Imported template types are not supported yet", template_base_node);
+						return evo::resultError;
+					}
+
+					const Token::ID ident_tok_id = template_base_node.token;
+					const Token& ident_tok = this->source.getToken(ident_tok_id);
+					const std::string_view ident = ident_tok.value.string;
+
+
+					type_qualifiers = type.qualifiers;
+
+					for(size_t scope_index : scope_manager.get_scopes()){
+						ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
+						if(scope.aliases.contains(ident)){
+							this->source.error("Templated aliases are not supported yet", template_base_node);
+							return evo::resultError;
+
+						}else if(scope.structs.contains(ident)){
+							ScopeManager::Scope::StructData& scope_struct_data = scope.structs.at(ident);
+
+
+							if(scope_struct_data.is_template == false){
+								this->source.error("Template pack given for a non-templated type", template_base_node);
+								return evo::resultError;
+							}
+
+
+							const AST::Struct& ast_struct = *scope_struct_data.template_info.ast_struct;
+							const AST::TemplatePack& template_pack = this->source.getTemplatePack(*ast_struct.templatePack);
+
+							if(templated_expr.templateArgs.size() != template_pack.templates.size()){
+								// TODO: better messaging
+								this->source.error("Incorrect number of struct template arguments recieved", template_base_node);
+								return evo::resultError;
+							}
+
+
+							// get template args
+							auto template_args = std::vector<PIR::TemplateArg>();
+							for(AST::Node::ID template_arg_node_id : templated_expr.templateArgs){
+								const AST::Node& template_arg_node = this->source.getNode(template_arg_node_id);
+
+								if(template_arg_node.kind == AST::Kind::Type){
+									const evo::Result<PIR::Type::VoidableID> template_arg_type_id = this->get_type_id(template_arg_node_id, scope_manager);
+									if(template_arg_type_id.isError()){ return evo::resultError; }
+
+									template_args.emplace_back(template_arg_type_id.value());
+
+								}else{
+									const evo::Result<ExprInfo> template_arg_expr_info = this->analyze_expr(template_arg_node_id, scope_manager, ExprValueKind::ConstEval);
+									if(template_arg_expr_info.isError()){ return evo::resultError; }
+
+									template_args.emplace_back(*template_arg_expr_info.value().type_id, *template_arg_expr_info.value().expr);
+								}
+							}
+
+
+							const SourceManager::GottenBaseTypeID gotten_base_type_id = this->src_manager.getOrCreateBaseType(
+								PIR::BaseType(PIR::BaseType::Kind::Struct, ident, &this->source, template_args)
+							);
+
+							if(gotten_base_type_id.created == false){
+								base_type_id = gotten_base_type_id.id;
+
+							}else{
+								const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, scope_struct_data.template_info.num_created, gotten_base_type_id.id);
+								scope_struct_data.template_info.num_created += 1;
+
+								ScopeManager& template_scope_manager = *scope_struct_data.template_info.scope_manager;
+
+								template_scope_manager.enter_scope(nullptr);
+
+
+									for(size_t i = 0; i < template_args.size(); i+=1){
+										const AST::TemplatePack::Template template_param = template_pack.templates[i];
+										const PIR::TemplateArg& template_arg = template_args[i];
+
+
+
+										// check in for ident redefinition
+										const Token& template_param_ident_tok = this->source.getIdent(template_param.ident);
+										const std::string_view template_param_ident = template_param_ident_tok.value.string;
+										if(template_scope_manager.has_in_scope(template_param_ident)){
+											this->already_defined(template_param_ident_tok, template_scope_manager);
+											return evo::resultError;
+										}
+
+										// add to scope
+										if(template_arg.isType){
+											template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg.typeID));
+
+										}else{
+											// check that template args match template params
+											const evo::Result<PIR::Type::VoidableID> template_param_type = this->get_type_id(template_param.typeNode, template_scope_manager);
+											if(template_param_type.isError()){ return evo::resultError; }
+											evo::debugAssert(template_param_type.value().isVoid() == false, "template arg expr is of type Void");
+
+											if(template_param_type.value().typeID() != template_arg.typeID.typeID()){
+												const PIR::Type& template_param_pir_type = this->src_manager.getType(template_param_type.value().typeID());
+												const PIR::Type& template_arg_pir_type = this->src_manager.getType(template_arg.typeID.typeID());
+
+												if(this->is_implicitly_convertable_to(
+													template_arg_pir_type, template_param_pir_type, this->source.getNode(templated_expr.templateArgs[i])
+												) == false){
+													this->source.error("Template parameter expected different type", template_base_node,
+														{
+															Message::Info(
+																std::format("In template argument: {}", i)
+															),
+															Message::Info(
+																std::format("Template parameter type: {}", this->src_manager.printType(template_param_type.value().typeID()))
+															),
+															Message::Info(
+																std::format("Template argument type:  {}", this->src_manager.printType(template_arg.typeID.typeID()))
+															),
+														}
+													);
+													return evo::resultError;
+												}
+											}
+
+											template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg.typeID, *template_arg.expr));
+										}
+									}
+
+									const bool analyze_struct_block_result = this->analyze_struct_block(
+										this->source.getStruct(struct_id), ast_struct, template_scope_manager
+									);
+									
+									if(analyze_struct_block_result == false){ return evo::resultError; }
+
+								template_scope_manager.leave_scope();
+
+								base_type_id = gotten_base_type_id.id;
+							}
+						}
+					}
+
+
+
+				} break;
+
+
 				default: {
 					// TODO: better messaging
 					this->source.error("Invalid base type", base_type_node);
@@ -2782,7 +3045,7 @@ namespace panther{
 			if(type_qualifiers_has_a_const){
 				if(i->isConst == false && has_warned == false){
 					has_warned = true;
-					this->source.warning("If one type level is const, all previous levels will automatically be made const as well", node_id);
+					this->source.warning("If one type qualifier level is const, all previous levels will automatically be made const as well", node_id);
 				}
 
 				i->isConst = true;
@@ -2796,7 +3059,7 @@ namespace panther{
 		return PIR::Type::VoidableID(
 			this->src_manager.getOrCreateTypeID(
 				PIR::Type(*base_type_id, type_qualifiers)
-			)
+			).id
 		);
 	};
 
@@ -2884,10 +3147,12 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::already_defined(const Token& ident) const noexcept -> void {
+	auto SemanticAnalyzer::already_defined(const Token& ident, ScopeManager& scope_manager) const noexcept -> void {
 		const std::string_view ident_str = ident.value.string;
 
-		for(const Scope& scope : this->scopes){
+		for(size_t scope_index : scope_manager.get_scopes()){
+			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 			if(scope.vars.contains(ident_str)){
 				const PIR::Var& var = this->source.getVar(scope.vars.at(ident_str));
 				const Location location = this->source.getToken(var.ident).location;
@@ -2909,8 +3174,15 @@ namespace panther{
 			}
 
 			if(scope.structs.contains(ident_str)){
-				const PIR::Struct& struct_decl = this->source.getStruct(scope.structs.at(ident_str));
-				const Location location = this->source.getToken(struct_decl.ident).location;
+				const ScopeManager::Scope::StructData& struct_data = scope.structs.at(ident_str);
+				const Location location = [&]() noexcept {
+					if(struct_data.is_template){
+						return this->source.getIdent(struct_data.template_info.ast_struct->ident).location;
+					}else{
+						const PIR::Struct& struct_decl = this->source.getStruct(struct_data.struct_id);
+						return this->source.getToken(struct_decl.ident).location;
+					}
+				}();
 
 				this->source.error(
 					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
@@ -2931,7 +3203,7 @@ namespace panther{
 			}
 
 			if(scope.imports.contains(ident_str)){
-				const Import& import = scope.imports.at(ident_str);
+				const ScopeManager::Import& import = scope.imports.at(ident_str);
 				const Location location = this->source.getIdent(import.ident).location;
 
 				this->source.error(
@@ -2942,12 +3214,23 @@ namespace panther{
 			}
 
 			if(scope.aliases.contains(ident_str)){
-				const Alias& alias = scope.aliases.at(ident_str);
+				const ScopeManager::Alias& alias = scope.aliases.at(ident_str);
 				const Location location = this->source.getIdent(alias.ident).location;
 
 				this->source.error(
 					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
 					std::vector<Message::Info>{ Message::Info("First defined here:", location) }
+				);
+				return;
+			}
+
+			if(scope.template_args.contains(ident_str)){
+				// const PIR::TemplateArg& template_arg = scope.template_args.at(ident_str);
+				// const Location location = this->source.getIdent(alias.ident).location;
+
+				this->source.error(
+					std::format("Identifier \"{}\" already defined", ident.value.string), ident,
+					{ Message::Info("(Location info not supported yet)") }
 				);
 				return;
 			}
@@ -2961,21 +3244,22 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// scope
 
-	auto SemanticAnalyzer::enter_scope(PIR::StmtBlock* stmts_entry) noexcept -> void {
-		this->scopes.emplace_back(stmts_entry);
+	auto SemanticAnalyzer::ScopeManager::enter_scope(PIR::StmtBlock* stmts_entry) noexcept -> void {
+		this->scope_alloc.emplace_back(stmts_entry);
+		this->scopes.emplace_back(this->scope_alloc.size() - 1);
 	};
 
-	auto SemanticAnalyzer::leave_scope() noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::leave_scope() noexcept -> void {
 		this->scopes.pop_back();
 	};
 
 
-	auto SemanticAnalyzer::add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void {
-		this->scopes.back().vars.emplace(str, id);
+	auto SemanticAnalyzer::ScopeManager::add_var_to_scope(std::string_view str, PIR::Var::ID id) noexcept -> void {
+		this->scope_alloc[this->scopes.back()].vars.emplace(str, id);
 	};
 
-	auto SemanticAnalyzer::add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void {
-		Scope& current_scope = this->scopes.back();
+	auto SemanticAnalyzer::ScopeManager::add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void {
+		ScopeManager::Scope& current_scope = this->scope_alloc[this->scopes.back()];
 
 		using FuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::iterator;
 		FuncScopeListIter func_scope_list_iter = current_scope.funcs.find(str);
@@ -2989,63 +3273,73 @@ namespace panther{
 		}
 	};
 
-	auto SemanticAnalyzer::add_struct_to_scope(std::string_view str, PIR::Struct::ID id) noexcept -> void {
-		this->scopes.back().structs.emplace(str, id);
+	auto SemanticAnalyzer::ScopeManager::add_struct_to_scope(std::string_view str, Scope::StructData struct_data) noexcept -> void {
+		this->scope_alloc[this->scopes.back()].structs.emplace(str, struct_data);
 	};
 
-	auto SemanticAnalyzer::add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void {
-		this->scopes.back().params.emplace(str, id);
+	auto SemanticAnalyzer::ScopeManager::add_param_to_scope(std::string_view str, PIR::Param::ID id) noexcept -> void {
+		this->scope_alloc[this->scopes.back()].params.emplace(str, id);
 	};
 
-	auto SemanticAnalyzer::add_import_to_scope(std::string_view str, Import import) noexcept -> void {
-		this->scopes.back().imports.emplace(str, import);
+	auto SemanticAnalyzer::ScopeManager::add_import_to_scope(std::string_view str, ScopeManager::Import import) noexcept -> void {
+		this->scope_alloc[this->scopes.back()].imports.emplace(str, import);
 	};
 
-	auto SemanticAnalyzer::add_alias_to_scope(std::string_view str, Alias alias) noexcept -> void {
-		this->scopes.back().aliases.emplace(str, alias);
+	auto SemanticAnalyzer::ScopeManager::add_alias_to_scope(std::string_view str, ScopeManager::Alias alias) noexcept -> void {
+		this->scope_alloc[this->scopes.back()].aliases.emplace(str, alias);
 	};
 
-
-	auto SemanticAnalyzer::set_scope_terminated() noexcept -> void {
-		this->scopes.back().is_terminated = true;
-	};
-
-	auto SemanticAnalyzer::scope_is_terminated() const noexcept -> bool {
-		return this->scopes.back().is_terminated;
+	auto SemanticAnalyzer::ScopeManager::add_template_arg_to_scope(std::string_view str, PIR::TemplateArg template_arg) noexcept -> void {
+		this->scope_alloc[this->scopes.back()].template_args.emplace(str, template_arg);
 	};
 
 
-	auto SemanticAnalyzer::get_stmts_entry() noexcept -> PIR::StmtBlock& {
-		Scope& current_scope = this->scopes.back();
+	auto SemanticAnalyzer::ScopeManager::set_scope_terminated() noexcept -> void {
+		this->scope_alloc[this->scopes.back()].is_terminated = true;
+	};
+
+	auto SemanticAnalyzer::ScopeManager::scope_is_terminated() const noexcept -> bool {
+		return this->scope_alloc[this->scopes.back()].is_terminated;
+	};
+
+
+	auto SemanticAnalyzer::ScopeManager::get_stmts_entry() noexcept -> PIR::StmtBlock& {
+		ScopeManager::Scope& current_scope = this->scope_alloc[this->scopes.back()];
 
 		evo::debugAssert(current_scope.stmts_entry != nullptr, "Cannot get stmts entry as it doesn't exist for this scope");
 
 		return *current_scope.stmts_entry;
 	};
 
-	auto SemanticAnalyzer::has_in_scope(std::string_view ident) const noexcept -> bool {
-		for(const Scope& scope : this->scopes){
+	auto SemanticAnalyzer::ScopeManager::has_in_scope(std::string_view ident) const noexcept -> bool {
+		for(size_t scope_index : this->scopes){
+			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 			if(scope.vars.contains(ident)){ return true; }
 			if(scope.funcs.contains(ident)){ return true; }
 			if(scope.structs.contains(ident)){ return true; }
 			if(scope.params.contains(ident)){ return true; }
 			if(scope.imports.contains(ident)){ return true; }
 			if(scope.aliases.contains(ident)){ return true; }
+			if(scope.template_args.contains(ident)){ return true; }
 		}
 
 		return false;
 	};
 
 
-	auto SemanticAnalyzer::is_in_func_base_scope() const noexcept -> bool {
-		return this->scopes.back().stmts_entry == &this->get_current_func().stmts;
+	auto SemanticAnalyzer::ScopeManager::is_in_func_base_scope() const noexcept -> bool {
+		return this->scope_alloc[this->scopes.back()].stmts_entry == &this->get_current_func().stmts;
 	};
 
 
-	auto SemanticAnalyzer::lookup_func_in_scope(std::string_view ident, const AST::FuncCall& func_call) const noexcept -> evo::Result<PIR::Func::ID> {
+	auto SemanticAnalyzer::lookup_func_in_scope(std::string_view ident, const AST::FuncCall& func_call, ScopeManager& scope_manager) noexcept
+	-> evo::Result<PIR::Func::ID> {
 		auto func_list = std::vector<PIR::Func::ID>();
 		
-		for(const Scope& scope : this->scopes){
+		for(size_t scope_index : scope_manager.get_scopes()){
+			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
 			ConstFuncScopeListIter func_scope_list_iter = scope.funcs.find(ident);
 			if(func_scope_list_iter == scope.funcs.end()){ continue; }
@@ -3055,17 +3349,17 @@ namespace panther{
 			}
 		}
 
-		return this->match_function_to_overloads(ident, func_call, func_list);
+		return this->match_function_to_overloads(ident, func_call, func_list, scope_manager);
 	};
 
 
-	auto SemanticAnalyzer::lookup_func_in_import(std::string_view ident, const Source& import, const AST::FuncCall& func_call) const noexcept
+	auto SemanticAnalyzer::lookup_func_in_import(std::string_view ident, const Source& import, const AST::FuncCall& func_call, ScopeManager& scope_manager) noexcept
 	-> evo::Result<PIR::Func::ID> {
 		using ConstPubFuncListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
 		ConstPubFuncListIter pub_func_list_iter = import.pir.pub_funcs.find(ident);
 
 		if(pub_func_list_iter != import.pir.pub_funcs.end()){
-			return this->match_function_to_overloads(ident, func_call, pub_func_list_iter->second);
+			return this->match_function_to_overloads(ident, func_call, pub_func_list_iter->second, scope_manager);
 		}else{
 			return evo::resultError;
 		}
@@ -3075,8 +3369,8 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::match_function_to_overloads(
-		std::string_view ident, const AST::FuncCall& func_call, evo::ArrayProxy<PIR::Func::ID> overload_list
-	) const noexcept -> evo::Result<PIR::Func::ID> {
+		std::string_view ident, const AST::FuncCall& func_call, evo::ArrayProxy<PIR::Func::ID> overload_list, ScopeManager& scope_manager
+	) noexcept -> evo::Result<PIR::Func::ID> {
 		if(overload_list.empty()){
 			this->source.error(std::format("function \"{}\" is undefined", ident), func_call.target);
 			return evo::resultError;
@@ -3084,17 +3378,11 @@ namespace panther{
 
 		// if only has one function, use SemanticAnalyzer::check_func_call() which is able to give better error messages
 		if(overload_list.size() == 1){
-			if(this->check_func_call(func_call, this->src_manager.getOrCreateTypeID(PIR::Type(Source::getFunc(overload_list[0]).baseType))) == false){
+			if(this->check_func_call(func_call, this->src_manager.getOrCreateTypeID(PIR::Type(Source::getFunc(overload_list[0]).baseType)).id, scope_manager) == false){
 				return evo::resultError;
 			}
 
 			return overload_list[0];
-		}
-
-
-		if(func_call.template_args.has_value()){
-			this->source.error("Template arguments are not supported yet", func_call.target);
-			return evo::resultError;
 		}
 
 
@@ -3121,7 +3409,7 @@ namespace panther{
 				const AST::Node& arg_node = this->source.getNode(arg_id);
 
 				// check types match
-				const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, ExprValueKind::None);
+				const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, scope_manager, ExprValueKind::None);
 				if(arg_info.isError()){ return evo::resultError; }
 
 
@@ -3163,7 +3451,9 @@ namespace panther{
 				// if(arg_node.kind == AST::Kind::Ident && param.kind == ParamKind::Write){
 				// 	std::string_view param_ident_str = this->source.getIdent(arg_node).value.string;
 
-				// 	for(const Scope& scope : this->scopes){
+				// 	for(size_t scope_index : scope_manager.get_scopes()){
+				// 		const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+
 	 		// 			if(scope.params.contains(param_ident_str)){
 				// 			PIR::Param& pir_param = this->source.getParam(scope.params.at(param_ident_str));
 				// 			pir_param.mayHaveBeenEdited = true;
@@ -3200,56 +3490,58 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// type scope
 
-	auto SemanticAnalyzer::enter_type_scope(TypeScope::Kind kind, PIR::Func& func) noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::enter_type_scope(TypeScope::Kind kind, PIR::Func& func) noexcept -> void {
 		evo::debugAssert(kind == TypeScope::Kind::Func, "incorrect kind for pir type");
-		this->type_scopes.emplace_back(kind, &func);
+		this->type_scope_alloc.emplace_back(kind, &func);
+		this->type_scopes.emplace_back(this->type_scope_alloc.size() - 1);
 	};
 
-	auto SemanticAnalyzer::enter_type_scope(TypeScope::Kind kind, PIR::Struct& struct_decl) noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::enter_type_scope(TypeScope::Kind kind, PIR::Struct& struct_decl) noexcept -> void {
 		evo::debugAssert(kind == TypeScope::Kind::Struct, "incorrect kind for pir type");
-		this->type_scopes.emplace_back(kind, &struct_decl);
+		this->type_scope_alloc.emplace_back(kind, &struct_decl);
+		this->type_scopes.emplace_back(this->type_scope_alloc.size() - 1);
 	};
 
-	auto SemanticAnalyzer::leave_type_scope() noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::leave_type_scope() noexcept -> void {
 		evo::debugAssert(this->in_type_scope(), "Not in a type scope");
 		this->type_scopes.pop_back();
 	};
 
 
-	auto SemanticAnalyzer::in_type_scope() const noexcept -> bool {
+	auto SemanticAnalyzer::ScopeManager::in_type_scope() const noexcept -> bool {
 		return this->type_scopes.empty() == false;
 	};
 
 
 
-	auto SemanticAnalyzer::in_func_scope() const noexcept -> bool {
-		return this->in_type_scope() && this->type_scopes.back().kind == TypeScope::Kind::Func;
+	auto SemanticAnalyzer::ScopeManager::in_func_scope() const noexcept -> bool {
+		return this->in_type_scope() && this->type_scope_alloc[this->type_scopes.back()].kind == TypeScope::Kind::Func;
 	};
 
-	auto SemanticAnalyzer::get_current_func() noexcept -> PIR::Func& {
+	auto SemanticAnalyzer::ScopeManager::get_current_func() noexcept -> PIR::Func& {
 		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		return *this->type_scopes.back().func;
+		return *(this->type_scope_alloc[this->type_scopes.back()].func);
 	};
 
-	auto SemanticAnalyzer::get_current_func() const noexcept -> const PIR::Func& {
+	auto SemanticAnalyzer::ScopeManager::get_current_func() const noexcept -> const PIR::Func& {
 		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		return *this->type_scopes.back().func;
+		return *(this->type_scope_alloc[this->type_scopes.back()].func);
 	};
 
 
 
-	auto SemanticAnalyzer::in_struct_scope() const noexcept -> bool {
-		return this->in_type_scope() && this->type_scopes.back().kind == TypeScope::Kind::Struct;
+	auto SemanticAnalyzer::ScopeManager::in_struct_scope() const noexcept -> bool {
+		return this->in_type_scope() && this->type_scope_alloc[this->type_scopes.back()].kind == TypeScope::Kind::Struct;
 	};
 
-	auto SemanticAnalyzer::get_current_struct() noexcept -> PIR::Struct& {
+	auto SemanticAnalyzer::ScopeManager::get_current_struct() noexcept -> PIR::Struct& {
 		evo::debugAssert(this->in_struct_scope(), "Not in a struct scope");
-		return *this->type_scopes.back().struct_decl;
+		return *(this->type_scope_alloc[this->type_scopes.back()].struct_decl);
 	};
 
-	auto SemanticAnalyzer::get_current_struct() const noexcept -> const PIR::Struct& {
+	auto SemanticAnalyzer::ScopeManager::get_current_struct() const noexcept -> const PIR::Struct& {
 		evo::debugAssert(this->in_struct_scope(), "Not in a struct scope");
-		return *this->type_scopes.back().struct_decl;
+		return *(this->type_scope_alloc[this->type_scopes.back()].struct_decl);
 	};
 
 
@@ -3257,13 +3549,14 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// scope level
 
-	auto SemanticAnalyzer::enter_scope_level() noexcept -> void {
-		this->scope_levels.emplace_back();
+	auto SemanticAnalyzer::ScopeManager::enter_scope_level() noexcept -> void {
+		this->scope_levels_alloc.emplace_back();
+		this->scope_levels.emplace_back(this->scope_levels_alloc.size() - 1);
 	};
 
-	auto SemanticAnalyzer::leave_scope_level() noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::leave_scope_level() noexcept -> void {
 		const bool scope_level_terminated = [&]() noexcept {
-			const ScopeLevel& scope_level = this->scope_levels.back();
+			const ScopeLevel& scope_level = this->scope_levels_alloc[this->scope_levels.back()];
 			return scope_level.num_scopes == scope_level.num_terminated;
 		}();
 
@@ -3278,12 +3571,12 @@ namespace panther{
 		}
 	};
 
-	auto SemanticAnalyzer::add_scope_level_scope() noexcept -> void {
-		this->scope_levels.back().num_scopes += 1;
+	auto SemanticAnalyzer::ScopeManager::add_scope_level_scope() noexcept -> void {
+		this->scope_levels_alloc[this->scope_levels.back()].num_scopes += 1;
 	};
 
-	auto SemanticAnalyzer::add_scope_level_terminated() noexcept -> void {
-		this->scope_levels.back().num_terminated += 1;
+	auto SemanticAnalyzer::ScopeManager::add_scope_level_terminated() noexcept -> void {
+		this->scope_levels_alloc[this->scope_levels.back()].num_terminated += 1;
 	};
 
 	

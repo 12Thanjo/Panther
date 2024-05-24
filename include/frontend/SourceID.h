@@ -16,6 +16,10 @@ namespace panther{
 	struct SourceID{ // typesafe identifier
 		uint32_t id;
 		explicit SourceID(uint32_t _id) noexcept : id(_id) {};
+
+		EVO_NODISCARD auto operator==(const SourceID& rhs) const noexcept -> bool {
+			return this->id == rhs.id;
+		};
 	};
 
 
