@@ -278,7 +278,7 @@ namespace panther{
 						llvm::AllocaInst* arg_alloca = this->builder->createAlloca(param_types[i], std::format("{}.addr", param_infos[i].name));
 						this->source->getParam(func.params[i]).alloca = arg_alloca;
 
-						this->builder->createStore(arg_alloca, llvmint::ptrcast<llvm::Value>(arguments[i]), false);
+						this->builder->createStore(arg_alloca, llvmint::ptrcast<llvm::Value>(arguments[i]));
 					}
 
 					this->builder->createBranch(begin);
@@ -358,14 +358,8 @@ namespace panther{
 				var.is_alloca = true;
 
 
-				if(var.value.kind == PIR::Expr::Kind::ASTNode){
-					const AST::Node& var_value_node = this->source->getNode(var.value.astNode);
-					if(var_value_node.kind != AST::Kind::Uninit){
-						this->builder->createStore(alloca_val, this->get_value(var.value), true);
-					}
-					
-				}else{
-					this->builder->createStore(alloca_val, this->get_value(var.value), true);
+				if(var.value.kind != PIR::Expr::Kind::Uninit){
+					this->builder->createStore(alloca_val, this->get_value(var.value));
 				}
 
 			};
@@ -449,7 +443,7 @@ namespace panther{
 				llvm::Value* dst = this->get_concrete_value(assignment.dst);
 				llvm::Value* value = this->get_value(assignment.value);
 
-				this->builder->createStore(dst, value, false);
+				this->builder->createStore(dst, value);
 			};
 
 
@@ -631,8 +625,8 @@ namespace panther{
 
 			EVO_NODISCARD inline auto get_const_value(PIR::Expr value) noexcept -> llvm::Constant* {
 				switch(value.kind){
-					case PIR::Expr::Kind::ASTNode: {
-						const Token& token = this->source->getLiteral(value.astNode);
+					case PIR::Expr::Kind::Literal: {
+						const Token& token = this->source->getLiteral(value.literal);
 
 						switch(token.kind){
 							case Token::LiteralInt: {
@@ -675,32 +669,22 @@ namespace panther{
 
 			EVO_NODISCARD inline auto get_value(PIR::Expr value, bool get_pointer_to_value = false) noexcept -> llvm::Value* {
 				switch(value.kind){
-					case PIR::Expr::Kind::ASTNode: {
-						const AST::Node& node = this->source->getNode(value.astNode);
+					case PIR::Expr::Kind::Literal: {
 
 						llvm::Value* temporary = nullptr;
 						llvm::Type* temporary_type = nullptr;
 
-						switch(node.kind){
-							case AST::Kind::Literal: {
-								const Token& token = this->source->getLiteral(value.astNode);
+						const Token& token = this->source->getLiteral(value.literal);
 
-								switch(token.kind){
-									case Token::LiteralInt: {
-										temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(token.value.integer));
-										temporary_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeInt());
-									} break;
-
-									case Token::LiteralBool: {
-										temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueBool(token.value.boolean));
-										temporary_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
-									} break;
-								};
+						switch(token.kind){
+							case Token::LiteralInt: {
+								temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(token.value.integer));
+								temporary_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeInt());
 							} break;
-							
 
-							default: {
-								evo::debugFatalBreak("Unknown AST::Kind");
+							case Token::LiteralBool: {
+								temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueBool(token.value.boolean));
+								temporary_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
 							} break;
 						};
 
@@ -712,6 +696,10 @@ namespace panther{
 						}else{
 							return temporary;
 						}
+					} break;
+
+					case PIR::Expr::Kind::Uninit: {
+						evo::debugFatalBreak("Cannot get value of PIR::Expr::Kind::Uninit");
 					} break;
 
 					case PIR::Expr::Kind::Var: {
@@ -1675,7 +1663,11 @@ namespace panther{
 			EVO_NODISCARD inline static auto mangle_name(const Source& source, const PIR::Struct& struct_decl) noexcept -> std::string {
 				const std::string ident = std::string(source.getToken(struct_decl.ident).value.string);
 
-				return std::format("PTHR.{}.{}", source.getID().id, ident);
+				if(struct_decl.templateInstantiationIndex.has_value()){
+					return std::format("PTHR.{}.{}-{}", source.getID().id, ident, *struct_decl.templateInstantiationIndex);
+				}else{
+					return std::format("PTHR.{}.{}", source.getID().id, ident);
+				}
 			};
 
 

@@ -13,6 +13,7 @@
 
 namespace panther{
 	class Source;
+	class SourceManager;
 
 	namespace PIR{
 
@@ -23,65 +24,37 @@ namespace panther{
 			Source& source;
 			uint32_t id;
 			explicit VarID(Source& _source, uint32_t _id) noexcept : source(_source), id(_id) {};
-
-			EVO_NODISCARD inline auto operator==(const VarID& rhs) const noexcept -> bool {
-				return &this->source == &rhs.source && this->id == rhs.id;
-			};
 		};
 
 		struct ParamID{ // typesafe identifier
 			uint32_t id;
 			explicit ParamID(uint32_t _id) noexcept : id(_id) {};
-
-			EVO_NODISCARD inline auto operator==(const ParamID& rhs) const noexcept -> bool {
-				return this->id == rhs.id;
-			};
 		};
 
 
 		struct PrefixID{ // typesafe identifier
 			uint32_t id;
 			explicit PrefixID(uint32_t _id) noexcept : id(_id) {};
-
-			EVO_NODISCARD inline auto operator==(const PrefixID& rhs) const noexcept -> bool {
-				return this->id == rhs.id;
-			};
 		};
 
 		struct DerefID{ // typesafe identifier
 			uint32_t id;
 			explicit DerefID(uint32_t _id) noexcept : id(_id) {};
-
-			EVO_NODISCARD inline auto operator==(const DerefID& rhs) const noexcept -> bool {
-				return this->id == rhs.id;
-			};
 		};
 
 		struct AccessorID{ // typesafe identifier
 			uint32_t id;
 			explicit AccessorID(uint32_t _id) noexcept : id(_id) {};
-
-			EVO_NODISCARD inline auto operator==(const AccessorID& rhs) const noexcept -> bool {
-				return this->id == rhs.id;
-			};
 		};
 
 		struct FuncCallID{
 			uint32_t id;
 			explicit FuncCallID(uint32_t _id) noexcept : id(_id){};
-
-			EVO_NODISCARD inline auto operator==(const FuncCallID& rhs) const noexcept -> bool {
-				return this->id == rhs.id;
-			};
 		};
 
 		struct InitializerID{ // typesafe identifier
 			uint32_t id;
 			explicit InitializerID(uint32_t _id) noexcept : id(_id) {};
-
-			EVO_NODISCARD inline auto operator==(const InitializerID& rhs) const noexcept -> bool {
-				return this->id == rhs.id;
-			};
 		};
 
 
@@ -96,7 +69,8 @@ namespace panther{
 				None,
 				Var,
 				Param,
-				ASTNode,
+				Literal,
+				Uninit,
 				FuncCall,
 				Initializer,
 				Prefix,
@@ -109,7 +83,7 @@ namespace panther{
 				evo::byte dummy;
 				VarID var;
 				ParamID param;
-				AST::Node::ID astNode;
+				AST::Node::ID literal;
 				FuncCallID funcCall;
 				InitializerID initializer;
 				PrefixID prefix;
@@ -118,16 +92,23 @@ namespace panther{
 				SourceID import;
 			};
 
-			explicit Expr()                             : kind(Kind::None), dummy(0) {};
-			explicit Expr(VarID id)                     : kind(Kind::Var), var(id) {};
-			explicit Expr(ParamID id)                   : kind(Kind::Param), param(id) {};
-			explicit Expr(AST::Node::ID node)           : kind(Kind::ASTNode), astNode(node) {};
-			explicit Expr(FuncCallID func_call_id)      : kind(Kind::FuncCall), funcCall(func_call_id) {};
-			explicit Expr(InitializerID initializer_id) : kind(Kind::Initializer), initializer(initializer_id) {};
-			explicit Expr(PrefixID prefix_id)           : kind(Kind::Prefix), prefix(prefix_id) {};
-			explicit Expr(DerefID deref_id)             : kind(Kind::Deref), deref(deref_id) {};
-			explicit Expr(AccessorID accessor_id)       : kind(Kind::Accessor), accessor(accessor_id) {};
-			explicit Expr(SourceID src_id)              : kind(Kind::Import), import(src_id) {};
+			SourceID src_id;
+
+			explicit Expr(SourceID _src_id)                      noexcept : kind(Kind::None),        dummy(0),                    src_id(_src_id) {};
+			Expr(SourceID _src_id, VarID id)                     noexcept : kind(Kind::Var),         var(id),                     src_id(_src_id) {};
+			Expr(SourceID _src_id, ParamID id)                   noexcept : kind(Kind::Param),       param(id),                   src_id(_src_id) {};
+			Expr(SourceID _src_id, AST::Node::ID node)           noexcept : kind(Kind::Literal),     literal(node),               src_id(_src_id) {};
+			Expr(SourceID _src_id, FuncCallID func_call_id)      noexcept : kind(Kind::FuncCall),    funcCall(func_call_id),      src_id(_src_id) {};
+			Expr(SourceID _src_id, InitializerID initializer_id) noexcept : kind(Kind::Initializer), initializer(initializer_id), src_id(_src_id) {};
+			Expr(SourceID _src_id, PrefixID prefix_id)           noexcept : kind(Kind::Prefix),      prefix(prefix_id),           src_id(_src_id) {};
+			Expr(SourceID _src_id, DerefID deref_id)             noexcept : kind(Kind::Deref),       deref(deref_id),             src_id(_src_id) {};
+			Expr(SourceID _src_id, AccessorID accessor_id)       noexcept : kind(Kind::Accessor),    accessor(accessor_id),       src_id(_src_id) {};
+			Expr(SourceID _src_id, SourceID import_id)           noexcept : kind(Kind::Import),      import(import_id),           src_id(_src_id) {};
+
+			EVO_NODISCARD static auto Uninit(SourceID _src_id) noexcept -> Expr {
+				return Expr(Kind::Uninit, _src_id);
+			};
+
 
 			auto operator=(const Expr& rhs) noexcept -> Expr& {
 				std::memcpy(this, &rhs, sizeof(Expr));
@@ -136,7 +117,12 @@ namespace panther{
 			};
 
 
-			EVO_NODISCARD auto operator==(const Expr& rhs) const noexcept -> bool;
+			// EVO_NODISCARD auto operator==(const Expr& rhs) const noexcept -> bool;
+			EVO_NODISCARD auto equals(const Expr& rhs, const SourceManager& src_manager) const noexcept -> bool;
+
+
+			private:
+				Expr(Kind _kind, SourceID _src_id) : kind(_kind), dummy(0), src_id(_src_id) {};
 		};
 
 
@@ -204,7 +190,7 @@ namespace panther{
 			TemplateArg(TypeVoidableID type_id)             noexcept : isType(true),  typeID(type_id), expr(std::nullopt) {};
 			TemplateArg(TypeVoidableID type_id, Expr _expr) noexcept : isType(false), typeID(type_id), expr(_expr)        {};
 
-			EVO_NODISCARD auto operator==(const TemplateArg& rhs) const noexcept -> bool;
+			EVO_NODISCARD auto equals(const TemplateArg& rhs, const SourceManager& src_manager) const noexcept -> bool;
 		};
 
 
@@ -312,7 +298,7 @@ namespace panther{
 
 				EVO_NODISCARD auto operator==(Token::Kind tok_kind) const noexcept -> bool;
 
-				EVO_NODISCARD auto operator==(const BaseType& rhs) const noexcept -> bool;
+				EVO_NODISCARD auto equals(const BaseType& rhs, const SourceManager& src_manager) const noexcept -> bool;
 
 
 			public:

@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.31.1
+- Fixed name mangling of templated structs
+- Fixed some stores in LLVM IR incorrectly being volatile
+- Fixed printing of templated struct types
+- Fixed templates with values not being correctly detecting if they are the same type
+- Fixed crashes caused by templated substructs
+
 ### v0.31.0
 - Changed template delimiters to `<{` and `}>`
 - Fixed fatal error when declaring imports at global scope

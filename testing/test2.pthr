@@ -1,8 +1,0 @@
-var foo #pub : Int = 12;
-
-var x: Int = 12;
-
-struct Vec2 = #pub {
-	var x: Int;
-	var y: Int;
-}

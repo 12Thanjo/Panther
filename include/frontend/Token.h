@@ -145,7 +145,7 @@ namespace panther{
 			bool boolean;
 			std::string_view string;
 			uint64_t integer;
-			float64_t floating_point;
+			float64_t floatingPoint;
 		} value;
 
 
@@ -172,7 +172,7 @@ namespace panther{
 
 		Token(Kind _kind, Location _location, float64_t value) noexcept
 			: kind(_kind), location(_location) {
-			this->value.floating_point = value;
+			this->value.floatingPoint = value;
 		};
 
 
@@ -182,6 +182,22 @@ namespace panther{
 
 			this->value.string = value;
 		}
+
+
+
+
+		EVO_NODISCARD auto operator==(const Token& rhs) const noexcept -> bool {
+			if(this->kind != rhs.kind){ return false; }
+
+			switch(this->kind){
+				case Kind::LiteralBool: return this->value.boolean == rhs.value.boolean;
+				case Kind::LiteralInt: return this->value.integer == rhs.value.integer;
+				case Kind::LiteralFloat: return this->value.floatingPoint == rhs.value.floatingPoint;
+				case Kind::LiteralChar: return this->value.string == rhs.value.string;
+				case Kind::LiteralString: return this->value.string == rhs.value.string;
+				default: return true;
+			};
+		};
 
 
 

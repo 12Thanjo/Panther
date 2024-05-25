@@ -38,10 +38,10 @@ namespace panther{
 			EVO_NODISCARD auto analyze_struct_member(const AST::VarDecl& var_decl, ScopeManager& scope_manager) noexcept -> bool; // only be called from analyze_var()
 
 			EVO_NODISCARD auto analyze_func(const AST::Func& func, ScopeManager& scope_manager) noexcept -> bool;
-			EVO_NODISCARD auto analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func, ScopeManager& scope_manager) noexcept -> bool;
+			EVO_NODISCARD auto analyze_func_block(PIR::Func::ID pir_func_id, const AST::Func& ast_func, ScopeManager& scope_manager) noexcept -> bool;
 
 			EVO_NODISCARD auto analyze_struct(const AST::Struct& struct_decl, ScopeManager& scope_manager) noexcept -> bool;
-			EVO_NODISCARD auto analyze_struct_block(PIR::Struct& pir_struct, const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept -> bool;
+			EVO_NODISCARD auto analyze_struct_block(PIR::Struct::ID pir_struct_id, const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept -> bool;
 
 			EVO_NODISCARD auto analyze_conditional(const AST::Conditional& cond, ScopeManager& scope_manager) noexcept -> bool;
 			EVO_NODISCARD auto analyze_conditional_recursive(const AST::Conditional& cond, ScopeManager& scope_manager) noexcept -> bool;
@@ -147,6 +147,22 @@ namespace panther{
 					struct Scope{
 						PIR::StmtBlock* stmts_entry;
 
+						struct FuncData{
+							bool is_template;
+
+							union{
+								PIR::Func::ID func_id;
+
+								struct{
+									const AST::Struct* ast_struct;
+									ScopeManager* scope_manager;
+									uint32_t num_created = 0;
+								} template_info;
+							} data;
+
+							explicit FuncData(PIR::Func::ID func_id) noexcept : is_template(false), data{.func_id = func_id} {};
+						};
+
 						struct StructData{
 							bool is_template;
 							union{
@@ -159,7 +175,7 @@ namespace panther{
 								} template_info;
 							};
 
-							explicit StructData(const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept 
+							StructData(const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept 
 								: is_template(true), template_info(&ast_struct, &scope_manager) {};
 
 							explicit StructData(PIR::Struct::ID _struct_id) noexcept 
@@ -167,7 +183,7 @@ namespace panther{
 						};
 
 						std::unordered_map<std::string_view, PIR::Var::ID> vars{};
-						std::unordered_map<std::string_view, std::vector<PIR::Func::ID>> funcs{};
+						std::unordered_map<std::string_view, std::vector<FuncData>> funcs{};
 						std::unordered_map<std::string_view, StructData> structs{};
 						std::unordered_map<std::string_view, PIR::Param::ID> params{};
 						std::unordered_map<std::string_view, ScopeManager::Import> imports{};
@@ -187,12 +203,12 @@ namespace panther{
 						} kind;
 
 						union{
-							PIR::Func* func;
-							PIR::Struct* struct_decl;
+							PIR::Func::ID func_id;
+							PIR::Struct::ID struct_id;
 						};
 
-						TypeScope(Kind _kind, PIR::Func* _func) : kind(_kind), func(_func) {};
-						TypeScope(Kind _kind, PIR::Struct* _struct_decl) : kind(_kind), struct_decl(_struct_decl) {};
+						TypeScope(Kind _kind, PIR::Func::ID _func_id) noexcept : kind(_kind), func_id(_func_id) {};
+						TypeScope(Kind _kind, PIR::Struct::ID _struct_id) noexcept : kind(_kind), struct_id(_struct_id) {};
 					};
 
 
@@ -242,24 +258,22 @@ namespace panther{
 					EVO_NODISCARD auto has_in_scope(std::string_view ident) const noexcept -> bool;
 					EVO_NODISCARD inline auto is_global_scope() const noexcept -> bool { return this->scopes.size() == 1; };
 
-					EVO_NODISCARD auto is_in_func_base_scope() const noexcept -> bool;
+					EVO_NODISCARD auto is_in_func_base_scope(const Source& source) const noexcept -> bool;
 
 
 					///////////////////////////////////
 					// type scope
 
-					auto enter_type_scope(TypeScope::Kind kind, PIR::Func& func) noexcept -> void;
-					auto enter_type_scope(TypeScope::Kind kind, PIR::Struct& struct_decl) noexcept -> void;
+					auto enter_type_scope(TypeScope::Kind kind, PIR::Func::ID func_id) noexcept -> void;
+					auto enter_type_scope(TypeScope::Kind kind, PIR::Struct::ID struct_id) noexcept -> void;
 					auto leave_type_scope() noexcept -> void;
 					EVO_NODISCARD auto in_type_scope() const noexcept -> bool;
 
 					EVO_NODISCARD auto in_func_scope() const noexcept -> bool;
-					EVO_NODISCARD auto get_current_func() noexcept -> PIR::Func&;
-					EVO_NODISCARD auto get_current_func() const noexcept -> const PIR::Func&;
+					EVO_NODISCARD auto get_current_func() const noexcept -> PIR::Func::ID;
 
 					EVO_NODISCARD auto in_struct_scope() const noexcept -> bool;
-					EVO_NODISCARD auto get_current_struct() noexcept -> PIR::Struct&;
-					EVO_NODISCARD auto get_current_struct() const noexcept -> const PIR::Struct&;
+					EVO_NODISCARD auto get_current_struct() const noexcept -> PIR::Struct::ID;
 
 
 					///////////////////////////////////

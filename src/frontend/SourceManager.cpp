@@ -651,7 +651,7 @@ namespace panther{
 
 	auto SourceManager::getOrCreateBaseType(PIR::BaseType&& base_type) noexcept -> GottenBaseTypeID {
 		for(size_t i = 0; i < this->base_types.size(); i+=1){
-			if(base_type == this->base_types[i]){
+			if(base_type.equals(this->base_types[i], *this)){
 				return GottenBaseTypeID(PIR::BaseType::ID(uint32_t(i)), false);
 			}
 		}
@@ -718,6 +718,14 @@ namespace panther{
 
 
 
+	auto SourceManager::printType(PIR::Type::VoidableID id) const noexcept -> std::string {
+		if(id.isVoid()){
+			return "Void";
+		}else{
+			return this->printType(id.typeID());
+		}
+	};
+
 	auto SourceManager::printType(PIR::Type::ID id) const noexcept -> std::string {
 		const PIR::Type& type = this->getType(id);
 		const PIR::BaseType& base_type = this->base_types[type.baseType.id];
@@ -740,7 +748,55 @@ namespace panther{
 
 				case PIR::BaseType::Kind::Struct: {
 					const PIR::BaseType::StructData struct_data = std::get<PIR::BaseType::StructData>(base_type.data);
-					return std::string(struct_data.name);
+					auto name = std::string(struct_data.name);
+
+					if(struct_data.templateArgs.empty() == false){
+						name += "<{";
+						for(size_t i = 0; i < struct_data.templateArgs.size(); i+=1){
+							const PIR::TemplateArg& template_arg = struct_data.templateArgs[i];
+
+							if(template_arg.isType){
+								name += printType(template_arg.typeID);
+							}else{
+								switch(template_arg.expr->kind){
+									case PIR::Expr::Kind::Literal: {
+										const Source& source = this->getSource(template_arg.expr->src_id);
+										const Token& token = source.getLiteral(template_arg.expr->literal);
+
+										switch(token.kind){
+											case Token::LiteralBool: {
+												name += std::to_string(token.value.boolean);
+											} break;
+											case Token::LiteralInt: {
+												name += std::to_string(token.value.integer);
+											} break;
+											case Token::LiteralFloat: {
+												name += std::to_string(token.value.floatingPoint);
+											} break;
+											case Token::LiteralChar: {
+												name += std::format("\'{}\'", token.value.string);
+											} break;
+											case Token::LiteralString: {
+												name += std::format("\"{}\"", token.value.string);
+											} break;
+										};
+									} break;
+
+									default: {
+										name += "`" + printType(template_arg.typeID) + "`";
+									} break;
+								};
+
+							}
+
+							if(i < struct_data.templateArgs.size() - 1){
+								name += ", ";
+							}
+						}
+						name += "}>";
+					}
+
+					return name;
 				} break;
 
 				default: evo::debugFatalBreak("Unknown base-type kind");

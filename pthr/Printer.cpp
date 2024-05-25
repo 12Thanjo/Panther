@@ -149,7 +149,7 @@ namespace panther{
 
 					break; case Token::LiteralBool: this->debug( std::format(" \"{}\"", token.value.boolean) );
 					break; case Token::LiteralInt: this->debug( std::format(" \"{}\"", token.value.integer) );
-					break; case Token::LiteralFloat: this->debug( std::format(" \"{}\"", token.value.floating_point) );
+					break; case Token::LiteralFloat: this->debug( std::format(" \"{}\"", token.value.floatingPoint) );
 					break; case Token::LiteralChar: this->debug( std::format(" \'{}\'", token.value.string) );
 					break; case Token::LiteralString: this->debug( std::format(" \"{}\"", token.value.string) );
 				};
@@ -1064,7 +1064,7 @@ namespace panther{
 
 			switch(token.kind){
 				break; case Token::LiteralInt: this->debug(std::to_string(token.value.integer)); this->trace(" [LiteralInt]");
-				break; case Token::LiteralFloat: this->debug(std::to_string(token.value.floating_point)); this->trace(" [LiteralFloat]");
+				break; case Token::LiteralFloat: this->debug(std::to_string(token.value.floatingPoint)); this->trace(" [LiteralFloat]");
 				break; case Token::LiteralBool: this->debug(evo::boolStr(token.value.boolean)); this->trace(" [LiteralBool]");
 				break; case Token::LiteralString: this->debug(std::format("\"{}\"", token.value.string)); this->trace(" [LiteralString]");
 				break; case Token::LiteralChar: this->debug(std::format("'{}'", token.value.string)); this->trace(" [LiteralChar]");

@@ -77,7 +77,7 @@ namespace panther{
 		}
 
 		for(const GlobalStruct& global_struct : this->global_structs){
-			if(this->analyze_struct_block(this->source.getStruct(global_struct.pir_id), global_struct.ast, *this->scope_managers[0]) == false){ return false; }
+			if(this->analyze_struct_block(global_struct.pir_id, global_struct.ast, *this->scope_managers[0]) == false){ return false; }
 		}
 
 
@@ -89,7 +89,7 @@ namespace panther{
 		this->is_analyzing_runtime = true;
 
 		for(const GlobalFunc& global_func : this->global_funcs){
-			if(this->analyze_func_block(this->source.getFunc(global_func.pir_id), global_func.ast, *this->scope_managers[0]) == false){ return false; }
+			if(this->analyze_func_block(global_func.pir_id, global_func.ast, *this->scope_managers[0]) == false){ return false; }
 		}
 
 		this->scope_managers[0]->leave_scope();
@@ -157,7 +157,7 @@ namespace panther{
 		const Token& ident = this->source.getToken(ident_tok_id);
 
 		if(scope_manager.in_struct_scope()){
-			PIR::Struct& current_struct = scope_manager.get_current_struct();
+			PIR::Struct& current_struct = this->source.getStruct(scope_manager.get_current_struct());
 			PIR::BaseType& current_struct_base_type = this->src_manager.getBaseType(current_struct.baseType);
 			PIR::BaseType::StructData& struct_data = std::get<PIR::BaseType::StructData>(current_struct_base_type.data);
 
@@ -278,7 +278,7 @@ namespace panther{
 
 
 		if(scope_manager.is_global_scope()){
-			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(), var_decl.isDef, is_export);
+			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(this->source.getID()), var_decl.isDef, is_export);
 			scope_manager.add_var_to_scope(ident.value.string, var_id);
 
 			this->source.pir.global_vars.emplace_back(var_id);
@@ -289,7 +289,7 @@ namespace panther{
 			}
 
 		}else if(scope_manager.in_func_scope()){
-			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(), var_decl.isDef, is_export);
+			const PIR::Var::ID var_id = this->source.createVar(ident_tok_id, SourceManager::getDummyTypeID(), PIR::Expr(this->source.getID()), var_decl.isDef, is_export);
 			scope_manager.add_var_to_scope(ident.value.string, var_id);
 
 			scope_manager.get_stmts_entry().emplace_back(var_id);
@@ -386,21 +386,17 @@ namespace panther{
 
 
 		// check for uninit
-		if(var.value.kind == PIR::Expr::Kind::ASTNode){
-			const AST::Node& var_value_node = this->source.getNode(var.value.astNode);
+		if(var.value.kind == PIR::Expr::Kind::Uninit){
+			if(scope_manager.is_global_scope()){
+				this->source.error("Global variables cannot be initialized with the value \"uninit\"", *var_decl.expr);
+				return false;
+			}
 
-			if(var_value_node.kind == AST::Kind::Uninit){
-				if(scope_manager.is_global_scope()){
-					this->source.error("Global variables cannot be initialized with the value \"uninit\"", *var_decl.expr);
-					return false;
-				}
-
-				if(var_decl.isDef){
-					this->source.warning(
-						"Declared a def variable with the value \"uninit\"", *var_decl.expr,
-						std::vector<Message::Info>{ {"Any use of this variable would be undefined behavior"} }
-					);
-				}
+			if(var_decl.isDef){
+				this->source.warning(
+					"Declared a def variable with the value \"uninit\"", *var_decl.expr,
+					std::vector<Message::Info>{ {"Any use of this variable would be undefined behavior"} }
+				);
 			}
 		}
 
@@ -426,7 +422,7 @@ namespace panther{
 
 
 		auto type_id = std::optional<PIR::Type::ID>();
-		auto default_value = PIR::Expr();
+		auto default_value = PIR::Expr(this->source.getID());
 
 		if(var_decl.type.has_value()){
 			///////////////////////////////////
@@ -450,7 +446,7 @@ namespace panther{
 				const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
 				if(expr_info.isError()){ return false; }
 
-				if(expr_info.value().type_id.has_value() == false){
+				if(expr_info.value().type_id.has_value()){
 					const PIR::Type& var_type = this->src_manager.getType(*type_id);
 					const PIR::Type& expr_type = this->src_manager.getType(*expr_info.value().type_id);
 
@@ -497,7 +493,7 @@ namespace panther{
 
 
 
-		PIR::Struct& current_struct = scope_manager.get_current_struct();
+		PIR::Struct& current_struct = this->source.getStruct(scope_manager.get_current_struct());
 
 		// look for circular members in type of newly added member
 		auto types_seen = std::unordered_set<PIR::Type::ID>();
@@ -681,12 +677,16 @@ namespace panther{
 		for(size_t scope_index : scope_manager.get_scopes()){
 			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
 
-			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
+			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<ScopeManager::Scope::FuncData>>::const_iterator;
 			ConstFuncScopeListIter func_scope_list_iter = scope.funcs.find(ident.value.string);
 			if(func_scope_list_iter == scope.funcs.end()){ continue; }
 
-			for(PIR::Func::ID existing_func_id : func_scope_list_iter->second){
-				const PIR::Func& existing_func = this->source.getFunc(existing_func_id);
+			for(ScopeManager::Scope::FuncData existing_func_data : func_scope_list_iter->second){
+				if(existing_func_data.is_template){
+					evo::fatalBreak("TODO");
+				}
+
+				const PIR::Func& existing_func = this->source.getFunc(existing_func_data.data.func_id);
 
 				if(existing_func.baseType == base_type_id){
 					this->source.error(
@@ -738,8 +738,7 @@ namespace panther{
 			}
 
 		}else{
-			PIR::Func& pir_func = this->source.pir.funcs[func_id.id];
-			if(this->analyze_func_block(pir_func, func, scope_manager) == false){
+			if(this->analyze_func_block(func_id, func, scope_manager) == false){
 				return false;
 			};
 		}
@@ -753,8 +752,10 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_func_block(PIR::Func& pir_func, const AST::Func& ast_func, ScopeManager& scope_manager) noexcept -> bool {
-		scope_manager.enter_type_scope(ScopeManager::TypeScope::Kind::Func, pir_func);
+	auto SemanticAnalyzer::analyze_func_block(PIR::Func::ID pir_func_id, const AST::Func& ast_func, ScopeManager& scope_manager) noexcept -> bool {
+		scope_manager.enter_type_scope(ScopeManager::TypeScope::Kind::Func, pir_func_id);
+
+			PIR::Func& pir_func = this->source.getFunc(pir_func_id);
 
 			scope_manager.enter_scope(&pir_func.stmts);
 				scope_manager.enter_scope_level();
@@ -860,8 +861,8 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::analyze_struct_block(PIR::Struct& pir_struct, const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept -> bool {
-		scope_manager.enter_type_scope(ScopeManager::TypeScope::Kind::Struct, pir_struct);
+	auto SemanticAnalyzer::analyze_struct_block(PIR::Struct::ID pir_struct_id, const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept -> bool {
+		scope_manager.enter_type_scope(ScopeManager::TypeScope::Kind::Struct, pir_struct_id);
 			scope_manager.enter_scope(nullptr);
 
 				const AST::Block& block = this->source.getBlock(ast_struct.block);
@@ -987,14 +988,14 @@ namespace panther{
 			return false;
 		}
 
-		const PIR::Type::VoidableID func_return_type_id = scope_manager.get_current_func().returnType;
+		const PIR::Type::VoidableID func_return_type_id = this->source.getFunc(scope_manager.get_current_func()).returnType;
 
-		auto return_value = PIR::Expr();
+		auto return_value = PIR::Expr(this->source.getID());
 
 		if(return_stmt.value.has_value()){
 			// "return expr;"
 
-			if(scope_manager.get_current_func().returnType.isVoid()){
+			if(this->source.getFunc(scope_manager.get_current_func()).returnType.isVoid()){
 				this->source.error("Return statement has value when function's return type is \"Void\"", return_stmt.keyword);
 				return false;	
 			}
@@ -1044,8 +1045,8 @@ namespace panther{
 		const PIR::Return::ID ret_id = this->source.createReturn(return_value);
 		scope_manager.get_stmts_entry().emplace_back(ret_id);
 		scope_manager.get_stmts_entry().setTerminated();
-		if(scope_manager.is_in_func_base_scope()){
-			scope_manager.get_current_func().terminatesInBaseScope = true;
+		if(scope_manager.is_in_func_base_scope(this->source)){
+			this->source.getFunc(scope_manager.get_current_func()).terminatesInBaseScope = true;
 		}
 
 		scope_manager.set_scope_terminated();
@@ -1292,8 +1293,8 @@ namespace panther{
 
 		scope_manager.get_stmts_entry().emplace_back(PIR::Stmt::getUnreachable());
 		scope_manager.get_stmts_entry().setTerminated();
-		if(scope_manager.is_in_func_base_scope()){
-			scope_manager.get_current_func().terminatesInBaseScope = true;
+		if(scope_manager.is_in_func_base_scope(this->source)){
+			this->source.getFunc(scope_manager.get_current_func()).terminatesInBaseScope = true;
 		}
 
 		return true;
@@ -1543,6 +1544,17 @@ namespace panther{
 			case AST::Kind::Literal:     return this->analyze_literal_expr(node_id, value_kind);
 			case AST::Kind::Intrinsic:   return this->analyze_intrinsic_expr(node_id, value_kind);
 			case AST::Kind::Uninit:      return this->analyze_uninit_expr(node_id, value_kind);
+
+			case AST::Kind::Type: {
+				const AST::Type& type = this->source.getType(node);
+
+				if(type.isBuiltin || type.qualifiers.empty() == false){
+					this->source.error("Type cannot be used as an expression", node);
+					return evo::resultError;
+				}
+
+				return this->analyze_expr(type.base.node, scope_manager, value_kind, lookup_func_call);
+			} break;
 		};
 
 
@@ -1573,7 +1585,7 @@ namespace panther{
 
 				if(value_kind != ExprValueKind::None){
 					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
-					expr = PIR::Expr(prefix_id);
+					expr = PIR::Expr(this->source.getID(), prefix_id);
 				}
 			} break;
 
@@ -1653,7 +1665,7 @@ namespace panther{
 					}
 
 					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
-					expr = PIR::Expr(prefix_id);
+					expr = PIR::Expr(this->source.getID(), prefix_id);
 				}
 			} break;
 
@@ -1682,7 +1694,7 @@ namespace panther{
 
 				if(value_kind == ExprValueKind::Runtime){
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{*rhs_info.value().expr});
-					expr = PIR::Expr(func_call_id);
+					expr = PIR::Expr(this->source.getID(), func_call_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
 					this->source.error("At this time, constant-evaluated expressions cannot be negation ([-])", node);
@@ -1716,7 +1728,7 @@ namespace panther{
 
 				if(value_kind == ExprValueKind::Runtime){
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{*rhs_info.value().expr});
-					expr = PIR::Expr(func_call_id);
+					expr = PIR::Expr(this->source.getID(), func_call_id);
 				}else if(value_kind == ExprValueKind::ConstEval){
 					this->source.error("At this time, constant-evaluated expressions cannot be logical not ([!])", node);
 					return evo::resultError;
@@ -1803,7 +1815,7 @@ namespace panther{
 						output.type_id = imported_var.type;
 
 						if(value_kind == ExprValueKind::Runtime){
-							output.expr = PIR::Expr(imported_var_id);
+							output.expr = PIR::Expr(this->source.getID(), imported_var_id);
 						}else if(value_kind == ExprValueKind::ConstEval){
 							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
 							return evo::resultError;
@@ -1816,7 +1828,7 @@ namespace panther{
 
 						if(value_kind == ExprValueKind::Runtime){
 							const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
-							output.expr = PIR::Expr(imported_source_id);
+							output.expr = PIR::Expr(this->source.getID(), imported_source_id);
 						}else if(value_kind == ExprValueKind::ConstEval){
 							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
 							return evo::resultError;
@@ -1847,7 +1859,7 @@ namespace panther{
 								const PIR::Accessor::ID accessor_id = this->source.createAccessor(
 									*lhs_info.value().expr, *lhs_info.value().type_id, rhs_ident.value.string
 								);
-								output.expr = PIR::Expr(accessor_id);
+								output.expr = PIR::Expr(this->source.getID(), accessor_id);
 							}else if(value_kind == ExprValueKind::ConstEval){
 								this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
 								return evo::resultError;
@@ -2019,7 +2031,7 @@ namespace panther{
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(
 							intrinsic_id, std::vector<PIR::Expr>{*lhs_info.value().expr, *rhs_info.value().expr}
 						);
-						output.expr = PIR::Expr(func_call_id);
+						output.expr = PIR::Expr(this->source.getID(), func_call_id);
 					}else if(value_kind == ExprValueKind::ConstEval){
 						this->source.error(std::format("At this time, constant-evaluated expressions cannot be [{}]", Token::printKind(infix_op_kind)), node);
 						return evo::resultError;
@@ -2095,7 +2107,7 @@ namespace panther{
 							if(value_kind == ExprValueKind::Runtime){
 								const PIR::FuncCall::ID func_call_id = 
 									this->source.createFuncCall(op.intrinsic, std::vector<PIR::Expr>{*lhs_info.value().expr});
-								output.expr = PIR::Expr(func_call_id);
+								output.expr = PIR::Expr(this->source.getID(), func_call_id);
 							}
 
 							break;
@@ -2197,7 +2209,7 @@ namespace panther{
 					const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy).id;
 
 					const PIR::Deref::ID deref_id = this->source.createDeref(*lhs_info.value().expr, deref_type_id);
-					output.expr = PIR::Expr(deref_id);
+					output.expr = PIR::Expr(this->source.getID(), deref_id);
 				}
 			} break;
 
@@ -2252,7 +2264,7 @@ namespace panther{
 
 
 				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
-				expr = PIR::Expr(func_call_id);
+				expr = PIR::Expr(this->source.getID(), func_call_id);
 			}
 
 		}else if(target_node.kind == AST::Kind::Intrinsic){
@@ -2281,7 +2293,7 @@ namespace panther{
 				const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
 				if(import_source_id.isError()){ return evo::resultError; }
 
-				expr = PIR::Expr(import_source_id.value());
+				expr = PIR::Expr(this->source.getID(), import_source_id.value());
 
 			}else{
 				if(value_kind == ExprValueKind::Runtime){
@@ -2290,7 +2302,7 @@ namespace panther{
 
 					// function calls normally
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
-					expr = PIR::Expr(func_call_id);
+					expr = PIR::Expr(this->source.getID(), func_call_id);
 				}
 			}
 
@@ -2320,7 +2332,7 @@ namespace panther{
 						
 						// create object
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
-						expr = PIR::Expr(func_call_id);
+						expr = PIR::Expr(this->source.getID(), func_call_id);
 					} break;
 
 				};
@@ -2431,7 +2443,7 @@ namespace panther{
 		auto expr = std::optional<PIR::Expr>();
 		if(value_kind == ExprValueKind::Runtime){
 			// get member values
-			auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr());
+			auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr(this->source.getID()));
 			auto members_set = std::vector<bool>(struct_data.memberVars.size(), false);
 			for(const AST::Initializer::Member& member_val : initializer.members){
 				const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
@@ -2459,18 +2471,12 @@ namespace panther{
 
 				const PIR::Expr& default_value = struct_data.memberVars[i].defaultValue;
 
-				if(default_value.kind != PIR::Expr::Kind::ASTNode){
-					member_values[i] = default_value;
-					continue;
-				}
-
-				const AST::Node& default_value_node = this->source.getNode(default_value.astNode);
-				if(default_value_node.kind != AST::Kind::Uninit){
+				if(default_value.kind != PIR::Expr::Kind::Uninit){
 					member_values[i] = default_value;
 				}
 			}
 
-			expr = PIR::Expr(this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
+			expr = PIR::Expr(this->source.getID(), this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
 		}
 
 
@@ -2489,7 +2495,6 @@ namespace panther{
 		AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
 	) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
-
 
 		const AST::Node& node = this->source.getNode(node_id);
 		const Token& ident = this->source.getIdent(node);
@@ -2514,7 +2519,7 @@ namespace panther{
 
 				// get expr
 				if(value_kind == ExprValueKind::Runtime){
-					output.expr = PIR::Expr(var_id);
+					output.expr = PIR::Expr(this->source.getID(), var_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
 					if(scope_manager.is_global_scope() == false){
@@ -2567,7 +2572,7 @@ namespace panther{
 
 				// get expr
 				if(value_kind == ExprValueKind::Runtime){
-					output.expr = PIR::Expr(param_id);
+					output.expr = PIR::Expr(this->source.getID(), param_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
 					this->source.error("Constant-evaluated expressions cannot be the value of a parameter", node);
@@ -2585,7 +2590,7 @@ namespace panther{
 
 				// get expr
 				const Source::ID import_source_id = scope.imports.at(ident_str).source_id;
-				output.expr = PIR::Expr(import_source_id);
+				output.expr = PIR::Expr(this->source.getID(), import_source_id);
 
 				break;
 
@@ -2609,6 +2614,7 @@ namespace panther{
 
 		if(output.type_id.has_value() == false){
 			this->source.error(std::format("Identifier \"{}\" does not exist", ident_str), ident);
+			evo::breakpoint();
 			return evo::resultError;
 		}
 
@@ -2648,7 +2654,7 @@ namespace panther{
 
 		auto expr = std::optional<PIR::Expr>();
 		if(value_kind != ExprValueKind::None){
-			expr = PIR::Expr(node_id);
+			expr = PIR::Expr(this->source.getID(), node_id);
 		}
 
 		return ExprInfo{
@@ -2690,8 +2696,10 @@ namespace panther{
 
 	auto SemanticAnalyzer::analyze_uninit_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
 		auto expr = std::optional<PIR::Expr>();
+
 		if(value_kind == ExprValueKind::Runtime){
-			expr = PIR::Expr(node_id);
+			expr = PIR::Expr::Uninit(this->source.getID());
+
 		}else if(value_kind == ExprValueKind::ConstEval){
 			this->source.error("Constant-evaluated expressions cannot be [uninit]", node_id);
 			return evo::resultError;
@@ -2891,23 +2899,23 @@ namespace panther{
 					type_qualifiers = type.qualifiers;
 
 					for(size_t scope_index : scope_manager.get_scopes()){
-						ScopeManager::Scope& scope = this->scope_alloc[scope_index];
+						ScopeManager::Scope* scope = &this->scope_alloc[scope_index];
 
-						if(scope.aliases.contains(ident)){
+						if(scope->aliases.contains(ident)){
 							this->source.error("Templated aliases are not supported yet", template_base_node);
 							return evo::resultError;
 
-						}else if(scope.structs.contains(ident)){
-							ScopeManager::Scope::StructData& scope_struct_data = scope.structs.at(ident);
+						}else if(scope->structs.contains(ident)){
+							ScopeManager::Scope::StructData* scope_struct_data = &scope->structs.at(ident);
 
 
-							if(scope_struct_data.is_template == false){
+							if(scope_struct_data->is_template == false){
 								this->source.error("Template pack given for a non-templated type", template_base_node);
 								return evo::resultError;
 							}
 
 
-							const AST::Struct& ast_struct = *scope_struct_data.template_info.ast_struct;
+							const AST::Struct& ast_struct = *scope_struct_data->template_info.ast_struct;
 							const AST::TemplatePack& template_pack = this->source.getTemplatePack(*ast_struct.templatePack);
 
 							if(templated_expr.templateArgs.size() != template_pack.templates.size()){
@@ -2918,103 +2926,103 @@ namespace panther{
 
 
 							// get template args
-							auto template_args = std::vector<PIR::TemplateArg>();
-							for(AST::Node::ID template_arg_node_id : templated_expr.templateArgs){
-								const AST::Node& template_arg_node = this->source.getNode(template_arg_node_id);
+							ScopeManager template_scope_manager = *scope_struct_data->template_info.scope_manager;
+							template_scope_manager.enter_scope(nullptr);
 
-								if(template_arg_node.kind == AST::Kind::Type){
+							//re-lookup scope because entering scope may have moved it
+							scope = &this->scope_alloc[scope_index];
+							scope_struct_data = &scope->structs.at(ident);
+
+							auto template_args = std::vector<PIR::TemplateArg>();
+							for(size_t i = 0; i < template_pack.templates.size(); i+=1){
+								const AST::TemplatePack::Template& template_param = template_pack.templates[i];
+
+								const AST::Node::ID template_arg_node_id = 	templated_expr.templateArgs[i];
+								// const AST::Node& template_arg_node = this->source.getNode(template_arg_node_id);
+
+								// check in for ident redefinition
+								const Token& template_param_ident_tok = this->source.getIdent(template_param.ident);
+								const std::string_view template_param_ident = template_param_ident_tok.value.string;
+								if(template_scope_manager.has_in_scope(template_param_ident)){
+									this->already_defined(template_param_ident_tok, template_scope_manager);
+									return evo::resultError;
+								}
+
+								// analyze template arguments and add to scope
+								if(template_param.isTypeKeyword){
 									const evo::Result<PIR::Type::VoidableID> template_arg_type_id = this->get_type_id(template_arg_node_id, scope_manager);
 									if(template_arg_type_id.isError()){ return evo::resultError; }
 
 									template_args.emplace_back(template_arg_type_id.value());
+									template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg_type_id.value()));
 
-								}else{
-									const evo::Result<ExprInfo> template_arg_expr_info = this->analyze_expr(template_arg_node_id, scope_manager, ExprValueKind::ConstEval);
-									if(template_arg_expr_info.isError()){ return evo::resultError; }
+								}else{ // is expr
+									// get template param type info
+									const evo::Result<PIR::Type::VoidableID> template_param_type_id = this->get_type_id(template_param.typeNode, template_scope_manager);
+									if(template_param_type_id.isError()){ return evo::resultError; }
+									if(template_param_type_id.value().isVoid()){
+										this->source.error("Template parameter type cannot be Void", template_param.typeNode);
+										return evo::resultError;
+									}
 
-									template_args.emplace_back(*template_arg_expr_info.value().type_id, *template_arg_expr_info.value().expr);
+									// get template arg type info
+									const evo::Result<ExprInfo> template_arg_info = this->analyze_expr(template_arg_node_id, template_scope_manager, ExprValueKind::ConstEval);
+									if(template_arg_info.isError()){ return evo::resultError; }
+									if(template_arg_info.value().type_id.has_value() == false){
+										this->source.error("Template parameter cannot be [uninit]", template_param.typeNode);
+										return evo::resultError;
+									}
+
+
+									// check that template args match template params
+									if(template_param_type_id.value().typeID() != *template_arg_info.value().type_id){
+										const PIR::Type& template_param_type = this->src_manager.getType(template_param_type_id.value().typeID());
+										const PIR::Type& template_arg_type = this->src_manager.getType(*template_arg_info.value().type_id);
+
+										if(this->is_implicitly_convertable_to(
+											template_arg_type, template_param_type, this->source.getNode(templated_expr.templateArgs[i])
+										) == false){
+											this->source.error("Template parameter expected different type", template_base_node,
+												{
+													Message::Info(
+														std::format("In template argument: {}", i)
+													),
+													Message::Info(
+														std::format("Template parameter type: {}", this->src_manager.printType(template_param_type_id.value().typeID()))
+													),
+													Message::Info(
+														std::format("Template argument type:  {}", this->src_manager.printType(*template_arg_info.value().type_id))
+													),
+												}
+											);
+											return evo::resultError;
+										}
+									}
+
+
+									template_args.emplace_back(template_param_type_id.value().typeID(), *template_arg_info.value().expr);
+									template_scope_manager.add_template_arg_to_scope(
+										template_param_ident, PIR::TemplateArg(template_param_type_id.value().typeID(), *template_arg_info.value().expr)
+									);
 								}
 							}
-
 
 							const SourceManager::GottenBaseTypeID gotten_base_type_id = this->src_manager.getOrCreateBaseType(
 								PIR::BaseType(PIR::BaseType::Kind::Struct, ident, &this->source, template_args)
 							);
 
-							if(gotten_base_type_id.created == false){
-								base_type_id = gotten_base_type_id.id;
+							if(gotten_base_type_id.created){
+								const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, scope_struct_data->template_info.num_created, gotten_base_type_id.id);
+								scope_struct_data->template_info.num_created += 1;
 
-							}else{
-								const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, scope_struct_data.template_info.num_created, gotten_base_type_id.id);
-								scope_struct_data.template_info.num_created += 1;
-
-								ScopeManager& template_scope_manager = *scope_struct_data.template_info.scope_manager;
-
-								template_scope_manager.enter_scope(nullptr);
-
-
-									for(size_t i = 0; i < template_args.size(); i+=1){
-										const AST::TemplatePack::Template template_param = template_pack.templates[i];
-										const PIR::TemplateArg& template_arg = template_args[i];
-
-
-
-										// check in for ident redefinition
-										const Token& template_param_ident_tok = this->source.getIdent(template_param.ident);
-										const std::string_view template_param_ident = template_param_ident_tok.value.string;
-										if(template_scope_manager.has_in_scope(template_param_ident)){
-											this->already_defined(template_param_ident_tok, template_scope_manager);
-											return evo::resultError;
-										}
-
-										// add to scope
-										if(template_arg.isType){
-											template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg.typeID));
-
-										}else{
-											// check that template args match template params
-											const evo::Result<PIR::Type::VoidableID> template_param_type = this->get_type_id(template_param.typeNode, template_scope_manager);
-											if(template_param_type.isError()){ return evo::resultError; }
-											evo::debugAssert(template_param_type.value().isVoid() == false, "template arg expr is of type Void");
-
-											if(template_param_type.value().typeID() != template_arg.typeID.typeID()){
-												const PIR::Type& template_param_pir_type = this->src_manager.getType(template_param_type.value().typeID());
-												const PIR::Type& template_arg_pir_type = this->src_manager.getType(template_arg.typeID.typeID());
-
-												if(this->is_implicitly_convertable_to(
-													template_arg_pir_type, template_param_pir_type, this->source.getNode(templated_expr.templateArgs[i])
-												) == false){
-													this->source.error("Template parameter expected different type", template_base_node,
-														{
-															Message::Info(
-																std::format("In template argument: {}", i)
-															),
-															Message::Info(
-																std::format("Template parameter type: {}", this->src_manager.printType(template_param_type.value().typeID()))
-															),
-															Message::Info(
-																std::format("Template argument type:  {}", this->src_manager.printType(template_arg.typeID.typeID()))
-															),
-														}
-													);
-													return evo::resultError;
-												}
-											}
-
-											template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg.typeID, *template_arg.expr));
-										}
-									}
-
-									const bool analyze_struct_block_result = this->analyze_struct_block(
-										this->source.getStruct(struct_id), ast_struct, template_scope_manager
-									);
-									
-									if(analyze_struct_block_result == false){ return evo::resultError; }
-
-								template_scope_manager.leave_scope();
-
-								base_type_id = gotten_base_type_id.id;
+								const bool analyze_struct_block_result = this->analyze_struct_block(struct_id, ast_struct, template_scope_manager);
+								
+								if(analyze_struct_block_result == false){ return evo::resultError; }
 							}
+
+							base_type_id = gotten_base_type_id.id;
+
+							template_scope_manager.leave_scope();
 						}
 					}
 
@@ -3101,7 +3109,7 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID> {
-		const std::string_view import_path_str = this->source.getLiteral(import_path.astNode).value.string;
+		const std::string_view import_path_str = this->source.getLiteral(import_path.literal).value.string;
 		const std::filesystem::path source_file_path = this->source.getLocation();
 		const evo::Expected<Source::ID, SourceManager::GetSourceIDError> imported_source_id_result =
 			this->src_manager.getSourceID(source_file_path, import_path_str);
@@ -3261,14 +3269,14 @@ namespace panther{
 	auto SemanticAnalyzer::ScopeManager::add_func_to_scope(std::string_view str, PIR::Func::ID id) noexcept -> void {
 		ScopeManager::Scope& current_scope = this->scope_alloc[this->scopes.back()];
 
-		using FuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::iterator;
+		using FuncScopeListIter = std::unordered_map<std::string_view, std::vector<ScopeManager::Scope::FuncData>>::iterator;
 		FuncScopeListIter func_scope_list_iter = current_scope.funcs.find(str);
 		if(func_scope_list_iter != current_scope.funcs.end()){
 			// add to existing list
 			func_scope_list_iter->second.emplace_back(id);
 		}else{
 			// create new list
-			auto new_func_list = std::vector<PIR::Func::ID>{id};
+			auto new_func_list = std::vector<ScopeManager::Scope::FuncData>{ ScopeManager::Scope::FuncData(id), };
 			current_scope.funcs.emplace(str, std::move(new_func_list));
 		}
 	};
@@ -3328,8 +3336,8 @@ namespace panther{
 	};
 
 
-	auto SemanticAnalyzer::ScopeManager::is_in_func_base_scope() const noexcept -> bool {
-		return this->scope_alloc[this->scopes.back()].stmts_entry == &this->get_current_func().stmts;
+	auto SemanticAnalyzer::ScopeManager::is_in_func_base_scope(const Source& source) const noexcept -> bool {
+		return this->scope_alloc[this->scopes.back()].stmts_entry == &source.getFunc(this->get_current_func()).stmts;
 	};
 
 
@@ -3340,12 +3348,15 @@ namespace panther{
 		for(size_t scope_index : scope_manager.get_scopes()){
 			const ScopeManager::Scope& scope = this->scope_alloc[scope_index];
 
-			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<PIR::Func::ID>>::const_iterator;
+			using ConstFuncScopeListIter = std::unordered_map<std::string_view, std::vector<ScopeManager::Scope::FuncData>>::const_iterator;
 			ConstFuncScopeListIter func_scope_list_iter = scope.funcs.find(ident);
 			if(func_scope_list_iter == scope.funcs.end()){ continue; }
 
-			for(PIR::Func::ID func : func_scope_list_iter->second){
-				func_list.emplace_back(func);
+			for(ScopeManager::Scope::FuncData func_data : func_scope_list_iter->second){
+				if(func_data.is_template){
+					evo::fatalBreak("TODO");
+				}
+				func_list.emplace_back(func_data.data.func_id);
 			}
 		}
 
@@ -3490,15 +3501,15 @@ namespace panther{
 	//////////////////////////////////////////////////////////////////////
 	// type scope
 
-	auto SemanticAnalyzer::ScopeManager::enter_type_scope(TypeScope::Kind kind, PIR::Func& func) noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::enter_type_scope(TypeScope::Kind kind, PIR::Func::ID func_id) noexcept -> void {
 		evo::debugAssert(kind == TypeScope::Kind::Func, "incorrect kind for pir type");
-		this->type_scope_alloc.emplace_back(kind, &func);
+		this->type_scope_alloc.emplace_back(kind, func_id);
 		this->type_scopes.emplace_back(this->type_scope_alloc.size() - 1);
 	};
 
-	auto SemanticAnalyzer::ScopeManager::enter_type_scope(TypeScope::Kind kind, PIR::Struct& struct_decl) noexcept -> void {
+	auto SemanticAnalyzer::ScopeManager::enter_type_scope(TypeScope::Kind kind, PIR::Struct::ID struct_id) noexcept -> void {
 		evo::debugAssert(kind == TypeScope::Kind::Struct, "incorrect kind for pir type");
-		this->type_scope_alloc.emplace_back(kind, &struct_decl);
+		this->type_scope_alloc.emplace_back(kind, struct_id);
 		this->type_scopes.emplace_back(this->type_scope_alloc.size() - 1);
 	};
 
@@ -3518,14 +3529,10 @@ namespace panther{
 		return this->in_type_scope() && this->type_scope_alloc[this->type_scopes.back()].kind == TypeScope::Kind::Func;
 	};
 
-	auto SemanticAnalyzer::ScopeManager::get_current_func() noexcept -> PIR::Func& {
-		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		return *(this->type_scope_alloc[this->type_scopes.back()].func);
-	};
 
-	auto SemanticAnalyzer::ScopeManager::get_current_func() const noexcept -> const PIR::Func& {
+	auto SemanticAnalyzer::ScopeManager::get_current_func() const noexcept -> PIR::Func::ID {
 		evo::debugAssert(this->in_func_scope(), "Not in a func scope");
-		return *(this->type_scope_alloc[this->type_scopes.back()].func);
+		return this->type_scope_alloc[this->type_scopes.back()].func_id;
 	};
 
 
@@ -3534,14 +3541,9 @@ namespace panther{
 		return this->in_type_scope() && this->type_scope_alloc[this->type_scopes.back()].kind == TypeScope::Kind::Struct;
 	};
 
-	auto SemanticAnalyzer::ScopeManager::get_current_struct() noexcept -> PIR::Struct& {
+	auto SemanticAnalyzer::ScopeManager::get_current_struct() const noexcept -> PIR::Struct::ID {
 		evo::debugAssert(this->in_struct_scope(), "Not in a struct scope");
-		return *(this->type_scope_alloc[this->type_scopes.back()].struct_decl);
-	};
-
-	auto SemanticAnalyzer::ScopeManager::get_current_struct() const noexcept -> const PIR::Struct& {
-		evo::debugAssert(this->in_struct_scope(), "Not in a struct scope");
-		return *(this->type_scope_alloc[this->type_scopes.back()].struct_decl);
+		return this->type_scope_alloc[this->type_scopes.back()].struct_id;
 	};
 
 

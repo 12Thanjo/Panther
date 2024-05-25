@@ -1,17 +1,13 @@
 
-
-struct Test = <{T: Type, DEFAULT: T}> {
-	var foo: T = DEFAULT;
+func sum = <{T: Type}> (lhs: T, rhs: T) -> T {
+	return lhs + rhs;
 }
 
 
-
 func entry = () #entry -> Int {
-	var test = Test<{USize, 12}>{};
+	// var foo: Int = sum<{Int}>(2 + 3);
 
-	@__printInt(test.foo cast Int);
-	// @__printUInt(test.size cast UInt);
-
+	// @__printInt(foo);
 	
 	return 0;
 }

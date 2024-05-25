@@ -147,6 +147,7 @@ namespace panther{
 			EVO_NODISCARD static inline auto getTypeUSize() noexcept -> PIR::Type::ID { return PIR::Type::ID(6); };
 
 
+			EVO_NODISCARD auto printType(PIR::Type::VoidableID id) const noexcept -> std::string;
 			EVO_NODISCARD auto printType(PIR::Type::ID id) const noexcept -> std::string;
 
 
