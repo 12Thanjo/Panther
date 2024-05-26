@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.31.2
+- Removed the `cast` operator (merged with `as`)
+
 ### v0.31.1
 - Fixed name mangling of templated structs
 - Fixed some stores in LLVM IR incorrectly being volatile

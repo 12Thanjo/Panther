@@ -231,7 +231,7 @@ namespace panther{
 			if(var_decl.expr.has_value() == false){ return evo::Result<bool>(false); }
 
 			const ExprValueKind value_kind = scope_manager.is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager, value_kind);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(this->source.getNode(*var_decl.expr), scope_manager, value_kind);
 			if(expr_info.isError()){ return evo::Result<bool>(evo::resultError); }
 
 			if(expr_info.value().type_id.has_value() == false){ return evo::Result<bool>(false); }
@@ -320,7 +320,7 @@ namespace panther{
 			return false;
 		}
 
-		const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
+		const evo::Result<ExprInfo> expr_info = this->analyze_expr(this->source.getNode(*var_decl.expr), scope_manager);
 		if(expr_info.isError()){ return false; }
 
 		if(expr_info.value().value_type != ExprInfo::ValueType::Ephemeral && expr_info.value().value_type != ExprInfo::ValueType::Import){
@@ -443,7 +443,7 @@ namespace panther{
 			// expr
 
 			if(var_decl.expr.has_value()){
-				const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
+				const evo::Result<ExprInfo> expr_info = this->analyze_expr(this->source.getNode(*var_decl.expr), scope_manager);
 				if(expr_info.isError()){ return false; }
 
 				if(expr_info.value().type_id.has_value()){
@@ -473,7 +473,7 @@ namespace panther{
 				return false;
 			}
 
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*var_decl.expr, scope_manager);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(this->source.getNode(*var_decl.expr), scope_manager);
 			if(expr_info.isError()){ return false; }
 
 			if(expr_info.value().type_id.has_value() == false){
@@ -899,7 +899,7 @@ namespace panther{
 		///////////////////////////////////
 		// condition
 
-		const evo::Result<ExprInfo> cond_info = this->analyze_expr(sub_cond.ifExpr, scope_manager);
+		const evo::Result<ExprInfo> cond_info = this->analyze_expr(this->source.getNode(sub_cond.ifExpr), scope_manager);
 		if(cond_info.isError()){ return false; }
 
 		if(cond_info.value().type_id.has_value() == false){
@@ -1000,7 +1000,7 @@ namespace panther{
 				return false;	
 			}
 
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(*return_stmt.value, scope_manager);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(this->source.getNode(*return_stmt.value), scope_manager);
 			if(expr_info.isError()){ return false; }
 
 			if(expr_info.value().type_id.has_value() == false){
@@ -1095,7 +1095,7 @@ namespace panther{
 		///////////////////////////////////
 		// checking of lhs
 
-		const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
+		const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager);
 		if(lhs_info.isError()){ return false; }
 
 
@@ -1133,7 +1133,7 @@ namespace panther{
 		///////////////////////////////////
 		// checking of rhs
 
-		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs, scope_manager);
+		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(this->source.getNode(infix.rhs), scope_manager);
 		if(rhs_info.isError()){ return false; }
 
 		if(rhs_info.value().value_type != ExprInfo::ValueType::Ephemeral){
@@ -1183,7 +1183,7 @@ namespace panther{
 
 	auto SemanticAnalyzer::analyze_func_call(const AST::FuncCall& func_call, ScopeManager& scope_manager) noexcept -> bool {
 		// analyze and get type of ident
-		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, scope_manager, ExprValueKind::None, &func_call);
+		const evo::Result<ExprInfo> target_info = this->analyze_expr(this->source.getNode(func_call.target), scope_manager, ExprValueKind::None, &func_call);
 		if(target_info.isError()){ return false; }
 
 		evo::debugAssert(target_info.value().type_id.has_value(), "type of function call target is [uninit]");
@@ -1254,7 +1254,7 @@ namespace panther{
 
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
-						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
+						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager);
 						evo::debugAssert(lhs_info.isSuccess(), "uncaught error");
 						evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
@@ -1420,7 +1420,7 @@ namespace panther{
 			const AST::Node& arg_node = this->source.getNode(arg_id);
 
 			// check types match
-			const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, scope_manager, ExprValueKind::None);
+			const evo::Result<ExprInfo> arg_info = this->analyze_expr(this->source.getNode(arg_id), scope_manager, ExprValueKind::None);
 			if(arg_info.isError()){ return false; }
 
 			if(arg_info.value().type_id.has_value() == false){
@@ -1519,7 +1519,7 @@ namespace panther{
 		auto args = std::vector<PIR::Expr>();
 
 		for(AST::Node::ID arg_id : func_call.args){
-			const evo::Result<ExprInfo> expr_info = this->analyze_expr(arg_id, scope_manager);
+			const evo::Result<ExprInfo> expr_info = this->analyze_expr(this->source.getNode(arg_id), scope_manager);
 			if(expr_info.isError()){ return evo::resultError; }
 
 			args.emplace_back(*expr_info.value().expr);
@@ -1530,20 +1530,19 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) noexcept 
+	auto SemanticAnalyzer::analyze_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call) noexcept 
 	-> evo::Result<ExprInfo> {
-		const AST::Node& node = this->source.getNode(node_id);
 
 		switch(node.kind){
-			case AST::Kind::Prefix:      return this->analyze_prefix_expr(node_id, scope_manager, value_kind);
-			case AST::Kind::Infix:       return this->analyze_infix_expr(node_id, scope_manager, value_kind, lookup_func_call);
-			case AST::Kind::Postfix:     return this->analyze_postfix_expr(node_id, scope_manager, value_kind);
-			case AST::Kind::FuncCall:    return this->analyze_func_call_expr(node_id, scope_manager, value_kind);
-			case AST::Kind::Initializer: return this->analyze_initializer_expr(node_id, scope_manager, value_kind);
-			case AST::Kind::Ident:       return this->analyze_ident_expr(node_id, scope_manager, value_kind, lookup_func_call);
-			case AST::Kind::Literal:     return this->analyze_literal_expr(node_id, value_kind);
-			case AST::Kind::Intrinsic:   return this->analyze_intrinsic_expr(node_id, value_kind);
-			case AST::Kind::Uninit:      return this->analyze_uninit_expr(node_id, value_kind);
+			case AST::Kind::Prefix:      return this->analyze_prefix_expr(node, scope_manager, value_kind);
+			case AST::Kind::Infix:       return this->analyze_infix_expr(node, scope_manager, value_kind, lookup_func_call);
+			case AST::Kind::Postfix:     return this->analyze_postfix_expr(node, scope_manager, value_kind);
+			case AST::Kind::FuncCall:    return this->analyze_func_call_expr(node, scope_manager, value_kind);
+			case AST::Kind::Initializer: return this->analyze_initializer_expr(node, scope_manager, value_kind);
+			case AST::Kind::Ident:       return this->analyze_ident_expr(node, scope_manager, value_kind, lookup_func_call);
+			case AST::Kind::Literal:     return this->analyze_literal_expr(node, value_kind);
+			case AST::Kind::Intrinsic:   return this->analyze_intrinsic_expr(node, value_kind);
+			case AST::Kind::Uninit:      return this->analyze_uninit_expr(node, value_kind);
 
 			case AST::Kind::Type: {
 				const AST::Type& type = this->source.getType(node);
@@ -1553,7 +1552,7 @@ namespace panther{
 					return evo::resultError;
 				}
 
-				return this->analyze_expr(type.base.node, scope_manager, value_kind, lookup_func_call);
+				return this->analyze_expr(this->source.getNode(type.base.node), scope_manager, value_kind, lookup_func_call);
 			} break;
 		};
 
@@ -1563,14 +1562,13 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_prefix_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_prefix_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		auto type_id = std::optional<PIR::Type::ID>();
 		auto expr = std::optional<PIR::Expr>();
 
-		const AST::Node& node = this->source.getNode(node_id);
 		const AST::Prefix& prefix = this->source.getPrefix(node);
 
-		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(prefix.rhs, scope_manager, value_kind);
+		const evo::Result<ExprInfo> rhs_info = this->analyze_expr(this->source.getNode(prefix.rhs), scope_manager, value_kind);
 		if(rhs_info.isError()){ return evo::resultError; }
 
 
@@ -1585,7 +1583,7 @@ namespace panther{
 
 				if(value_kind != ExprValueKind::None){
 					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
-					expr = PIR::Expr(this->source.getID(), prefix_id);
+					expr = PIR::Expr(prefix_id);
 				}
 			} break;
 
@@ -1665,7 +1663,7 @@ namespace panther{
 					}
 
 					const PIR::Prefix::ID prefix_id = this->source.createPrefix(prefix.op, *rhs_info.value().expr);
-					expr = PIR::Expr(this->source.getID(), prefix_id);
+					expr = PIR::Expr(prefix_id);
 				}
 			} break;
 
@@ -1694,7 +1692,7 @@ namespace panther{
 
 				if(value_kind == ExprValueKind::Runtime){
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{*rhs_info.value().expr});
-					expr = PIR::Expr(this->source.getID(), func_call_id);
+					expr = PIR::Expr(func_call_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
 					this->source.error("At this time, constant-evaluated expressions cannot be negation ([-])", node);
@@ -1728,7 +1726,7 @@ namespace panther{
 
 				if(value_kind == ExprValueKind::Runtime){
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::vector<PIR::Expr>{*rhs_info.value().expr});
-					expr = PIR::Expr(this->source.getID(), func_call_id);
+					expr = PIR::Expr(func_call_id);
 				}else if(value_kind == ExprValueKind::ConstEval){
 					this->source.error("At this time, constant-evaluated expressions cannot be logical not ([!])", node);
 					return evo::resultError;
@@ -1748,18 +1746,17 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_infix_expr(
-		AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
+		const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
 	) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
 
-		const AST::Node& node = this->source.getNode(node_id);
 		const AST::Infix& infix = this->source.getInfix(node);
 		const Token::Kind infix_op_kind = this->source.getToken(infix.op).kind;
 
 
 		switch(infix_op_kind){
 			case Token::get("."): {
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -1815,7 +1812,7 @@ namespace panther{
 						output.type_id = imported_var.type;
 
 						if(value_kind == ExprValueKind::Runtime){
-							output.expr = PIR::Expr(this->source.getID(), imported_var_id);
+							output.expr = PIR::Expr(imported_var_id);
 						}else if(value_kind == ExprValueKind::ConstEval){
 							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
 							return evo::resultError;
@@ -1828,7 +1825,7 @@ namespace panther{
 
 						if(value_kind == ExprValueKind::Runtime){
 							const Source::ID imported_source_id = import_source.pir.pub_imports.at(rhs_ident.value.string);
-							output.expr = PIR::Expr(this->source.getID(), imported_source_id);
+							output.expr = PIR::Expr(imported_source_id);
 						}else if(value_kind == ExprValueKind::ConstEval){
 							this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
 							return evo::resultError;
@@ -1859,7 +1856,7 @@ namespace panther{
 								const PIR::Accessor::ID accessor_id = this->source.createAccessor(
 									*lhs_info.value().expr, *lhs_info.value().type_id, rhs_ident.value.string
 								);
-								output.expr = PIR::Expr(this->source.getID(), accessor_id);
+								output.expr = PIR::Expr(accessor_id);
 							}else if(value_kind == ExprValueKind::ConstEval){
 								this->source.error("At this time, constant-evaluated expressions cannot be accessor ([.])", node);
 								return evo::resultError;
@@ -1890,7 +1887,7 @@ namespace panther{
 				///////////////////////////////////
 				// lhs
 
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager, value_kind);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager, value_kind);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -1951,7 +1948,7 @@ namespace panther{
 				///////////////////////////////////
 				// rhs
 
-				const evo::Result<ExprInfo> rhs_info = this->analyze_expr(infix.rhs, scope_manager, value_kind);
+				const evo::Result<ExprInfo> rhs_info = this->analyze_expr(this->source.getNode(infix.rhs), scope_manager, value_kind);
 				if(rhs_info.isError()){ return evo::resultError; }
 
 				if(rhs_info.value().type_id.has_value() == false){
@@ -2031,7 +2028,7 @@ namespace panther{
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(
 							intrinsic_id, std::vector<PIR::Expr>{*lhs_info.value().expr, *rhs_info.value().expr}
 						);
-						output.expr = PIR::Expr(this->source.getID(), func_call_id);
+						output.expr = PIR::Expr(func_call_id);
 					}else if(value_kind == ExprValueKind::ConstEval){
 						this->source.error(std::format("At this time, constant-evaluated expressions cannot be [{}]", Token::printKind(infix_op_kind)), node);
 						return evo::resultError;
@@ -2047,13 +2044,13 @@ namespace panther{
 			} break;
 
 
-			case Token::KeywordAs: case Token::KeywordCast: {
+			case Token::KeywordAs: {
 				output.value_type = ExprInfo::ValueType::Ephemeral;
 
 				///////////////////////////////////
 				// lhs
 
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager, value_kind);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager, value_kind);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -2087,14 +2084,7 @@ namespace panther{
 				evo::debugAssert(lhs_base_type.kind != PIR::BaseType::Kind::Function, "should have been caught already");
 
 
-				const std::vector<PIR::BaseType::OverloadedOperator>& op_list = [&]() noexcept {
-					switch(infix_op_kind){
-						case Token::KeywordAs:   return lhs_base_type.ops.as;
-						case Token::KeywordCast: return lhs_base_type.ops.cast;
-					};
-
-					evo::debugFatalBreak("invalid op for this infix case");
-				}();
+				const std::vector<PIR::BaseType::OverloadedOperator>& op_list = lhs_base_type.ops.as;
 
 				for(const PIR::BaseType::OverloadedOperator& op : op_list){
 					if(lhs_base_type.kind == PIR::BaseType::Kind::Builtin){
@@ -2107,7 +2097,7 @@ namespace panther{
 							if(value_kind == ExprValueKind::Runtime){
 								const PIR::FuncCall::ID func_call_id = 
 									this->source.createFuncCall(op.intrinsic, std::vector<PIR::Expr>{*lhs_info.value().expr});
-								output.expr = PIR::Expr(this->source.getID(), func_call_id);
+								output.expr = PIR::Expr(func_call_id);
 							}
 
 							break;
@@ -2122,7 +2112,7 @@ namespace panther{
 				if(output.type_id.has_value() == false){
 					// TODO: better messaging
 					this->source.error(
-						std::format("This type does not have a valid [{}] operator to that type", Token::printKind(infix_op_kind)), infix.rhs,
+						"This type does not have a valid [as] operator to that type", infix.rhs,
 						std::vector<Message::Info>{
 							Message::Info(std::format("From: {}", this->src_manager.printType(*lhs_info.value().type_id))),
 							Message::Info(std::format("To:   {}", this->src_manager.printType(rhs_type_id.value().typeID())))
@@ -2143,10 +2133,9 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_postfix_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_postfix_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
 
-		const AST::Node& node = this->source.getNode(node_id);
 		const AST::Postfix& postfix = this->source.getPostfix(node);
 
 
@@ -2171,7 +2160,7 @@ namespace panther{
 
 
 				// get type of lhs
-				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(postfix.lhs, scope_manager, value_kind);
+				const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(postfix.lhs), scope_manager, value_kind);
 				if(lhs_info.isError()){ return evo::resultError; }
 
 				if(lhs_info.value().type_id.has_value() == false){
@@ -2209,7 +2198,7 @@ namespace panther{
 					const PIR::Type::ID deref_type_id = this->src_manager.getOrCreateTypeID(lhs_type_copy).id;
 
 					const PIR::Deref::ID deref_id = this->source.createDeref(*lhs_info.value().expr, deref_type_id);
-					output.expr = PIR::Expr(this->source.getID(), deref_id);
+					output.expr = PIR::Expr(deref_id);
 				}
 			} break;
 
@@ -2225,12 +2214,11 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_func_call_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
-		const AST::Node& node = this->source.getNode(node_id);
+	auto SemanticAnalyzer::analyze_func_call_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		const AST::FuncCall& func_call = this->source.getFuncCall(node);
 
 		// get target type
-		const evo::Result<ExprInfo> target_info = this->analyze_expr(func_call.target, scope_manager, ExprValueKind::None, &func_call);
+		const evo::Result<ExprInfo> target_info = this->analyze_expr(this->source.getNode(func_call.target), scope_manager, ExprValueKind::None, &func_call);
 		if(target_info.isError()){ return evo::resultError; }
 
 		// check function call / arguments
@@ -2264,7 +2252,7 @@ namespace panther{
 
 
 				const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(func_id.value(), std::move(args.value()));
-				expr = PIR::Expr(this->source.getID(), func_call_id);
+				expr = PIR::Expr(func_call_id);
 			}
 
 		}else if(target_node.kind == AST::Kind::Intrinsic){
@@ -2293,7 +2281,7 @@ namespace panther{
 				const evo::Result<Source::ID> import_source_id = this->get_import_source_id(args.value()[0], func_call.target);
 				if(import_source_id.isError()){ return evo::resultError; }
 
-				expr = PIR::Expr(this->source.getID(), import_source_id.value());
+				expr = PIR::Expr(import_source_id.value());
 
 			}else{
 				if(value_kind == ExprValueKind::Runtime){
@@ -2302,7 +2290,7 @@ namespace panther{
 
 					// function calls normally
 					const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(intrinsic_id, std::move(args.value()));	
-					expr = PIR::Expr(this->source.getID(), func_call_id);
+					expr = PIR::Expr(func_call_id);
 				}
 			}
 
@@ -2316,7 +2304,7 @@ namespace panther{
 
 				switch(this->source.getToken(infix.op).kind){
 					case Token::get("."): {
-						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager);
+						const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager);
 						if(lhs_info.isError()){ return evo::resultError; }
 						evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
@@ -2332,7 +2320,7 @@ namespace panther{
 						
 						// create object
 						const PIR::FuncCall::ID func_call_id = this->source.createFuncCall(imported_func_id.value(), std::move(args.value()));
-						expr = PIR::Expr(this->source.getID(), func_call_id);
+						expr = PIR::Expr(func_call_id);
 					} break;
 
 				};
@@ -2356,8 +2344,7 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_initializer_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
-		const AST::Node& node = this->source.getNode(node_id);
+	auto SemanticAnalyzer::analyze_initializer_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo> {
 		const AST::Initializer& initializer = this->source.getInitializer(node);
 
 		const evo::Result<PIR::Type::VoidableID> initializer_type_id = this->get_type_id(initializer.type, scope_manager);
@@ -2397,7 +2384,7 @@ namespace panther{
 					const AST::Node& member_val_node = this->source.getNode(member_val.value);
 					if(member_val_node.kind == AST::Kind::Uninit){ break; }
 
-					const evo::Result<ExprInfo> member_val_info = this->analyze_expr(member_val.value, scope_manager, ExprValueKind::None);
+					const evo::Result<ExprInfo> member_val_info = this->analyze_expr(this->source.getNode(member_val.value), scope_manager, ExprValueKind::None);
 					if(member_val_info.isError()){ return evo::resultError; }
 
 
@@ -2454,7 +2441,7 @@ namespace panther{
 
 						if(this->source.getNode(member_val.value).kind == AST::Kind::Uninit){ break; }
 
-						const evo::Result<ExprInfo> member_val_expr_info = this->analyze_expr(member_val.value, scope_manager);
+						const evo::Result<ExprInfo> member_val_expr_info = this->analyze_expr(this->source.getNode(member_val.value), scope_manager);
 						if(member_val_expr_info.isError()){ return evo::resultError; }
 
 						member_values[i] = *member_val_expr_info.value().expr;
@@ -2476,7 +2463,7 @@ namespace panther{
 				}
 			}
 
-			expr = PIR::Expr(this->source.getID(), this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
+			expr = PIR::Expr(this->source.createInitializer(initializer_type_id.value().typeID(), std::move(member_values)));
 		}
 
 
@@ -2492,11 +2479,10 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::analyze_ident_expr(
-		AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
+		const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
 	) noexcept -> evo::Result<ExprInfo> {
 		auto output = ExprInfo{};
 
-		const AST::Node& node = this->source.getNode(node_id);
 		const Token& ident = this->source.getIdent(node);
 		std::string_view ident_str = ident.value.string;
 
@@ -2519,7 +2505,7 @@ namespace panther{
 
 				// get expr
 				if(value_kind == ExprValueKind::Runtime){
-					output.expr = PIR::Expr(this->source.getID(), var_id);
+					output.expr = PIR::Expr(var_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
 					if(scope_manager.is_global_scope() == false){
@@ -2572,7 +2558,7 @@ namespace panther{
 
 				// get expr
 				if(value_kind == ExprValueKind::Runtime){
-					output.expr = PIR::Expr(this->source.getID(), param_id);
+					output.expr = PIR::Expr(param_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
 					this->source.error("Constant-evaluated expressions cannot be the value of a parameter", node);
@@ -2590,7 +2576,7 @@ namespace panther{
 
 				// get expr
 				const Source::ID import_source_id = scope.imports.at(ident_str).source_id;
-				output.expr = PIR::Expr(this->source.getID(), import_source_id);
+				output.expr = PIR::Expr(import_source_id);
 
 				break;
 
@@ -2625,15 +2611,15 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_literal_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
-		const Token& literal_value = this->source.getLiteral(node_id);
+	auto SemanticAnalyzer::analyze_literal_expr(const AST::Node& node, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+		const Token& literal_value = this->source.getLiteral(node);
 
 		if(literal_value.kind == Token::LiteralFloat){
-			this->source.error("Literal floats are not supported yet", node_id);
+			this->source.error("Literal floats are not supported yet", node);
 			return evo::resultError;
 		}
 		if(literal_value.kind == Token::LiteralChar){
-			this->source.error("Literal chars are not supported yet", node_id);
+			this->source.error("Literal chars are not supported yet", node);
 			return evo::resultError;
 		}
 
@@ -2654,7 +2640,11 @@ namespace panther{
 
 		auto expr = std::optional<PIR::Expr>();
 		if(value_kind != ExprValueKind::None){
-			expr = PIR::Expr(this->source.getID(), node_id);
+			switch(literal_value.kind){
+				break; case Token::LiteralInt: expr = PIR::Expr(literal_value.value.integer);
+				break; case Token::LiteralBool: expr = PIR::Expr(literal_value.value.boolean);
+				break; case Token::LiteralString: expr = PIR::Expr(literal_value.value.string);
+			};
 		}
 
 		return ExprInfo{
@@ -2668,12 +2658,11 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_intrinsic_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_intrinsic_expr(const AST::Node& node, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
 		evo::debugAssert(value_kind == ExprValueKind::None, "getting value of intrinsic is unsupported at the moment");
 
 		auto type_id = std::optional<PIR::Type::ID>();
 
-		const AST::Node& node = this->source.getNode(node_id);
 		const Token& intrinsic_tok = this->source.getIntrinsic(node);
 
 		for(const PIR::Intrinsic& intrinsic : this->src_manager.getIntrinsics()){
@@ -2694,14 +2683,14 @@ namespace panther{
 
 
 
-	auto SemanticAnalyzer::analyze_uninit_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
+	auto SemanticAnalyzer::analyze_uninit_expr(const AST::Node& node, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo> {
 		auto expr = std::optional<PIR::Expr>();
 
 		if(value_kind == ExprValueKind::Runtime){
-			expr = PIR::Expr::Uninit(this->source.getID());
+			expr = PIR::Expr::Uninit();
 
 		}else if(value_kind == ExprValueKind::ConstEval){
-			this->source.error("Constant-evaluated expressions cannot be [uninit]", node_id);
+			this->source.error("Constant-evaluated expressions cannot be [uninit]", node);
 			return evo::resultError;
 		}
 
@@ -2846,7 +2835,7 @@ namespace panther{
 					}
 
 					const ExprValueKind value_kind = scope_manager.is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
-					const evo::Result<ExprInfo> lhs_info = this->analyze_expr(infix.lhs, scope_manager, value_kind); 
+					const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager, value_kind); 
 					if(lhs_info.isError()){ return evo::resultError; }
 					evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
 
@@ -2966,7 +2955,9 @@ namespace panther{
 									}
 
 									// get template arg type info
-									const evo::Result<ExprInfo> template_arg_info = this->analyze_expr(template_arg_node_id, template_scope_manager, ExprValueKind::ConstEval);
+									const evo::Result<ExprInfo> template_arg_info = this->analyze_expr(
+										this->source.getNode(template_arg_node_id), template_scope_manager, ExprValueKind::ConstEval
+									);
 									if(template_arg_info.isError()){ return evo::resultError; }
 									if(template_arg_info.value().type_id.has_value() == false){
 										this->source.error("Template parameter cannot be [uninit]", template_param.typeNode);
@@ -3420,7 +3411,7 @@ namespace panther{
 				const AST::Node& arg_node = this->source.getNode(arg_id);
 
 				// check types match
-				const evo::Result<ExprInfo> arg_info = this->analyze_expr(arg_id, scope_manager, ExprValueKind::None);
+				const evo::Result<ExprInfo> arg_info = this->analyze_expr(this->source.getNode(arg_id), scope_manager, ExprValueKind::None);
 				if(arg_info.isError()){ return evo::resultError; }
 
 

@@ -1,13 +1,10 @@
 
-func sum = <{T: Type}> (lhs: T, rhs: T) -> T {
+func sum = (lhs: Int, rhs: Int) -> Int {
 	return lhs + rhs;
 }
 
 
 func entry = () #entry -> Int {
-	// var foo: Int = sum<{Int}>(2 + 3);
-
-	// @__printInt(foo);
 	
-	return 0;
+	return sum(12, 19 as Bool as Int);
 }

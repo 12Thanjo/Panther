@@ -58,8 +58,6 @@ namespace panther{
 		};
 
 
-
-
 		///////////////////////////////////
 		// expressions
 
@@ -67,9 +65,9 @@ namespace panther{
 		struct Expr{
 			enum class Kind{
 				None,
+
 				Var,
 				Param,
-				Literal,
 				Uninit,
 				FuncCall,
 				Initializer,
@@ -77,10 +75,17 @@ namespace panther{
 				Deref,
 				Accessor,
 				Import,
+
+				LiteralBool,
+				LiteralInt,
+				LiteralFloat,
+				LiteralChar,
+				LiteralString,
 			} kind;
 
 			union {
 				evo::byte dummy;
+
 				VarID var;
 				ParamID param;
 				AST::Node::ID literal;
@@ -90,23 +95,35 @@ namespace panther{
 				DerefID deref;
 				AccessorID accessor;
 				SourceID import;
+
+				bool boolean;
+				uint64_t integer;
+				float64_t floatingPoint;
+				char character;
+				std::string_view string;
 			};
 
-			SourceID src_id;
 
-			explicit Expr(SourceID _src_id)                      noexcept : kind(Kind::None),        dummy(0),                    src_id(_src_id) {};
-			Expr(SourceID _src_id, VarID id)                     noexcept : kind(Kind::Var),         var(id),                     src_id(_src_id) {};
-			Expr(SourceID _src_id, ParamID id)                   noexcept : kind(Kind::Param),       param(id),                   src_id(_src_id) {};
-			Expr(SourceID _src_id, AST::Node::ID node)           noexcept : kind(Kind::Literal),     literal(node),               src_id(_src_id) {};
-			Expr(SourceID _src_id, FuncCallID func_call_id)      noexcept : kind(Kind::FuncCall),    funcCall(func_call_id),      src_id(_src_id) {};
-			Expr(SourceID _src_id, InitializerID initializer_id) noexcept : kind(Kind::Initializer), initializer(initializer_id), src_id(_src_id) {};
-			Expr(SourceID _src_id, PrefixID prefix_id)           noexcept : kind(Kind::Prefix),      prefix(prefix_id),           src_id(_src_id) {};
-			Expr(SourceID _src_id, DerefID deref_id)             noexcept : kind(Kind::Deref),       deref(deref_id),             src_id(_src_id) {};
-			Expr(SourceID _src_id, AccessorID accessor_id)       noexcept : kind(Kind::Accessor),    accessor(accessor_id),       src_id(_src_id) {};
-			Expr(SourceID _src_id, SourceID import_id)           noexcept : kind(Kind::Import),      import(import_id),           src_id(_src_id) {};
+			explicit Expr()                             noexcept : kind(Kind::None),          dummy(0)                    {};
 
-			EVO_NODISCARD static auto Uninit(SourceID _src_id) noexcept -> Expr {
-				return Expr(Kind::Uninit, _src_id);
+			explicit Expr(VarID id)                     noexcept : kind(Kind::Var),           var(id)                     {};
+			explicit Expr(ParamID id)                   noexcept : kind(Kind::Param),         param(id)                   {};
+			explicit Expr(FuncCallID func_call_id)      noexcept : kind(Kind::FuncCall),      funcCall(func_call_id)      {};
+			explicit Expr(InitializerID initializer_id) noexcept : kind(Kind::Initializer),   initializer(initializer_id) {};
+			explicit Expr(PrefixID prefix_id)           noexcept : kind(Kind::Prefix),        prefix(prefix_id)           {};
+			explicit Expr(DerefID deref_id)             noexcept : kind(Kind::Deref),         deref(deref_id)             {};
+			explicit Expr(AccessorID accessor_id)       noexcept : kind(Kind::Accessor),      accessor(accessor_id)       {};
+			explicit Expr(SourceID import_id)           noexcept : kind(Kind::Import),        import(import_id)           {};
+
+			explicit Expr(bool literal)                 noexcept : kind(Kind::LiteralBool),   boolean(literal)            {};
+			explicit Expr(uint64_t literal)             noexcept : kind(Kind::LiteralInt),    integer(literal)            {};
+			explicit Expr(float64_t literal)            noexcept : kind(Kind::LiteralFloat),  floatingPoint(literal)      {};
+			explicit Expr(char literal)                 noexcept : kind(Kind::LiteralChar),   character(literal)          {};
+			explicit Expr(std::string_view literal)     noexcept : kind(Kind::LiteralString), string(literal)             {};
+
+
+			EVO_NODISCARD static auto Uninit() noexcept -> Expr {
+				return Expr(Kind::Uninit);
 			};
 
 
@@ -117,12 +134,11 @@ namespace panther{
 			};
 
 
-			// EVO_NODISCARD auto operator==(const Expr& rhs) const noexcept -> bool;
-			EVO_NODISCARD auto equals(const Expr& rhs, const SourceManager& src_manager) const noexcept -> bool;
+			EVO_NODISCARD auto operator==(const Expr& rhs) const noexcept -> bool;
 
 
 			private:
-				Expr(Kind _kind, SourceID _src_id) : kind(_kind), dummy(0), src_id(_src_id) {};
+				Expr(Kind _kind) noexcept: kind(_kind), dummy(0) {};
 		};
 
 
@@ -190,7 +206,7 @@ namespace panther{
 			TemplateArg(TypeVoidableID type_id)             noexcept : isType(true),  typeID(type_id), expr(std::nullopt) {};
 			TemplateArg(TypeVoidableID type_id, Expr _expr) noexcept : isType(false), typeID(type_id), expr(_expr)        {};
 
-			EVO_NODISCARD auto equals(const TemplateArg& rhs, const SourceManager& src_manager) const noexcept -> bool;
+			EVO_NODISCARD auto operator==(const TemplateArg& rhs) const noexcept -> bool;
 		};
 
 
@@ -298,7 +314,7 @@ namespace panther{
 
 				EVO_NODISCARD auto operator==(Token::Kind tok_kind) const noexcept -> bool;
 
-				EVO_NODISCARD auto equals(const BaseType& rhs, const SourceManager& src_manager) const noexcept -> bool;
+				EVO_NODISCARD auto operator==(const BaseType& rhs) const noexcept -> bool;
 
 
 			public:
@@ -331,7 +347,6 @@ namespace panther{
 					std::vector<OverloadedOperator> logicalOr{};
 
 					std::vector<OverloadedOperator> as{};
-					std::vector<OverloadedOperator> cast{};
 				} ops;
 		};
 

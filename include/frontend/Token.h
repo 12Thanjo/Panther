@@ -78,7 +78,7 @@ namespace panther{
 			KeywordAlias,
 
 			KeywordAs,
-			KeywordCast,
+			// KeywordCast,
 
 
 			///////////////////////////////////
@@ -331,7 +331,7 @@ namespace panther{
 				break; case Kind::KeywordAlias:       return "alias";
 
 				break; case Kind::KeywordAs:          return "as";
-				break; case Kind::KeywordCast:        return "cast";
+				// break; case Kind::KeywordCast:        return "cast";
 
 
 				///////////////////////////////////

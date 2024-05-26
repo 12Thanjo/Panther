@@ -731,7 +731,7 @@ namespace panther{
 				this->info("rhs:\n");
 				this->indenter_push();
 					this->indenter_set_end();
-					if(op_kind == Token::KeywordAs || op_kind == Token::KeywordCast){
+					if(op_kind == Token::KeywordAs){
 						this->print_type(this->ast_source->getNode(infix.rhs));
 					}else{
 						this->print_expr(this->ast_source->getNode(infix.rhs));
@@ -988,7 +988,7 @@ namespace panther{
 						this->info("RHS:\n");
 						this->indenter_push();
 							this->indenter_set_end();
-							if(op_kind == Token::KeywordAs || op_kind == Token::KeywordCast){
+							if(op_kind == Token::KeywordAs){
 								this->indenter_print();
 								this->print_type(this->ast_source->getNode(infix.rhs));
 							}else{

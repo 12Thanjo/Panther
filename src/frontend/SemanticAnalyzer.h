@@ -85,22 +85,22 @@ namespace panther{
 
 			// note: lookup_func_call is only used when looking up a function overload
 			EVO_NODISCARD auto analyze_expr(
-				AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind = ExprValueKind::Runtime, const AST::FuncCall* lookup_func_call = nullptr
+				const AST::Node& node_id, ScopeManager& scope_manager, ExprValueKind value_kind = ExprValueKind::Runtime, const AST::FuncCall* lookup_func_call = nullptr
 			) noexcept -> evo::Result<ExprInfo>;
 
-			EVO_NODISCARD auto analyze_prefix_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_prefix_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
 			EVO_NODISCARD auto analyze_infix_expr(
-				AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
+				const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
 			) noexcept -> evo::Result<ExprInfo>;
-			EVO_NODISCARD auto analyze_postfix_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
-			EVO_NODISCARD auto analyze_func_call_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
-			EVO_NODISCARD auto analyze_initializer_expr(AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_postfix_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_func_call_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_initializer_expr(const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind) noexcept -> evo::Result<ExprInfo>;
 			EVO_NODISCARD auto analyze_ident_expr(
-				AST::Node::ID node_id, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
+				const AST::Node& node, ScopeManager& scope_manager, ExprValueKind value_kind, const AST::FuncCall* lookup_func_call
 			) noexcept -> evo::Result<ExprInfo>;
-			EVO_NODISCARD auto analyze_literal_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
-			EVO_NODISCARD auto analyze_intrinsic_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
-			EVO_NODISCARD auto analyze_uninit_expr(AST::Node::ID node_id, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_literal_expr(const AST::Node& node, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_intrinsic_expr(const AST::Node& node, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
+			EVO_NODISCARD auto analyze_uninit_expr(const AST::Node& node, ExprValueKind value_kind) const noexcept -> evo::Result<ExprInfo>;
 
 
 

@@ -697,7 +697,6 @@ namespace panther{
 			case Token::get("/"):    return 6;
 
 			case Token::KeywordAs:	 return 7;
-			case Token::KeywordCast: return 7;
 		};
 
 		return -1;
@@ -719,7 +718,7 @@ namespace panther{
 		this->skip(1);
 
 		const Result rhs_result = [&]() noexcept {
-			if(peeked_kind == Token::KeywordAs || peeked_kind == Token::KeywordCast){
+			if(peeked_kind == Token::KeywordAs){
 				return this->parse_type();
 			}
 

@@ -566,30 +566,30 @@ namespace panther{
 		///////////////////////////////////
 		// casting
 
-		type_Int.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToUInt));
-		type_Int.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToBool));
-		type_Int.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToISize));
-		type_Int.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToUSize));
+		type_Int.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToUInt));
+		type_Int.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToBool));
+		type_Int.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToISize));
+		type_Int.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convIntToUSize));
 
-		type_UInt.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToInt));
-		type_UInt.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToBool));
-		type_UInt.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToISize));
-		type_UInt.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToUSize));
+		type_UInt.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToInt));
+		type_UInt.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToBool));
+		type_UInt.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToISize));
+		type_UInt.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUIntToUSize));
 
 		type_Bool.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convBoolToInt));
 		type_Bool.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convBoolToUInt));
 		type_Bool.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convBoolToISize));
 		type_Bool.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convBoolToUSize));
 
-		type_ISize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToInt));
-		type_ISize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToUInt));
-		type_ISize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToBool));
-		type_ISize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToUSize));
+		type_ISize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToInt));
+		type_ISize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToUInt));
+		type_ISize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToBool));
+		type_ISize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convISizeToUSize));
 
-		type_USize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToInt));
-		type_USize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToUInt));
-		type_USize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToBool));
-		type_USize.ops.cast.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToISize));
+		type_USize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToInt));
+		type_USize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToUInt));
+		type_USize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToBool));
+		type_USize.ops.as.emplace_back(this->getIntrinsicID(PIR::Intrinsic::Kind::convUSizeToISize));
 	};
 
 
@@ -651,7 +651,7 @@ namespace panther{
 
 	auto SourceManager::getOrCreateBaseType(PIR::BaseType&& base_type) noexcept -> GottenBaseTypeID {
 		for(size_t i = 0; i < this->base_types.size(); i+=1){
-			if(base_type.equals(this->base_types[i], *this)){
+			if(base_type == this->base_types[i]){
 				return GottenBaseTypeID(PIR::BaseType::ID(uint32_t(i)), false);
 			}
 		}
@@ -759,28 +759,11 @@ namespace panther{
 								name += printType(template_arg.typeID);
 							}else{
 								switch(template_arg.expr->kind){
-									case PIR::Expr::Kind::Literal: {
-										const Source& source = this->getSource(template_arg.expr->src_id);
-										const Token& token = source.getLiteral(template_arg.expr->literal);
-
-										switch(token.kind){
-											case Token::LiteralBool: {
-												name += std::to_string(token.value.boolean);
-											} break;
-											case Token::LiteralInt: {
-												name += std::to_string(token.value.integer);
-											} break;
-											case Token::LiteralFloat: {
-												name += std::to_string(token.value.floatingPoint);
-											} break;
-											case Token::LiteralChar: {
-												name += std::format("\'{}\'", token.value.string);
-											} break;
-											case Token::LiteralString: {
-												name += std::format("\"{}\"", token.value.string);
-											} break;
-										};
-									} break;
+									break; case PIR::Expr::Kind::LiteralBool:   name += evo::boolStr(template_arg.expr->boolean);
+									break; case PIR::Expr::Kind::LiteralInt:    name += std::to_string(template_arg.expr->integer);
+									break; case PIR::Expr::Kind::LiteralFloat:  name += std::to_string(template_arg.expr->floatingPoint);
+									break; case PIR::Expr::Kind::LiteralChar:   name += std::format("\'{}\'", template_arg.expr->string);
+									break; case PIR::Expr::Kind::LiteralString: name += std::format("\"{}\"", template_arg.expr->string);
 
 									default: {
 										name += "`" + printType(template_arg.typeID) + "`";

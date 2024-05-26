@@ -623,22 +623,14 @@ namespace panther{
 
 
 
-			EVO_NODISCARD inline auto get_const_value(PIR::Expr value) noexcept -> llvm::Constant* {
+			EVO_NODISCARD inline auto get_const_value(const PIR::Expr& value) noexcept -> llvm::Constant* {
 				switch(value.kind){
-					case PIR::Expr::Kind::Literal: {
-						const Token& token = this->source->getLiteral(value.literal);
+					case PIR::Expr::Kind::LiteralBool: {
+						return llvmint::ptrcast<llvm::Constant>(this->builder->valueUI64(value.boolean));
+					} break;
 
-						switch(token.kind){
-							case Token::LiteralInt: {
-								return llvmint::ptrcast<llvm::Constant>(this->builder->valueUI64(token.value.integer));
-							} break;
-
-							case Token::LiteralBool: {
-								return llvmint::ptrcast<llvm::Constant>(this->builder->valueBool(token.value.boolean));
-							} break;
-
-							default: evo::debugFatalBreak("Invalid literal value kind");
-						};
+					case PIR::Expr::Kind::LiteralInt: {
+						return llvmint::ptrcast<llvm::Constant>(this->builder->valueUI64(value.integer));
 					} break;
 
 
@@ -667,29 +659,15 @@ namespace panther{
 			};
 
 
-			EVO_NODISCARD inline auto get_value(PIR::Expr value, bool get_pointer_to_value = false) noexcept -> llvm::Value* {
+			EVO_NODISCARD inline auto get_value(const PIR::Expr& value, bool get_pointer_to_value = false) noexcept -> llvm::Value* {
 				switch(value.kind){
-					case PIR::Expr::Kind::Literal: {
 
-						llvm::Value* temporary = nullptr;
-						llvm::Type* temporary_type = nullptr;
-
-						const Token& token = this->source->getLiteral(value.literal);
-
-						switch(token.kind){
-							case Token::LiteralInt: {
-								temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(token.value.integer));
-								temporary_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeInt());
-							} break;
-
-							case Token::LiteralBool: {
-								temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueBool(token.value.boolean));
-								temporary_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
-							} break;
-						};
+					case PIR::Expr::Kind::LiteralBool: {
+						llvm::Value* temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueBool(value.boolean));
 
 						if(get_pointer_to_value){
-							llvm::AllocaInst* temporary_storage = this->builder->createAlloca(temporary_type, "temp_storage");
+							llvm::Type* llvm_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeBool());
+							llvm::AllocaInst* temporary_storage = this->builder->createAlloca(llvm_type, "temp_storage");
 							this->builder->createStore(temporary_storage, temporary);
 
 							return llvmint::ptrcast<llvm::Value>(temporary_storage);
@@ -697,6 +675,21 @@ namespace panther{
 							return temporary;
 						}
 					} break;
+
+					case PIR::Expr::Kind::LiteralInt: {
+						llvm::Value* temporary = llvmint::ptrcast<llvm::Value>(this->builder->valueUI64(value.integer));
+
+						if(get_pointer_to_value){
+							llvm::Type* llvm_type = llvmint::ptrcast<llvm::Type>(this->builder->getTypeInt());
+							llvm::AllocaInst* temporary_storage = this->builder->createAlloca(llvm_type, "temp_storage");
+							this->builder->createStore(temporary_storage, temporary);
+
+							return llvmint::ptrcast<llvm::Value>(temporary_storage);
+						}else{
+							return temporary;
+						}
+					} break;
+
 
 					case PIR::Expr::Kind::Uninit: {
 						evo::debugFatalBreak("Cannot get value of PIR::Expr::Kind::Uninit");
