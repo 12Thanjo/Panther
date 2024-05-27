@@ -1,10 +1,20 @@
+// def test2 = @import("test2.pthr");
 
-func sum = (lhs: Int, rhs: Int) -> Int {
-	return lhs + rhs;
+struct TemplBase = <{T: Type, DEFAULT: T}> {
+	var foo: T = DEFAULT;
+}
+
+struct Templ = <{T: Type, DEFAULT: T}> {
+	var base = TemplBase<{T, DEFAULT}>{};
 }
 
 
+
 func entry = () #entry -> Int {
+	// var vec2 = test2.Vec2<{Int, 12}>{};
+	var templ = Templ<{Int, 12}>{};
+	var templ2 = Templ<{UInt, 14}>{};
+
 	
-	return sum(12, 19 as Bool as Int);
+	return templ.base.foo + templ2.base.foo as Int;
 }

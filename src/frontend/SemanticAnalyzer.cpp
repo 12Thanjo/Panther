@@ -422,7 +422,7 @@ namespace panther{
 
 
 		auto type_id = std::optional<PIR::Type::ID>();
-		auto default_value = PIR::Expr(this->source.getID());
+		auto default_value = PIR::Expr();
 
 		if(var_decl.type.has_value()){
 			///////////////////////////////////
@@ -836,7 +836,7 @@ namespace panther{
 
 		if(struct_decl.templatePack.has_value()){
 			ScopeManager& new_scope_manager = *this->scope_managers.emplace_back(std::make_unique<ScopeManager>(scope_manager));
-			scope_manager.add_struct_to_scope(ident.value.string, ScopeManager::Scope::StructData(struct_decl, new_scope_manager));
+			scope_manager.add_struct_to_scope(ident.value.string, ScopeManager::Scope::StructData(struct_decl, new_scope_manager, is_pub));
 			return true;
 		}
 
@@ -990,7 +990,7 @@ namespace panther{
 
 		const PIR::Type::VoidableID func_return_type_id = this->source.getFunc(scope_manager.get_current_func()).returnType;
 
-		auto return_value = PIR::Expr(this->source.getID());
+		auto return_value = PIR::Expr();
 
 		if(return_stmt.value.has_value()){
 			// "return expr;"
@@ -2430,7 +2430,7 @@ namespace panther{
 		auto expr = std::optional<PIR::Expr>();
 		if(value_kind == ExprValueKind::Runtime){
 			// get member values
-			auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr(this->source.getID()));
+			auto member_values = std::vector<PIR::Expr>(struct_data.memberVars.size(), PIR::Expr());
 			auto members_set = std::vector<bool>(struct_data.memberVars.size(), false);
 			for(const AST::Initializer::Member& member_val : initializer.members){
 				const std::string_view member_ident = this->source.getIdent(member_val.ident).value.string;
@@ -2508,11 +2508,6 @@ namespace panther{
 					output.expr = PIR::Expr(var_id);
 
 				}else if(value_kind == ExprValueKind::ConstEval){
-					if(scope_manager.is_global_scope() == false){
-						this->source.error("Constant-evaluated expressions cannot be the value of a local variable", node);
-						return evo::resultError;						
-					}
-
 					this->source.error("At this time, constant-evaluated expressions cannot be the value of a variable", node);
 					return evo::resultError;
 				}
@@ -2600,7 +2595,6 @@ namespace panther{
 
 		if(output.type_id.has_value() == false){
 			this->source.error(std::format("Identifier \"{}\" does not exist", ident_str), ident);
-			evo::breakpoint();
 			return evo::resultError;
 		}
 
@@ -2834,10 +2828,11 @@ namespace panther{
 						return evo::resultError;
 					}
 
+					// TODO: make this just consteval?
 					const ExprValueKind value_kind = scope_manager.is_global_scope() ? ExprValueKind::ConstEval : ExprValueKind::Runtime;
 					const evo::Result<ExprInfo> lhs_info = this->analyze_expr(this->source.getNode(infix.lhs), scope_manager, value_kind); 
 					if(lhs_info.isError()){ return evo::resultError; }
-					evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "incorrect expr kind gotten");
+					evo::debugAssert(lhs_info.value().expr->kind == PIR::Expr::Kind::Import, "expected expression to be an import");
 
 					const Source& import_source = this->src_manager.getSource(lhs_info.value().expr->import);
 					const Token& rhs_ident = this->source.getIdent(infix.rhs);
@@ -2875,147 +2870,168 @@ namespace panther{
 					const AST::TemplatedExpr& templated_expr = this->source.getTemplatedExpr(base_type_node);
 					const AST::Node& template_base_node = this->source.getNode(templated_expr.expr);
 
+
+
+					// find scope and struct data
+					auto ident_tok_id = Token::ID(std::numeric_limits<uint32_t>::max()); // fill with fake value
+					std::string_view ident;
+					size_t scope_index_with_struct_data = std::numeric_limits<size_t>::max(); // fill with fake value
+					ScopeManager::Scope::StructData* scope_struct_data = nullptr;
+
 					if(template_base_node.kind == AST::Kind::Infix){
 						this->source.error("Imported template types are not supported yet", template_base_node);
 						return evo::resultError;
-					}
 
-					const Token::ID ident_tok_id = template_base_node.token;
-					const Token& ident_tok = this->source.getToken(ident_tok_id);
-					const std::string_view ident = ident_tok.value.string;
+					}else{
+						evo::debugAssert(template_base_node.kind == AST::Kind::Ident);
 
+						ident_tok_id = template_base_node.token;
+						const Token& ident_tok = this->source.getToken(ident_tok_id);
+						ident = ident_tok.value.string;
 
-					type_qualifiers = type.qualifiers;
+						type_qualifiers = type.qualifiers;
 
-					for(size_t scope_index : scope_manager.get_scopes()){
-						ScopeManager::Scope* scope = &this->scope_alloc[scope_index];
+						for(size_t scope_index : scope_manager.get_scopes()){
+							ScopeManager::Scope* scope = &this->scope_alloc[scope_index];
 
-						if(scope->aliases.contains(ident)){
-							this->source.error("Templated aliases are not supported yet", template_base_node);
+							if(scope->aliases.contains(ident)){
+								this->source.error("Templated aliases are not supported yet", template_base_node);
+								return evo::resultError;
+
+							}else if(scope->structs.contains(ident)){
+								scope_struct_data = &scope->structs.at(ident);
+								scope_index_with_struct_data = scope_index;
+							}
+						}
+
+						if(scope_struct_data == nullptr){
+							// TODO: better messaging
+							this->source.error("Could not find type", template_base_node);
 							return evo::resultError;
-
-						}else if(scope->structs.contains(ident)){
-							ScopeManager::Scope::StructData* scope_struct_data = &scope->structs.at(ident);
-
-
-							if(scope_struct_data->is_template == false){
-								this->source.error("Template pack given for a non-templated type", template_base_node);
-								return evo::resultError;
-							}
-
-
-							const AST::Struct& ast_struct = *scope_struct_data->template_info.ast_struct;
-							const AST::TemplatePack& template_pack = this->source.getTemplatePack(*ast_struct.templatePack);
-
-							if(templated_expr.templateArgs.size() != template_pack.templates.size()){
-								// TODO: better messaging
-								this->source.error("Incorrect number of struct template arguments recieved", template_base_node);
-								return evo::resultError;
-							}
-
-
-							// get template args
-							ScopeManager template_scope_manager = *scope_struct_data->template_info.scope_manager;
-							template_scope_manager.enter_scope(nullptr);
-
-							//re-lookup scope because entering scope may have moved it
-							scope = &this->scope_alloc[scope_index];
-							scope_struct_data = &scope->structs.at(ident);
-
-							auto template_args = std::vector<PIR::TemplateArg>();
-							for(size_t i = 0; i < template_pack.templates.size(); i+=1){
-								const AST::TemplatePack::Template& template_param = template_pack.templates[i];
-
-								const AST::Node::ID template_arg_node_id = 	templated_expr.templateArgs[i];
-								// const AST::Node& template_arg_node = this->source.getNode(template_arg_node_id);
-
-								// check in for ident redefinition
-								const Token& template_param_ident_tok = this->source.getIdent(template_param.ident);
-								const std::string_view template_param_ident = template_param_ident_tok.value.string;
-								if(template_scope_manager.has_in_scope(template_param_ident)){
-									this->already_defined(template_param_ident_tok, template_scope_manager);
-									return evo::resultError;
-								}
-
-								// analyze template arguments and add to scope
-								if(template_param.isTypeKeyword){
-									const evo::Result<PIR::Type::VoidableID> template_arg_type_id = this->get_type_id(template_arg_node_id, scope_manager);
-									if(template_arg_type_id.isError()){ return evo::resultError; }
-
-									template_args.emplace_back(template_arg_type_id.value());
-									template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg_type_id.value()));
-
-								}else{ // is expr
-									// get template param type info
-									const evo::Result<PIR::Type::VoidableID> template_param_type_id = this->get_type_id(template_param.typeNode, template_scope_manager);
-									if(template_param_type_id.isError()){ return evo::resultError; }
-									if(template_param_type_id.value().isVoid()){
-										this->source.error("Template parameter type cannot be Void", template_param.typeNode);
-										return evo::resultError;
-									}
-
-									// get template arg type info
-									const evo::Result<ExprInfo> template_arg_info = this->analyze_expr(
-										this->source.getNode(template_arg_node_id), template_scope_manager, ExprValueKind::ConstEval
-									);
-									if(template_arg_info.isError()){ return evo::resultError; }
-									if(template_arg_info.value().type_id.has_value() == false){
-										this->source.error("Template parameter cannot be [uninit]", template_param.typeNode);
-										return evo::resultError;
-									}
-
-
-									// check that template args match template params
-									if(template_param_type_id.value().typeID() != *template_arg_info.value().type_id){
-										const PIR::Type& template_param_type = this->src_manager.getType(template_param_type_id.value().typeID());
-										const PIR::Type& template_arg_type = this->src_manager.getType(*template_arg_info.value().type_id);
-
-										if(this->is_implicitly_convertable_to(
-											template_arg_type, template_param_type, this->source.getNode(templated_expr.templateArgs[i])
-										) == false){
-											this->source.error("Template parameter expected different type", template_base_node,
-												{
-													Message::Info(
-														std::format("In template argument: {}", i)
-													),
-													Message::Info(
-														std::format("Template parameter type: {}", this->src_manager.printType(template_param_type_id.value().typeID()))
-													),
-													Message::Info(
-														std::format("Template argument type:  {}", this->src_manager.printType(*template_arg_info.value().type_id))
-													),
-												}
-											);
-											return evo::resultError;
-										}
-									}
-
-
-									template_args.emplace_back(template_param_type_id.value().typeID(), *template_arg_info.value().expr);
-									template_scope_manager.add_template_arg_to_scope(
-										template_param_ident, PIR::TemplateArg(template_param_type_id.value().typeID(), *template_arg_info.value().expr)
-									);
-								}
-							}
-
-							const SourceManager::GottenBaseTypeID gotten_base_type_id = this->src_manager.getOrCreateBaseType(
-								PIR::BaseType(PIR::BaseType::Kind::Struct, ident, &this->source, template_args)
-							);
-
-							if(gotten_base_type_id.created){
-								const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, scope_struct_data->template_info.num_created, gotten_base_type_id.id);
-								scope_struct_data->template_info.num_created += 1;
-
-								const bool analyze_struct_block_result = this->analyze_struct_block(struct_id, ast_struct, template_scope_manager);
-								
-								if(analyze_struct_block_result == false){ return evo::resultError; }
-							}
-
-							base_type_id = gotten_base_type_id.id;
-
-							template_scope_manager.leave_scope();
 						}
 					}
+
+
+
+					if(scope_struct_data->is_template == false){
+						this->source.error("Template pack given for a non-templated type", template_base_node);
+						return evo::resultError;
+					}
+
+
+					const AST::Struct& ast_struct = *scope_struct_data->template_info.ast_struct;
+					const AST::TemplatePack& template_pack = this->source.getTemplatePack(*ast_struct.templatePack);
+
+					if(templated_expr.templateArgs.size() != template_pack.templates.size()){
+						// TODO: better messaging
+						this->source.error("Incorrect number of struct template arguments recieved", template_base_node);
+						return evo::resultError;
+					}
+
+
+					// get template args
+					ScopeManager template_scope_manager = *scope_struct_data->template_info.scope_manager;
+					template_scope_manager.enter_scope(nullptr);
+
+					//re-lookup scope because entering scope may have moved it
+					scope_struct_data = &this->scope_alloc[scope_index_with_struct_data].structs.at(ident);
+
+					auto template_args = std::vector<PIR::TemplateArg>();
+					for(size_t i = 0; i < template_pack.templates.size(); i+=1){
+						const AST::TemplatePack::Template& template_param = template_pack.templates[i];
+
+						const AST::Node::ID template_arg_node_id = 	templated_expr.templateArgs[i];
+						// const AST::Node& template_arg_node = this->source.getNode(template_arg_node_id);
+
+						// check in for ident redefinition
+						const Token& template_param_ident_tok = this->source.getIdent(template_param.ident);
+						const std::string_view template_param_ident = template_param_ident_tok.value.string;
+						if(template_scope_manager.has_in_scope(template_param_ident)){
+							this->already_defined(template_param_ident_tok, template_scope_manager);
+							return evo::resultError;
+						}
+
+						// analyze template arguments and add to scope
+						if(template_param.isTypeKeyword){
+							const evo::Result<PIR::Type::VoidableID> template_arg_type_id = this->get_type_id(template_arg_node_id, scope_manager);
+							if(template_arg_type_id.isError()){ return evo::resultError; }
+
+							template_args.emplace_back(template_arg_type_id.value());
+							template_scope_manager.add_template_arg_to_scope(template_param_ident, PIR::TemplateArg(template_arg_type_id.value()));
+
+						}else{ // is expr
+							// get template param type info
+							const evo::Result<PIR::Type::VoidableID> template_param_type_id = this->get_type_id(template_param.typeNode, template_scope_manager);
+							if(template_param_type_id.isError()){ return evo::resultError; }
+							if(template_param_type_id.value().isVoid()){
+								this->source.error("Template parameter type cannot be Void", template_param.typeNode);
+								return evo::resultError;
+							}
+
+							// get template arg type info
+							const evo::Result<ExprInfo> template_arg_info = this->analyze_expr(
+								this->source.getNode(template_arg_node_id), scope_manager, ExprValueKind::ConstEval
+							);
+							if(template_arg_info.isError()){ return evo::resultError; }
+							if(template_arg_info.value().type_id.has_value() == false){
+								this->source.error("Template parameter cannot be [uninit]", template_param.typeNode);
+								return evo::resultError;
+							}
+
+
+							// check that template args match template params
+							if(template_param_type_id.value().typeID() != *template_arg_info.value().type_id){
+								const PIR::Type& template_param_type = this->src_manager.getType(template_param_type_id.value().typeID());
+								const PIR::Type& template_arg_type = this->src_manager.getType(*template_arg_info.value().type_id);
+
+								if(this->is_implicitly_convertable_to(
+									template_arg_type, template_param_type, this->source.getNode(templated_expr.templateArgs[i])
+								) == false){
+									this->source.error("Template parameter expected different type", template_base_node,
+										{
+											Message::Info(
+												std::format("In template argument: {}", i)
+											),
+											Message::Info(
+												std::format("Template parameter type: {}", this->src_manager.printType(template_param_type_id.value().typeID()))
+											),
+											Message::Info(
+												std::format("Template argument type:  {}", this->src_manager.printType(*template_arg_info.value().type_id))
+											),
+										}
+									);
+									return evo::resultError;
+								}
+							}
+
+
+							template_args.emplace_back(template_param_type_id.value().typeID(), *template_arg_info.value().expr);
+							template_scope_manager.add_template_arg_to_scope(
+								template_param_ident, PIR::TemplateArg(template_param_type_id.value().typeID(), *template_arg_info.value().expr)
+							);
+						}
+					}
+
+					const SourceManager::GottenBaseTypeID gotten_base_type_id = this->src_manager.getOrCreateBaseType(
+						PIR::BaseType(PIR::BaseType::Kind::Struct, ident, &this->source, template_args)
+					);
+
+					if(gotten_base_type_id.created){
+						const PIR::Struct::ID struct_id = this->source.createStruct(ident_tok_id, scope_struct_data->template_info.num_created, gotten_base_type_id.id);
+						scope_struct_data->template_info.num_created += 1;
+
+						const bool analyze_struct_block_result = this->analyze_struct_block(struct_id, ast_struct, template_scope_manager);
+						
+						if(analyze_struct_block_result == false){ return evo::resultError; }
+
+						if(scope_struct_data->template_info.isPub){
+							this->source.addPublicStruct(ident, struct_id);
+						}
+					}
+
+					base_type_id = gotten_base_type_id.id;
+
+					template_scope_manager.leave_scope();
 
 
 
@@ -3100,7 +3116,7 @@ namespace panther{
 
 
 	auto SemanticAnalyzer::get_import_source_id(const PIR::Expr& import_path, AST::Node::ID expr_node) const noexcept -> evo::Result<Source::ID> {
-		const std::string_view import_path_str = this->source.getLiteral(import_path.literal).value.string;
+		const std::string_view import_path_str = import_path.string;
 		const std::filesystem::path source_file_path = this->source.getLocation();
 		const evo::Expected<Source::ID, SourceManager::GetSourceIDError> imported_source_id_result =
 			this->src_manager.getSourceID(source_file_path, import_path_str);

@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.31.3
+- Fixed imports causing fatal error
+- Fixed incorrect error caused by passing a template expression parameter to a substruct template as a template argument
+- Fixed fatal crash when using `uninit` as a default value for a struct member
+
 ### v0.31.2
 - Removed the `cast` operator (merged with `as`)
 

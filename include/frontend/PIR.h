@@ -88,7 +88,6 @@ namespace panther{
 
 				VarID var;
 				ParamID param;
-				AST::Node::ID literal;
 				FuncCallID funcCall;
 				InitializerID initializer;
 				PrefixID prefix;

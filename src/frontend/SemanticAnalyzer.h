@@ -171,12 +171,14 @@ namespace panther{
 								struct{
 									const AST::Struct* ast_struct;
 									ScopeManager* scope_manager;
+									bool isPub;
+
 									uint32_t num_created = 0;
 								} template_info;
 							};
 
-							StructData(const AST::Struct& ast_struct, ScopeManager& scope_manager) noexcept 
-								: is_template(true), template_info(&ast_struct, &scope_manager) {};
+							StructData(const AST::Struct& ast_struct, ScopeManager& scope_manager, bool is_pub) noexcept 
+								: is_template(true), template_info(&ast_struct, &scope_manager, is_pub) {};
 
 							explicit StructData(PIR::Struct::ID _struct_id) noexcept 
 								: is_template(false), struct_id(_struct_id) {};

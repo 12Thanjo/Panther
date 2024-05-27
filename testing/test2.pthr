@@ -1,0 +1,7 @@
+
+
+struct Vec2 = <{T: Type, DEFAULT: T}> #pub {
+	var x: T = DEFAULT;
+	var y: T = DEFAULT;
+}
+
