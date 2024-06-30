@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.31.4
+- Updated README to alert of the movement of the project
+
 ### v0.31.3
 - Fixed imports causing fatal error
 - Fixed incorrect error caused by passing a template expression parameter to a substruct template as a template argument

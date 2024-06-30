@@ -2,6 +2,12 @@
 # Panther
 Statically typed, compiled, high-performance, general-purpose programming language.
 
+> [!IMPORTANT]
+> This repository is largely just a proof of concept. No further development of the repository is expected. However, the project itself is still being developed, and you can find it [here](https://github.com/PCIT-Project/PCIT-CPP) as part of the [PCIT project](https://github.com/PCIT-Project). 
+
+> [!WARNING]
+> Because the project has moved, this repository will be deleted at some point in the future.
+
 ### Notes:
 - This compiler is currently super early into development, so there's not any way to use it without directly editing settings in `pthr/main.cpp`
 - It is not robust yet. For example, it is possible to get it to have a fatal error in some cases while parsing
